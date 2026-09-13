@@ -18,6 +18,7 @@ async def test_home_page_is_rendered() -> None:
 
     assert response.status_code == 200
     assert "Реестр пейсмейкеров" in response.text
+    assert 'href="/static/styles.css"' in response.text
 
 
 @pytest.mark.anyio
