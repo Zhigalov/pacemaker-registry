@@ -1,0 +1,1 @@
+"""Pacemaker registry application."""

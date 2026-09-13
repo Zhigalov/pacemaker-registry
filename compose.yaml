@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pacemaker_registry
+      POSTGRES_USER: registry
+      POSTGRES_PASSWORD: registry-dev-password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U registry -d pacemaker_registry"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://registry:registry-dev-password@postgres:5432/pacemaker_registry
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
