@@ -11,7 +11,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from psycopg import Error as PsycopgError
 
-from pacemaker_registry.db import check_database, initialize_database, save_race_result
+from pacemaker_registry.db import (
+    Registry,
+    check_database,
+    initialize_database,
+    load_registry,
+    save_race_result,
+)
 from pacemaker_registry.russiarunning import (
     InvalidResultUrl,
     RussiaRunningError,
@@ -41,7 +47,17 @@ templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request=request, name="index.html")
+    registry_error = None
+    try:
+        registry = load_registry()
+    except (PsycopgError, RuntimeError):
+        registry = Registry(pacemakers=(), event_count=0, result_count=0)
+        registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={"registry": registry, "registry_error": registry_error},
+    )
 
 
 @app.get("/add", response_class=HTMLResponse)

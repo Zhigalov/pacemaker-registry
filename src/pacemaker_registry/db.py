@@ -1,6 +1,6 @@
 import os
-from dataclasses import asdict
-from decimal import Decimal
+from dataclasses import asdict, dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +12,34 @@ from pacemaker_registry.russiarunning import RaceResult, RussiaRunningError
 
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+
+
+@dataclass(frozen=True, slots=True)
+class RegistryResult:
+    id: int
+    event_id: int
+    event_name: str
+    distance_km: str
+    target_time: str
+    target_pace: str
+    chip_time: str
+    actual_pace: str
+    checkpoints: tuple[dict[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RegistryPacemaker:
+    id: int
+    full_name: str
+    initials: str
+    results: tuple[RegistryResult, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Registry:
+    pacemakers: tuple[RegistryPacemaker, ...]
+    event_count: int
+    result_count: int
 
 
 def connect_database() -> Connection[Any]:
@@ -48,6 +76,88 @@ def initialize_database() -> None:
 def check_database() -> None:
     with connect_database() as connection:
         connection.execute("SELECT 1").fetchone()
+
+
+def load_registry() -> Registry:
+    with connect_database() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                p.id,
+                p.last_name,
+                p.first_name,
+                rr.id,
+                e.id,
+                e.name,
+                rr.distance_km,
+                rr.target_time,
+                rr.chip_time,
+                rr.pace,
+                rr.checkpoints
+            FROM pacemakers AS p
+            JOIN race_results AS rr ON rr.pacemaker_id = p.id
+            JOIN events AS e ON e.id = rr.event_id
+            ORDER BY
+                lower(p.last_name),
+                lower(p.first_name),
+                rr.created_at DESC,
+                lower(e.name)
+            """
+        ).fetchall()
+
+    grouped: dict[int, dict[str, Any]] = {}
+    event_ids: set[int] = set()
+    for row in rows:
+        (
+            pacemaker_id,
+            last_name,
+            first_name,
+            result_id,
+            event_id,
+            event_name,
+            distance,
+            target_time,
+            chip_time,
+            actual_pace,
+            checkpoints,
+        ) = row
+        event_ids.add(event_id)
+        pacemaker = grouped.setdefault(
+            pacemaker_id,
+            {
+                "full_name": f"{last_name} {first_name}",
+                "initials": f"{last_name[0]}{first_name[0]}",
+                "results": [],
+            },
+        )
+        pacemaker["results"].append(
+            RegistryResult(
+                id=result_id,
+                event_id=event_id,
+                event_name=event_name,
+                distance_km=_format_registry_distance(distance),
+                target_time=target_time,
+                target_pace=_calculate_target_pace(target_time, distance),
+                chip_time=chip_time,
+                actual_pace=actual_pace,
+                checkpoints=tuple(checkpoints),
+            )
+        )
+
+    pacemakers = tuple(
+        RegistryPacemaker(
+            id=pacemaker_id,
+            full_name=data["full_name"],
+            initials=data["initials"],
+            results=tuple(data["results"]),
+        )
+        for pacemaker_id, data in grouped.items()
+    )
+    return Registry(
+        pacemakers=pacemakers,
+        event_count=len(event_ids),
+        result_count=len(rows),
+    )
 
 
 def save_race_result(result: RaceResult, target_time: str) -> bool:
@@ -120,3 +230,18 @@ def _split_athlete_name(full_name: str) -> tuple[str, str]:
     if len(parts) != 2:
         raise RussiaRunningError("Не удалось разделить фамилию и имя участника.")
     return parts[0], parts[1]
+
+
+def _calculate_target_pace(target_time: str, distance_km: Decimal) -> str:
+    hours, minutes = map(int, target_time.split(":"))
+    total_seconds = hours * 3600 + minutes * 60
+    seconds_per_km = int(
+        (Decimal(total_seconds) / distance_km).quantize(
+            Decimal("1"), rounding=ROUND_HALF_UP
+        )
+    )
+    return f"{seconds_per_km // 60:02d}:{seconds_per_km % 60:02d} /км"
+
+
+def _format_registry_distance(distance: Decimal) -> str:
+    return format(distance.normalize(), "f").replace(".", ",")

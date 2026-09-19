@@ -1,6 +1,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from pacemaker_registry.db import Registry, RegistryPacemaker, RegistryResult
 from pacemaker_registry.main import app
 from pacemaker_registry.russiarunning import Checkpoint, RaceResult
 
@@ -11,7 +12,40 @@ def anyio_backend() -> str:
 
 
 @pytest.mark.anyio
-async def test_home_page_is_rendered() -> None:
+async def test_home_page_is_rendered(monkeypatch) -> None:
+    registry = Registry(
+        pacemakers=(
+            RegistryPacemaker(
+                id=1,
+                full_name="Жигалов Сергей",
+                initials="ЖС",
+                results=(
+                    RegistryResult(
+                        id=1,
+                        event_id=1,
+                        event_name="Международный Когалымский полумарафон",
+                        distance_km="21,1",
+                        target_time="01:54",
+                        target_pace="05:24 /км",
+                        chip_time="01:53:53",
+                        actual_pace="05:23 /км",
+                        checkpoints=(
+                            {
+                                "distance_km": "5,00",
+                                "segment_distance_km": "5,00",
+                                "time": "27:29",
+                                "pace_per_km": "05:25",
+                            },
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        event_count=1,
+        result_count=1,
+    )
+    monkeypatch.setattr("pacemaker_registry.main.load_registry", lambda: registry)
+
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -21,7 +55,11 @@ async def test_home_page_is_rendered() -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/styles.css"' in response.text
     assert 'href="/add"' in response.text
-    assert "Добавить результат забега" in response.text
+    assert "Жигалов Сергей" in response.text
+    assert "Международный Когалымский полумарафон" in response.text
+    assert "05:24 /км" in response.text
+    assert "Детали результата" in response.text
+    assert "Здесь появится список выступлений" not in response.text
 
 
 @pytest.mark.anyio

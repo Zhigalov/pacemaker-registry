@@ -6,9 +6,10 @@
     <meta name="description" content="Реестр результатов пейсмейкеров">
     <title>Реестр пейсмейкеров</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/registry.js" defer></script>
   </head>
   <body>
-    <main class="app-shell">
+    <main class="app-shell app-shell--registry">
       <header class="site-header">
         <a class="brand" href="/" aria-label="Реестр пейсмейкеров — главная">
           <span class="brand-mark" aria-hidden="true">P</span>
@@ -20,23 +21,114 @@
         </a>
       </header>
 
-      <section class="registry-intro" aria-labelledby="page-title">
+      <section class="registry-heading" aria-labelledby="page-title">
         <div>
           <p class="eyebrow">Результаты забегов</p>
-          <h1 id="page-title">Реестр пейсмейкеров</h1>
-          <p class="lead">
-            Здесь появится список выступлений пейсмейкеров: дистанции,
-            контрольные точки и фактический темп.
-          </p>
+          <h1 id="page-title">Пейсмейкеры</h1>
         </div>
+        {% if registry.pacemakers %}
+          <dl class="registry-stats" aria-label="Статистика реестра">
+            <div><dt>Пэйсмейкеров</dt><dd>{{ registry.pacemakers | length }}</dd></div>
+            <div><dt>Соревнований</dt><dd>{{ registry.event_count }}</dd></div>
+            <div><dt>Результатов</dt><dd>{{ registry.result_count }}</dd></div>
+          </dl>
+        {% endif %}
       </section>
 
-      <section class="empty-state" aria-labelledby="empty-title">
-        <div class="empty-icon" aria-hidden="true">↗</div>
-        <h2 id="empty-title">Здесь появится список результатов</h2>
-        <p>Пока результаты можно добавлять по ссылке с RussiaRunning.</p>
-        <a class="button button--primary" href="/add">Добавить результат забега</a>
-      </section>
+      {% if registry_error %}
+        <div class="error-message registry-load-error" role="alert">{{ registry_error }}</div>
+      {% elif registry.pacemakers %}
+        <section class="registry-list" aria-label="Список пейсмейкеров">
+          <div class="registry-columns" aria-hidden="true">
+            <span>Пэйсмейкер</span>
+            <span>Соревнования</span>
+          </div>
+
+          {% for pacemaker in registry.pacemakers %}
+            <article class="pacemaker-row">
+              <header class="pacemaker-profile">
+                <span class="pacemaker-avatar" aria-hidden="true">{{ pacemaker.initials }}</span>
+                <div>
+                  <h2>{{ pacemaker.full_name }}</h2>
+                  <p>Результатов: {{ pacemaker.results | length }}</p>
+                </div>
+              </header>
+
+              <div class="results-strip">
+                {% for result in pacemaker.results %}
+                  <button
+                    class="result-summary"
+                    type="button"
+                    data-tooltip-id="result-details-{{ result.id }}"
+                    aria-describedby="result-details-{{ result.id }}"
+                  >
+                    <span class="result-event">{{ result.event_name }}</span>
+                    <span class="result-summary-data">
+                      <span>
+                        <small>Дистанция</small>
+                        <strong>{{ result.distance_km }} км</strong>
+                      </span>
+                      <span>
+                        <small>Целевой темп</small>
+                        <strong>{{ result.target_pace }}</strong>
+                      </span>
+                    </span>
+                    <span class="result-hint">Подробнее при наведении</span>
+                  </button>
+
+                  <div
+                    class="result-popover"
+                    id="result-details-{{ result.id }}"
+                    role="tooltip"
+                    popover="manual"
+                  >
+                    <div class="popover-heading">
+                      <p class="eyebrow">Детали результата</p>
+                      <h3>{{ result.event_name }}</h3>
+                    </div>
+                    <dl class="popover-facts">
+                      <div><dt>Дистанция</dt><dd>{{ result.distance_km }} км</dd></div>
+                      <div><dt>Время на флаге</dt><dd>{{ result.target_time }}</dd></div>
+                      <div><dt>Целевой темп</dt><dd>{{ result.target_pace }}</dd></div>
+                      <div><dt>Чип-тайм</dt><dd>{{ result.chip_time }}</dd></div>
+                      <div><dt>Фактический темп</dt><dd>{{ result.actual_pace }}</dd></div>
+                    </dl>
+                    {% if result.checkpoints %}
+                      <div class="popover-splits">
+                        <h4>Контрольные точки</h4>
+                        <div class="popover-table-wrap">
+                          <table>
+                            <thead>
+                              <tr><th>Точка</th><th>Отрезок</th><th>Время</th><th>Темп</th></tr>
+                            </thead>
+                            <tbody>
+                              {% for checkpoint in result.checkpoints %}
+                                <tr>
+                                  <td>{{ checkpoint.distance_km }} км</td>
+                                  <td>{{ checkpoint.segment_distance_km }} км</td>
+                                  <td>{{ checkpoint.time }}</td>
+                                  <td>{{ checkpoint.pace_per_km }} /км</td>
+                                </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            </article>
+          {% endfor %}
+        </section>
+      {% else %}
+        <section class="empty-state" aria-labelledby="empty-title">
+          <div class="empty-icon" aria-hidden="true">↗</div>
+          <h2 id="empty-title">В реестре пока нет результатов</h2>
+          <p>Добавьте результат по ссылке с RussiaRunning.</p>
+          <a class="button button--primary" href="/add">Добавить результат забега</a>
+        </section>
+      {% endif %}
     </main>
   </body>
 </html>
