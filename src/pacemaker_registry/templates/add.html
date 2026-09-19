@@ -8,18 +8,27 @@
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
-    <main class="page-shell page-shell--top">
-      <section class="panel" aria-labelledby="page-title">
-        <a class="back-link" href="/">← На главную</a>
-        <p class="eyebrow">Предпросмотр данных</p>
-        <h1 class="form-title" id="page-title">Добавить результат</h1>
-        <p class="lead lead--compact">
-          Вставьте ссылку на страницу участника RussiaRunning. Пока данные
-          только загружаются и показываются — в реестр они не сохраняются.
-        </p>
+    <main class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="Реестр пейсмейкеров — главная">
+          <span class="brand-mark" aria-hidden="true">P</span>
+          <span>Реестр пейсмейкеров</span>
+        </a>
+        <a class="quiet-link" href="/">← На главную</a>
+      </header>
+
+      <section class="form-card" aria-labelledby="page-title">
+        <div class="form-intro">
+          <p class="eyebrow">Новый результат</p>
+          <h1 id="page-title">Добавить результат забега</h1>
+          <p class="lead lead--compact">
+            Скопируйте ссылку на страницу участника RussiaRunning. Мы получим
+            данные и покажем их для проверки — пока ничего не сохраняется.
+          </p>
+        </div>
 
         <form class="result-form" method="post" action="/add">
-          <label for="result-url">Ссылка на результат</label>
+          <label for="result-url">Ссылка на страницу участника</label>
           <div class="form-row">
             <input
               id="result-url"
@@ -28,54 +37,85 @@
               required
               maxlength="500"
               autocomplete="off"
+              inputmode="url"
+              aria-describedby="url-example"
               placeholder="https://results.russiarunning.com/participant/..."
               value="{{ result_url }}"
             >
-            <button type="submit">Добавить</button>
+            <button class="button button--primary" type="submit">Получить данные</button>
           </div>
+          <p class="field-hint" id="url-example">
+            Например: <span>https://results.russiarunning.com/participant/Kogalymskiypolumarafon2026/21km/827f5fcd-eaaf-41c0-93d2-ed4fd58de206</span>
+          </p>
         </form>
 
         {% if error %}
-          <div class="error-message" role="alert">{{ error }}</div>
-        {% endif %}
-
-        {% if result %}
-          <section class="result-card" aria-labelledby="result-title">
-            <div class="result-heading">
-              <div>
-                <p class="eyebrow">Полученные данные</p>
-                <h2 id="result-title">{{ result.athlete_name }}</h2>
-              </div>
-              <a href="{{ result.source_url }}" target="_blank" rel="noreferrer">Источник ↗</a>
-            </div>
-
-            <dl class="result-facts">
-              <div><dt>Мероприятие</dt><dd>{{ result.event_name }}</dd></div>
-              <div><dt>Дистанция</dt><dd>{{ result.distance_km }} км</dd></div>
-              <div><dt>Chip time</dt><dd>{{ result.chip_time }}</dd></div>
-              <div><dt>Фактический темп</dt><dd>{{ result.pace }}</dd></div>
-            </dl>
-
-            <h3>Контрольные точки</h3>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Расстояние, км</th><th>Время</th><th>Темп, /км</th></tr>
-                </thead>
-                <tbody>
-                  {% for checkpoint in result.checkpoints %}
-                    <tr>
-                      <td>{{ checkpoint.distance_km }}</td>
-                      <td>{{ checkpoint.time }}</td>
-                      <td>{{ checkpoint.pace_per_km }}</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <div class="error-message" role="alert">
+            <strong>Не получилось получить результат.</strong>
+            <span>{{ error }}</span>
+          </div>
         {% endif %}
       </section>
+
+      {% if result %}
+        <section class="result-card" aria-labelledby="result-title">
+          <div class="review-notice" role="status">
+            <span class="review-icon" aria-hidden="true">✓</span>
+            <div>
+              <strong>Проверьте полученные данные</strong>
+              <p>Убедитесь, что имя, время и контрольные точки распознаны верно.</p>
+            </div>
+          </div>
+
+          <div class="result-heading">
+            <div>
+              <p class="eyebrow">Участник</p>
+              <h2 id="result-title">{{ result.athlete_name }}</h2>
+              <p class="event-name">{{ result.event_name }}</p>
+            </div>
+            <a class="source-link" href="{{ result.source_url }}" target="_blank" rel="noreferrer">Открыть источник ↗</a>
+          </div>
+
+          <dl class="result-facts">
+            <div>
+              <dt>Дистанция</dt>
+              <dd>{{ result.distance_km }} <span>км</span></dd>
+            </div>
+            <div>
+              <dt>Чип-тайм</dt>
+              <dd>{{ result.chip_time }}</dd>
+            </div>
+            <div>
+              <dt>Фактический темп</dt>
+              <dd>{{ result.pace }}</dd>
+            </div>
+          </dl>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Сплиты</p>
+              <h3>Контрольные точки</h3>
+            </div>
+            <span>{{ result.checkpoints | length }}</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Расстояние</th><th>Время</th><th>Темп</th></tr>
+              </thead>
+              <tbody>
+                {% for checkpoint in result.checkpoints %}
+                  <tr>
+                    <td data-label="Расстояние"><strong>{{ checkpoint.distance_km }}</strong> км</td>
+                    <td data-label="Время">{{ checkpoint.time }}</td>
+                    <td data-label="Темп">{{ checkpoint.pace_per_km }} <span class="unit">/км</span></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% endif %}
     </main>
   </body>
 </html>

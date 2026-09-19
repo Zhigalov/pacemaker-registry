@@ -3,24 +3,39 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Реестр имплантированных кардиостимуляторов">
+    <meta name="description" content="Реестр результатов пейсмейкеров">
     <title>Реестр пейсмейкеров</title>
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
-    <main class="page-shell">
-      <section class="hero" aria-labelledby="page-title">
-        <p class="eyebrow">Первый рабочий контур</p>
-        <h1 id="page-title">Реестр пейсмейкеров</h1>
-        <p class="lead">
-          Приложение запущено. На следующем шаге здесь появятся согласованные
-          поля реестра, поиск и управление записями.
-        </p>
-        <div class="status" role="status">
-          <span class="status-dot" aria-hidden="true"></span>
-          Веб-сервис работает
+    <main class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="Реестр пейсмейкеров — главная">
+          <span class="brand-mark" aria-hidden="true">P</span>
+          <span>Реестр пейсмейкеров</span>
+        </a>
+        <a class="button button--primary" href="/add">
+          <span aria-hidden="true">＋</span>
+          Добавить результат
+        </a>
+      </header>
+
+      <section class="registry-intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Результаты забегов</p>
+          <h1 id="page-title">Реестр пейсмейкеров</h1>
+          <p class="lead">
+            Здесь появится список выступлений пейсмейкеров: дистанции,
+            контрольные точки и фактический темп.
+          </p>
         </div>
-        <a class="primary-link" href="/add">Добавить результат забега</a>
+      </section>
+
+      <section class="empty-state" aria-labelledby="empty-title">
+        <div class="empty-icon" aria-hidden="true">↗</div>
+        <h2 id="empty-title">В реестре пока нет записей</h2>
+        <p>Загрузите первый результат по ссылке с RussiaRunning.</p>
+        <a class="button button--primary" href="/add">Добавить результат забега</a>
       </section>
     </main>
   </body>

@@ -21,6 +21,7 @@ async def test_home_page_is_rendered() -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/styles.css"' in response.text
     assert 'href="/add"' in response.text
+    assert "Добавить результат забега" in response.text
 
 
 @pytest.mark.anyio
@@ -56,6 +57,8 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     assert "Жигалов Сергей" in response.text
     assert "01:53:53" in response.text
     assert "27:29" in response.text
+    assert "Проверьте полученные данные" in response.text
+    assert "Контрольные точки" in response.text
 
 
 @pytest.mark.anyio
