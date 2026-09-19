@@ -32,9 +32,15 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
             event_name="Международный Когалымский полумарафон",
             distance_km="21,1",
             chip_time="01:53:53",
+            target_time="01:54",
             pace="05:23 /км",
             checkpoints=(
-                Checkpoint(distance_km="5,00", time="27:29", pace_per_km="05:25"),
+                Checkpoint(
+                    distance_km="5,00",
+                    segment_distance_km="5,00",
+                    time="27:29",
+                    pace_per_km="05:25",
+                ),
             ),
             source_url=value,
         )
@@ -56,7 +62,9 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     assert response.status_code == 200
     assert "Жигалов Сергей" in response.text
     assert "01:53:53" in response.text
+    assert 'value="01:54"' in response.text
     assert "27:29" in response.text
+    assert "Отрезок" in response.text
     assert "Проверьте полученные данные" in response.text
     assert "Контрольные точки" in response.text
 

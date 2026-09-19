@@ -32,6 +32,7 @@ class ParticipantLink:
 @dataclass(frozen=True, slots=True)
 class Checkpoint:
     distance_km: str
+    segment_distance_km: str
     time: str
     pace_per_km: str
 
@@ -42,6 +43,7 @@ class RaceResult:
     event_name: str
     distance_km: str
     chip_time: str
+    target_time: str
     pace: str
     checkpoints: tuple[Checkpoint, ...]
     source_url: str
@@ -107,6 +109,7 @@ def parse_result_payloads(
     }
     checkpoints: list[Checkpoint] = []
     finish_distance: Any = None
+    previous_checkpoint_distance = Decimal("0")
 
     for stage in options.get("stagesInfo", []):
         distance = stage.get("distance")
@@ -123,13 +126,17 @@ def parse_result_payloads(
         if not checkpoint_time or not checkpoint_pace:
             continue
 
+        checkpoint_distance = Decimal(str(distance))
+        segment_distance = checkpoint_distance - previous_checkpoint_distance
         checkpoints.append(
             Checkpoint(
-                distance_km=_format_distance(distance, fixed=True),
+                distance_km=_format_distance(checkpoint_distance, fixed=True),
+                segment_distance_km=_format_distance(segment_distance, fixed=True),
                 time=checkpoint_time,
                 pace_per_km=_pace_value(checkpoint_pace),
             )
         )
+        previous_checkpoint_distance = checkpoint_distance
 
     distance = finish_distance if finish_distance is not None else race.get("distance")
     if distance is None:
@@ -149,6 +156,7 @@ def parse_result_payloads(
         event_name=required_fields["event_name"],
         distance_km=_format_distance(distance),
         chip_time=required_fields["chip_time"],
+        target_time=guess_target_time(required_fields["chip_time"]),
         pace=required_fields["pace"],
         checkpoints=tuple(checkpoints),
         source_url=link.source_url,
@@ -224,3 +232,35 @@ def _format_distance(value: Any, *, fixed: bool = False) -> str:
 
 def _pace_value(value: str) -> str:
     return value.split()[0]
+
+
+def guess_target_time(chip_time: str) -> str:
+    """Guess the flag time from the nearest common pacemaker target."""
+    parts = chip_time.strip().split(":")
+    if len(parts) not in (2, 3) or not all(part.isdigit() for part in parts):
+        raise RussiaRunningError("Не удалось определить время на флаге.")
+
+    if len(parts) == 2:
+        hours = 0
+        minutes, seconds = map(int, parts)
+    else:
+        hours, minutes, seconds = map(int, parts)
+
+    if minutes >= 60 or seconds >= 60:
+        raise RussiaRunningError("Не удалось определить время на флаге.")
+
+    chip_seconds = hours * 3600 + minutes * 60 + seconds
+    center_minute = chip_seconds // 60
+    candidate_minutes = range(max(0, center_minute - 5), center_minute + 7)
+    candidates = [
+        minute * 60 for minute in candidate_minutes if minute % 5 in (0, 4)
+    ]
+    target_seconds = min(
+        candidates,
+        key=lambda candidate: (
+            abs(candidate - chip_seconds),
+            candidate < chip_seconds,
+        ),
+    )
+    target_minutes = target_seconds // 60
+    return f"{target_minutes // 60:02d}:{target_minutes % 60:02d}"

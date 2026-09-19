@@ -3,6 +3,7 @@ import pytest
 from pacemaker_registry.russiarunning import (
     Checkpoint,
     InvalidResultUrl,
+    guess_target_time,
     parse_participant_url,
     parse_result_payloads,
 )
@@ -81,8 +82,35 @@ def test_parse_result_uses_chip_time_and_absolute_checkpoint_time() -> None:
     assert result.event_name == "Международный Когалымский полумарафон"
     assert result.distance_km == "21,1"
     assert result.chip_time == "01:53:53"
+    assert result.target_time == "01:54"
     assert result.pace == "05:23 /км"
     assert result.checkpoints == (
-        Checkpoint(distance_km="5,00", time="27:29", pace_per_km="05:25"),
-        Checkpoint(distance_km="21,10", time="01:54:16", pace_per_km="05:24"),
+        Checkpoint(
+            distance_km="5,00",
+            segment_distance_km="5,00",
+            time="27:29",
+            pace_per_km="05:25",
+        ),
+        Checkpoint(
+            distance_km="21,10",
+            segment_distance_km="16,10",
+            time="01:54:16",
+            pace_per_km="05:24",
+        ),
     )
+
+
+@pytest.mark.parametrize(
+    ("chip_time", "expected"),
+    [
+        ("01:53:53", "01:54"),
+        ("01:54:20", "01:54"),
+        ("01:57:30", "01:59"),
+        ("01:30:02", "01:30"),
+        ("29:45", "00:30"),
+    ],
+)
+def test_guess_target_time_uses_nearest_common_flag_time(
+    chip_time: str, expected: str
+) -> None:
+    assert guess_target_time(chip_time) == expected
