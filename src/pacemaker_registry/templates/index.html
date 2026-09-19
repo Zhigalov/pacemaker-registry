@@ -61,8 +61,8 @@
                     type="button"
                     data-tooltip-id="result-details-{{ result.id }}"
                     aria-describedby="result-details-{{ result.id }}"
+                    aria-label="{{ result.event_name }}: {{ result.distance_km }} км, целевой темп {{ result.target_pace }}, фактический темп {{ result.actual_pace }}"
                   >
-                    <span class="result-event">{{ result.event_name }}</span>
                     <span class="result-summary-data">
                       <span>
                         <small>Дистанция</small>
@@ -72,8 +72,11 @@
                         <small>Целевой темп</small>
                         <strong>{{ result.target_pace }}</strong>
                       </span>
+                      <span>
+                        <small>Фактический темп</small>
+                        <strong>{{ result.actual_pace }}</strong>
+                      </span>
                     </span>
-                    <span class="result-hint">Подробнее при наведении</span>
                   </button>
 
                   <div

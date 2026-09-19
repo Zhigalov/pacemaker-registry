@@ -58,6 +58,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Жигалов Сергей" in response.text
     assert "Международный Когалымский полумарафон" in response.text
     assert "05:24 /км" in response.text
+    assert "05:23 /км" in response.text
+    assert 'class="result-event"' not in response.text
     assert "Детали результата" in response.text
     assert "Здесь появится список выступлений" not in response.text
 
@@ -106,8 +108,17 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     assert "27:29" in response.text
     assert "Отрезок" in response.text
     assert "Проверьте полученные данные" in response.text
+    assert "При необходимости скорректируйте время на флаге." in response.text
+    assert "Убедитесь, что имя, время" not in response.text
     assert "Контрольные точки" in response.text
     assert "Сохранить в реестр" in response.text
+    assert "Ожидаемый темп" in response.text
+    assert 'data-distance="21,1"' in response.text
+    assert 'src="/static/add.js"' in response.text
+    assert "пока ничего не сохраняется" not in response.text
+    assert response.text.index("Сохранить в реестр") < response.text.index(
+        "Контрольные точки"
+    )
 
 
 @pytest.mark.anyio
@@ -162,7 +173,9 @@ async def test_result_can_be_saved_after_review(monkeypatch) -> None:
     assert response.status_code == 200
     assert saved == ["01:55"]
     assert "Результат сохранён в реестр" in response.text
-    assert 'value="01:55"' in response.text
+    assert "Жигалов Сергей" not in response.text
+    assert 'value="01:55"' not in response.text
+    assert 'value=""' in response.text
 
 
 @pytest.mark.anyio

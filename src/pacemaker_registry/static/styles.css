@@ -189,8 +189,8 @@ h1 {
 .form-card h1 { font-size: clamp(1.75rem, 4vw, 2.55rem); }
 
 .result-form {
-  margin-top: 2rem;
-  padding-top: 1.65rem;
+  margin-top: 1.35rem;
+  padding-top: 1.25rem;
   border-top: 1px solid #e3eae7;
 }
 
@@ -241,6 +241,34 @@ input:focus { border-color: #278168; }
   line-height: 1.45;
 }
 
+.loading-button__busy {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.is-loading .loading-button__label { display: none; }
+.is-loading .loading-button__busy { display: inline-flex; }
+
+.loading-button:disabled {
+  cursor: wait;
+  opacity: 0.88;
+  transform: none;
+}
+
+.spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 0.13rem solid rgba(255, 255, 255, 0.42);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .result-card {
   max-width: 56rem;
   margin: 1.25rem auto 0;
@@ -264,6 +292,11 @@ input:focus { border-color: #278168; }
   border-color: #b9decf;
   background: #e9f7f1;
   color: #145843;
+}
+
+.success-message--compact {
+  align-items: center;
+  margin: 1rem 0 0;
 }
 
 .success-message p {
@@ -301,6 +334,13 @@ input:focus { border-color: #278168; }
   gap: 1.5rem;
 }
 
+.result-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 1rem;
+}
+
 .result-heading h2 {
   margin: 0;
   font-size: clamp(1.8rem, 4.5vw, 2.7rem);
@@ -314,14 +354,11 @@ input:focus { border-color: #278168; }
   line-height: 1.5;
 }
 
-.source-link {
-  flex: 0 0 auto;
-  margin-top: 1.4rem;
-}
+.source-link { flex: 0 0 auto; }
 
 .result-facts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
   gap: 0.75rem;
   margin: 2rem 0 2.5rem;
 }
@@ -376,7 +413,8 @@ input:focus { border-color: #278168; }
   opacity: 1;
 }
 
-.target-time-fact p {
+.target-time-fact p,
+.expected-pace-fact p {
   margin: 0.45rem 0 0;
   color: #71807b;
   font-size: 0.68rem;
@@ -486,7 +524,14 @@ tbody tr:hover { background: #fbfcfc; }
   }
 
   .form-row .button { width: 100%; }
-  .source-link { margin-top: 0; }
+
+  .result-heading-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+
+  .result-heading-actions .button { width: 100%; }
 
   .save-actions {
     align-items: stretch;
@@ -658,7 +703,7 @@ tbody tr:hover { background: #fbfcfc; }
 .results-strip {
   display: grid;
   min-width: 0;
-  grid-auto-columns: minmax(15rem, 18rem);
+  grid-auto-columns: minmax(17rem, 19rem);
   grid-auto-flow: column;
   justify-content: start;
   gap: 0.75rem;
@@ -669,13 +714,10 @@ tbody tr:hover { background: #fbfcfc; }
 }
 
 .result-summary {
-  display: flex;
-  min-height: 8.7rem;
+  display: block;
+  min-height: 4.7rem;
   min-width: 0;
-  align-items: stretch;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 1rem;
+  padding: 0.75rem 0.8rem;
   border: 1px solid #dce6e2;
   border-radius: 0.9rem;
   background: #fff;
@@ -694,21 +736,10 @@ tbody tr:hover { background: #fbfcfc; }
   transform: translateY(-2px);
 }
 
-.result-event {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 0.88rem;
-  font-weight: 740;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 .result-summary-data {
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr;
-  gap: 0.65rem;
-  margin-top: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
 }
 
 .result-summary-data span {
@@ -718,19 +749,14 @@ tbody tr:hover { background: #fbfcfc; }
 
 .result-summary-data small {
   color: #71807b;
-  font-size: 0.64rem;
+  font-size: 0.58rem;
+  line-height: 1.2;
 }
 
 .result-summary-data strong {
-  font-size: 0.87rem;
+  font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.result-hint {
-  margin-top: 0.8rem;
-  color: #8a9793;
-  font-size: 0.62rem;
 }
 
 .result-popover {
@@ -853,13 +879,9 @@ tbody tr:hover { background: #fbfcfc; }
   }
 
   .results-strip {
-    grid-auto-columns: minmax(14.5rem, 78vw);
+    grid-auto-columns: minmax(17rem, 82vw);
     margin-right: -1rem;
     padding-right: 1rem;
-  }
-
-  .result-hint {
-    display: none;
   }
 
   .result-popover table {
@@ -892,7 +914,6 @@ tbody tr:hover { background: #fbfcfc; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .result-summary {
-    transition: none;
-  }
+  .result-summary, .button { transition: none; }
+  .spinner { animation: none; }
 }

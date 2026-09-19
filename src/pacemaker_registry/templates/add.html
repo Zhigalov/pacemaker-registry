@@ -6,6 +6,7 @@
     <meta name="description" content="Получение результата пейсмейкера с RussiaRunning">
     <title>Добавить результат — Реестр пейсмейкеров</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/add.js" defer></script>
   </head>
   <body>
     <main class="app-shell">
@@ -21,13 +22,9 @@
         <div class="form-intro">
           <p class="eyebrow">Новый результат</p>
           <h1 id="page-title">Добавить результат забега</h1>
-          <p class="lead lead--compact">
-            Скопируйте ссылку на страницу участника RussiaRunning. Мы получим
-            данные и покажем их для проверки — пока ничего не сохраняется.
-          </p>
         </div>
 
-        <form class="result-form" method="post" action="/add">
+        <form class="result-form js-fetch-result" method="post" action="/add">
           <label for="result-url">Ссылка на страницу участника</label>
           <div class="form-row">
             <input
@@ -42,7 +39,13 @@
               placeholder="https://results.russiarunning.com/participant/..."
               value="{{ result_url }}"
             >
-            <button class="button button--primary" type="submit">Получить данные</button>
+            <button class="button button--primary loading-button" type="submit">
+              <span class="loading-button__label">Получить данные</span>
+              <span class="loading-button__busy">
+                <span class="spinner" aria-hidden="true"></span>
+                Получаем данные…
+              </span>
+            </button>
           </div>
           <p class="field-hint" id="url-example">
             Например: <span>https://results.russiarunning.com/participant/Kogalymskiypolumarafon2026/21km/827f5fcd-eaaf-41c0-93d2-ed4fd58de206</span>
@@ -55,27 +58,24 @@
             <span>{{ error }}</span>
           </div>
         {% endif %}
+
+        {% if saved_message %}
+          <div class="success-message success-message--compact" role="status">
+            <span class="review-icon" aria-hidden="true">✓</span>
+            <strong>{{ saved_message }}</strong>
+          </div>
+        {% endif %}
       </section>
 
       {% if result %}
         <section class="result-card" aria-labelledby="result-title">
-          {% if saved_message %}
-            <div class="success-message" role="status">
-              <span class="review-icon" aria-hidden="true">✓</span>
-              <div>
-                <strong>{{ saved_message }}</strong>
-                <p><a href="/add">Добавить ещё один результат</a></p>
-              </div>
+          <div class="review-notice" role="status">
+            <span class="review-icon" aria-hidden="true">✓</span>
+            <div>
+              <strong>Проверьте полученные данные</strong>
+              <p>При необходимости скорректируйте время на флаге.</p>
             </div>
-          {% else %}
-            <div class="review-notice" role="status">
-              <span class="review-icon" aria-hidden="true">✓</span>
-              <div>
-                <strong>Проверьте полученные данные</strong>
-                <p>Убедитесь, что имя, время и контрольные точки распознаны верно.</p>
-              </div>
-            </div>
-          {% endif %}
+          </div>
 
           <form class="save-result-form" method="post" action="/results">
             <input type="hidden" name="result_url" value="{{ result.source_url }}">
@@ -86,7 +86,10 @@
                 <h2 id="result-title">{{ result.athlete_name }}</h2>
                 <p class="event-name">{{ result.event_name }}</p>
               </div>
-              <a class="source-link" href="{{ result.source_url }}" target="_blank" rel="noreferrer">Открыть источник ↗</a>
+              <div class="result-heading-actions">
+                <a class="source-link" href="{{ result.source_url }}" target="_blank" rel="noreferrer">Открыть источник ↗</a>
+                <button class="button button--primary" type="submit">Сохранить в реестр</button>
+              </div>
             </div>
 
             <dl class="result-facts">
@@ -111,7 +114,6 @@
                     maxlength="5"
                     value="{{ result.target_time }}"
                     aria-describedby="target-time-hint"
-                    {% if saved_message %}disabled{% endif %}
                   >
                 </dd>
                 <p id="target-time-hint">Предположили по чип-тайму. Можно исправить.</p>
@@ -119,6 +121,13 @@
               <div>
                 <dt>Фактический темп</dt>
                 <dd>{{ result.pace }}</dd>
+              </div>
+              <div class="expected-pace-fact">
+                <dt>Ожидаемый темп</dt>
+                <dd>
+                  <output id="target-pace" for="target-time" data-distance="{{ result.distance_km }}">—</output>
+                </dd>
+                <p>Рассчитан по времени на флаге.</p>
               </div>
             </dl>
 
@@ -146,13 +155,6 @@
                 </tbody>
               </table>
             </div>
-
-            {% if not saved_message %}
-              <div class="save-actions">
-                <p>После сохранения результат появится в реестре.</p>
-                <button class="button button--primary" type="submit">Сохранить в реестр</button>
-              </div>
-            {% endif %}
           </form>
         </section>
       {% endif %}

@@ -128,6 +128,8 @@ async def save_result(
                 if created
                 else "Этот результат уже был сохранён — дубликат не добавлен."
             )
+            result = None
+            result_url = ""
         except InvalidResultUrl as exception:
             error = str(exception)
             status_code = 422
