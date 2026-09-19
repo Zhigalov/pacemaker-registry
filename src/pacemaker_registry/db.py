@@ -171,7 +171,7 @@ def load_registry() -> Registry:
             )
         )
     return Registry(
-        pacemakers=tuple(pacemakers),
+        pacemakers=_sort_pacemakers(pacemakers),
         event_count=len(event_ids),
         result_count=len(rows),
     )
@@ -267,7 +267,7 @@ def calculate_pacemaker_rating(target_time: str, chip_time: str) -> float:
         return 8 * exp((difference + 30) / 90)
     if difference <= 0:
         return 10 + difference / 15
-    return 10 * exp(-difference / 30)
+    return 10 * exp(-difference / 80)
 
 
 def _time_difference_seconds(target_time: str, chip_time: str) -> int:
@@ -297,6 +297,17 @@ def _rating_tone(rating: float) -> str:
     if rating >= 6:
         return "fair"
     return "low"
+
+
+def _sort_pacemakers(
+    pacemakers: list[RegistryPacemaker],
+) -> tuple[RegistryPacemaker, ...]:
+    return tuple(
+        sorted(
+            pacemakers,
+            key=lambda pacemaker: (-pacemaker.rating, pacemaker.full_name.casefold()),
+        )
+    )
 
 
 def _format_registry_distance(distance: Decimal) -> str:

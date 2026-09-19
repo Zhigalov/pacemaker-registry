@@ -3,8 +3,10 @@ from decimal import Decimal
 import pytest
 
 from pacemaker_registry.db import (
+    RegistryPacemaker,
     _calculate_target_pace,
     _format_time_difference,
+    _sort_pacemakers,
     calculate_pacemaker_rating,
 )
 
@@ -31,12 +33,17 @@ def test_rating_is_linear_in_the_target_zone(
     assert calculate_pacemaker_rating("02:00", chip_time) == expected
 
 
-def test_ten_seconds_late_matches_forty_seconds_early() -> None:
-    late = calculate_pacemaker_rating("02:00", "02:00:10")
+def test_ninety_six_seconds_late_scores_about_three() -> None:
+    rating = calculate_pacemaker_rating("01:39", "01:40:36")
+
+    assert rating == pytest.approx(3.01, abs=0.01)
+
+
+def test_late_finish_is_worse_than_equally_early_finish() -> None:
+    late = calculate_pacemaker_rating("02:00", "02:00:40")
     early = calculate_pacemaker_rating("02:00", "01:59:20")
 
-    assert late == pytest.approx(early, abs=0.01)
-    assert late == pytest.approx(7.17, abs=0.01)
+    assert late < early
 
 
 def test_exponential_rating_never_reaches_zero_for_realistic_result() -> None:
@@ -50,3 +57,19 @@ def test_exponential_rating_never_reaches_zero_for_realistic_result() -> None:
 )
 def test_format_time_difference(seconds: int, expected: str) -> None:
     assert _format_time_difference(seconds) == expected
+
+
+def test_pacemakers_are_sorted_by_rating_then_name() -> None:
+    pacemakers = [
+        RegistryPacemaker(1, "Петров Пётр", "ПП", 3.0, "low", ()),
+        RegistryPacemaker(2, "Сидоров Семён", "СС", 9.5, "excellent", ()),
+        RegistryPacemaker(3, "Алексеев Алексей", "АА", 9.5, "excellent", ()),
+    ]
+
+    sorted_pacemakers = _sort_pacemakers(pacemakers)
+
+    assert [item.full_name for item in sorted_pacemakers] == [
+        "Алексеев Алексей",
+        "Сидоров Семён",
+        "Петров Пётр",
+    ]

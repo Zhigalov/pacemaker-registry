@@ -70,8 +70,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert ">Факт<" in response.text
     assert "−7 с" in response.text
     assert "Как считается рейтинг" in response.text
-    assert "+10 секунд" in response.text
-    assert "7,2 балла" in response.text
+    assert "1:36" in response.text
+    assert "3,0 балла" in response.text
     assert "Детали результата" in response.text
     assert "Здесь появится список выступлений" not in response.text
 
