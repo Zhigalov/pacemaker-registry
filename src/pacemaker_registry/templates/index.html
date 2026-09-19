@@ -50,7 +50,16 @@
                 <span class="pacemaker-avatar" aria-hidden="true">{{ pacemaker.initials }}</span>
                 <div>
                   <h2>{{ pacemaker.full_name }}</h2>
-                  <p>Результатов: {{ pacemaker.results | length }}</p>
+                  <div
+                    class="pacemaker-rating pacemaker-rating--{{ pacemaker.rating_tone }}"
+                    aria-label="Рейтинг {{ '%.1f'|format(pacemaker.rating)|replace('.', ',') }} из 10"
+                  >
+                    <span class="pacemaker-rating-value">{{ "%.1f"|format(pacemaker.rating)|replace(".", ",") }}</span>
+                    <span class="pacemaker-rating-max">/10</span>
+                    <span class="rating-meter" aria-hidden="true">
+                      <span style="width: {{ pacemaker.rating * 10 }}%"></span>
+                    </span>
+                  </div>
                 </div>
               </header>
 
@@ -61,7 +70,7 @@
                     type="button"
                     data-tooltip-id="result-details-{{ result.id }}"
                     aria-describedby="result-details-{{ result.id }}"
-                    aria-label="{{ result.event_name }}: {{ result.distance_km }} км, целевой темп {{ result.target_pace }}, фактический темп {{ result.actual_pace }}"
+                    aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time }}, факт {{ result.chip_time }}, оценка {{ '%.1f'|format(result.rating) }} из 10"
                   >
                     <span class="result-summary-data">
                       <span>
@@ -69,12 +78,16 @@
                         <strong>{{ result.distance_km }} км</strong>
                       </span>
                       <span>
-                        <small>Целевой темп</small>
-                        <strong>{{ result.target_pace }}</strong>
+                        <small>Цель</small>
+                        <strong>{{ result.target_time }}</strong>
                       </span>
                       <span>
-                        <small>Фактический темп</small>
-                        <strong>{{ result.actual_pace }}</strong>
+                        <small>Факт</small>
+                        <strong>{{ result.chip_time }}</strong>
+                      </span>
+                      <span class="result-rating result-rating--{{ result.rating_tone }}">
+                        <small>Оценка</small>
+                        <strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong>
                       </span>
                     </span>
                   </button>
@@ -95,6 +108,10 @@
                       <div><dt>Целевой темп</dt><dd>{{ result.target_pace }}</dd></div>
                       <div><dt>Чип-тайм</dt><dd>{{ result.chip_time }}</dd></div>
                       <div><dt>Фактический темп</dt><dd>{{ result.actual_pace }}</dd></div>
+                      <div><dt>Отклонение</dt><dd>{{ result.time_difference }}</dd></div>
+                      <div class="popover-rating popover-rating--{{ result.rating_tone }}">
+                        <dt>Оценка</dt><dd>{{ "%.1f"|format(result.rating)|replace(".", ",") }} / 10</dd>
+                      </div>
                     </dl>
                     {% if result.checkpoints %}
                       <div class="popover-splits">
@@ -124,6 +141,44 @@
             </article>
           {% endfor %}
         </section>
+
+        <details class="rating-methodology">
+          <summary>
+            <span>Как считается рейтинг</span>
+            <span class="rating-methodology-hint">Формула и логика оценки</span>
+          </summary>
+          <div class="rating-methodology-content">
+            <p>
+              Сначала считаем отклонение <strong>Δ</strong> в секундах:
+              фактическое чип-время минус время на флаге. Отрицательное значение
+              означает финиш раньше цели, положительное — опоздание.
+            </p>
+            <div class="rating-zones">
+              <div>
+                <strong>От −30 до 0 секунд</strong>
+                <span>Оценка растёт линейно от 8 до 10. Финиш ровно в цель даёт 10.</span>
+              </div>
+              <div>
+                <strong>Раньше чем на 30 секунд</strong>
+                <span>Оценка плавно снижается по экспоненте с масштабом 90 секунд.</span>
+              </div>
+              <div>
+                <strong>Позже цели</strong>
+                <span>Оценка снижается втрое быстрее — опоздание для пейсера критичнее.</span>
+              </div>
+            </div>
+            <div class="rating-formula" aria-label="Формула рейтинга">
+              <code>−30 ≤ Δ ≤ 0: 10 + Δ / 15</code>
+              <code>Δ &lt; −30: 8 × e<sup>(Δ + 30) / 90</sup></code>
+              <code>Δ &gt; 0: 10 × e<sup>−Δ / 30</sup></code>
+            </div>
+            <p class="rating-example">
+              Для ориентира: <strong>+10 секунд</strong> и <strong>−40 секунд</strong>
+              дают примерно одинаковые <strong>7,2 балла</strong>. Оценка стремится к нулю,
+              но не достигает его. Рейтинг пейсера — среднее всех его выступлений.
+            </p>
+          </div>
+        </details>
       {% else %}
         <section class="empty-state" aria-labelledby="empty-title">
           <div class="empty-icon" aria-hidden="true">↗</div>

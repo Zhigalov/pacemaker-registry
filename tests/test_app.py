@@ -19,6 +19,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
                 id=1,
                 full_name="Жигалов Сергей",
                 initials="ЖС",
+                rating=9.533,
+                rating_tone="excellent",
                 results=(
                     RegistryResult(
                         id=1,
@@ -29,6 +31,9 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
                         target_pace="05:24 /км",
                         chip_time="01:53:53",
                         actual_pace="05:23 /км",
+                        rating=9.533,
+                        rating_tone="excellent",
+                        time_difference="−7 с",
                         checkpoints=(
                             {
                                 "distance_km": "5,00",
@@ -60,6 +65,13 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "05:24 /км" in response.text
     assert "05:23 /км" in response.text
     assert 'class="result-event"' not in response.text
+    assert "Рейтинг 9,5 из 10" in response.text
+    assert ">Цель<" in response.text
+    assert ">Факт<" in response.text
+    assert "−7 с" in response.text
+    assert "Как считается рейтинг" in response.text
+    assert "+10 секунд" in response.text
+    assert "7,2 балла" in response.text
     assert "Детали результата" in response.text
     assert "Здесь появится список выступлений" not in response.text
 

@@ -1,6 +1,7 @@
 import os
 from dataclasses import asdict, dataclass
 from decimal import ROUND_HALF_UP, Decimal
+from math import exp
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,9 @@ class RegistryResult:
     target_pace: str
     chip_time: str
     actual_pace: str
+    rating: float
+    rating_tone: str
+    time_difference: str
     checkpoints: tuple[dict[str, str], ...]
 
 
@@ -32,6 +36,8 @@ class RegistryPacemaker:
     id: int
     full_name: str
     initials: str
+    rating: float
+    rating_tone: str
     results: tuple[RegistryResult, ...]
 
 
@@ -130,6 +136,7 @@ def load_registry() -> Registry:
                 "results": [],
             },
         )
+        rating = calculate_pacemaker_rating(target_time, chip_time)
         pacemaker["results"].append(
             RegistryResult(
                 id=result_id,
@@ -140,21 +147,31 @@ def load_registry() -> Registry:
                 target_pace=_calculate_target_pace(target_time, distance),
                 chip_time=chip_time,
                 actual_pace=actual_pace,
+                rating=rating,
+                rating_tone=_rating_tone(rating),
+                time_difference=_format_time_difference(
+                    _time_difference_seconds(target_time, chip_time)
+                ),
                 checkpoints=tuple(checkpoints),
             )
         )
 
-    pacemakers = tuple(
-        RegistryPacemaker(
-            id=pacemaker_id,
-            full_name=data["full_name"],
-            initials=data["initials"],
-            results=tuple(data["results"]),
+    pacemakers = []
+    for pacemaker_id, data in grouped.items():
+        results = tuple(data["results"])
+        rating = sum(result.rating for result in results) / len(results)
+        pacemakers.append(
+            RegistryPacemaker(
+                id=pacemaker_id,
+                full_name=data["full_name"],
+                initials=data["initials"],
+                rating=rating,
+                rating_tone=_rating_tone(rating),
+                results=results,
+            )
         )
-        for pacemaker_id, data in grouped.items()
-    )
     return Registry(
-        pacemakers=pacemakers,
+        pacemakers=tuple(pacemakers),
         event_count=len(event_ids),
         result_count=len(rows),
     )
@@ -241,6 +258,45 @@ def _calculate_target_pace(target_time: str, distance_km: Decimal) -> str:
         )
     )
     return f"{seconds_per_km // 60:02d}:{seconds_per_km % 60:02d} /км"
+
+
+def calculate_pacemaker_rating(target_time: str, chip_time: str) -> float:
+    """Rate how closely the chip time matches the flag time on a 0–10 scale."""
+    difference = _time_difference_seconds(target_time, chip_time)
+    if difference < -30:
+        return 8 * exp((difference + 30) / 90)
+    if difference <= 0:
+        return 10 + difference / 15
+    return 10 * exp(-difference / 30)
+
+
+def _time_difference_seconds(target_time: str, chip_time: str) -> int:
+    target_hours, target_minutes = map(int, target_time.split(":"))
+    chip_hours, chip_minutes, chip_seconds = map(int, chip_time.split(":"))
+    target_seconds = target_hours * 3600 + target_minutes * 60
+    actual_seconds = chip_hours * 3600 + chip_minutes * 60 + chip_seconds
+    return actual_seconds - target_seconds
+
+
+def _format_time_difference(seconds: int) -> str:
+    if seconds == 0:
+        return "ровно"
+    sign = "+" if seconds > 0 else "−"
+    absolute = abs(seconds)
+    if absolute < 60:
+        return f"{sign}{absolute} с"
+    minutes, remaining_seconds = divmod(absolute, 60)
+    return f"{sign}{minutes}:{remaining_seconds:02d}"
+
+
+def _rating_tone(rating: float) -> str:
+    if rating >= 9:
+        return "excellent"
+    if rating >= 8:
+        return "good"
+    if rating >= 6:
+        return "fair"
+    return "low"
 
 
 def _format_registry_distance(distance: Decimal) -> str:
