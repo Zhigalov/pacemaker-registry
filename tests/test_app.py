@@ -29,6 +29,8 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     async def fake_load_race_result(value: str) -> RaceResult:
         return RaceResult(
             athlete_name="Жигалов Сергей",
+            source_event_id="490b438c-8b18-4162-8382-4f1b480960cd",
+            source_participant_id="827f5fcd-eaaf-41c0-93d2-ed4fd58de206",
             event_name="Международный Когалымский полумарафон",
             distance_km="21,1",
             chip_time="01:53:53",
@@ -67,6 +69,102 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     assert "Отрезок" in response.text
     assert "Проверьте полученные данные" in response.text
     assert "Контрольные точки" in response.text
+    assert "Сохранить в реестр" in response.text
+
+
+@pytest.mark.anyio
+async def test_result_can_be_saved_after_review(monkeypatch) -> None:
+    result = RaceResult(
+        athlete_name="Жигалов Сергей",
+        source_event_id="490b438c-8b18-4162-8382-4f1b480960cd",
+        source_participant_id="827f5fcd-eaaf-41c0-93d2-ed4fd58de206",
+        event_name="Международный Когалымский полумарафон",
+        distance_km="21,1",
+        chip_time="01:53:53",
+        target_time="01:54",
+        pace="05:23 /км",
+        checkpoints=(
+            Checkpoint(
+                distance_km="5,00",
+                segment_distance_km="5,00",
+                time="27:29",
+                pace_per_km="05:25",
+            ),
+        ),
+        source_url=(
+            "https://results.russiarunning.com/participant/event/race/"
+            "827f5fcd-eaaf-41c0-93d2-ed4fd58de206"
+        ),
+    )
+
+    async def fake_load_race_result(_: str) -> RaceResult:
+        return result
+
+    saved: list[str] = []
+
+    def fake_save_race_result(_: RaceResult, target_time: str) -> bool:
+        saved.append(target_time)
+        return True
+
+    monkeypatch.setattr(
+        "pacemaker_registry.main.load_race_result", fake_load_race_result
+    )
+    monkeypatch.setattr(
+        "pacemaker_registry.main.save_race_result", fake_save_race_result
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/results",
+            data={"result_url": result.source_url, "target_time": "01:55"},
+        )
+
+    assert response.status_code == 200
+    assert saved == ["01:55"]
+    assert "Результат сохранён в реестр" in response.text
+    assert 'value="01:55"' in response.text
+
+
+@pytest.mark.anyio
+async def test_duplicate_result_is_not_added(monkeypatch) -> None:
+    result = RaceResult(
+        athlete_name="Жигалов Сергей",
+        source_event_id="event-id",
+        source_participant_id="827f5fcd-eaaf-41c0-93d2-ed4fd58de206",
+        event_name="Забег",
+        distance_km="5",
+        chip_time="00:29:53",
+        target_time="00:30",
+        pace="05:59 /км",
+        checkpoints=(),
+        source_url=(
+            "https://results.russiarunning.com/participant/event/race/"
+            "827f5fcd-eaaf-41c0-93d2-ed4fd58de206"
+        ),
+    )
+
+    async def fake_load_race_result(_: str) -> RaceResult:
+        return result
+
+    monkeypatch.setattr(
+        "pacemaker_registry.main.load_race_result", fake_load_race_result
+    )
+    monkeypatch.setattr(
+        "pacemaker_registry.main.save_race_result", lambda *_: False
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/results",
+            data={"result_url": result.source_url, "target_time": "00:30"},
+        )
+
+    assert response.status_code == 200
+    assert "дубликат не добавлен" in response.text
 
 
 @pytest.mark.anyio

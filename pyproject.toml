@@ -29,4 +29,4 @@ testpaths = ["tests"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-pacemaker_registry = ["templates/*.html", "static/*.css"]
+pacemaker_registry = ["templates/*.html", "static/*.css", "schema.sql"]

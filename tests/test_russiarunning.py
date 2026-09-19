@@ -39,6 +39,7 @@ def test_parse_participant_url_rejects_unsafe_urls(url: str) -> None:
 def test_parse_result_uses_chip_time_and_absolute_checkpoint_time() -> None:
     link = parse_participant_url(RESULT_URL)
     event = {
+        "id": "490b438c-8b18-4162-8382-4f1b480960cd",
         "title": "Международный Когалымский полумарафон",
         "races": [{"id": "race-id", "code": "21km", "distance": 21}],
     }
@@ -79,6 +80,8 @@ def test_parse_result_uses_chip_time_and_absolute_checkpoint_time() -> None:
     result = parse_result_payloads(link, event, options, profile)
 
     assert result.athlete_name == "Жигалов Сергей"
+    assert result.source_event_id == "490b438c-8b18-4162-8382-4f1b480960cd"
+    assert result.source_participant_id == "827f5fcd-eaaf-41c0-93d2-ed4fd58de206"
     assert result.event_name == "Международный Когалымский полумарафон"
     assert result.distance_km == "21,1"
     assert result.chip_time == "01:53:53"

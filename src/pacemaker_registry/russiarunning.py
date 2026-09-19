@@ -40,6 +40,8 @@ class Checkpoint:
 @dataclass(frozen=True, slots=True)
 class RaceResult:
     athlete_name: str
+    source_event_id: str
+    source_participant_id: str
     event_name: str
     distance_km: str
     chip_time: str
@@ -144,6 +146,7 @@ def parse_result_payloads(
 
     required_fields = {
         "athlete_name": participant.get("fullName"),
+        "source_event_id": event.get("id"),
         "event_name": event.get("title"),
         "chip_time": participant.get("individualResult"),
         "pace": participant.get("pace"),
@@ -153,6 +156,8 @@ def parse_result_payloads(
 
     return RaceResult(
         athlete_name=required_fields["athlete_name"],
+        source_event_id=str(required_fields["source_event_id"]),
+        source_participant_id=link.participant_id,
         event_name=required_fields["event_name"],
         distance_km=_format_distance(distance),
         chip_time=required_fields["chip_time"],
