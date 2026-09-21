@@ -39,6 +39,12 @@ def test_ninety_six_seconds_late_scores_about_three() -> None:
     assert rating == pytest.approx(3.01, abs=0.01)
 
 
+def test_rating_accepts_sub_hour_chip_time_without_hours() -> None:
+    rating = calculate_pacemaker_rating("00:59", "59:05")
+
+    assert rating == pytest.approx(9.39, abs=0.01)
+
+
 def test_late_finish_is_worse_than_equally_early_finish() -> None:
     late = calculate_pacemaker_rating("02:00", "02:00:40")
     early = calculate_pacemaker_rating("02:00", "01:59:20")

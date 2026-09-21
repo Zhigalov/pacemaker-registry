@@ -272,7 +272,14 @@ def calculate_pacemaker_rating(target_time: str, chip_time: str) -> float:
 
 def _time_difference_seconds(target_time: str, chip_time: str) -> int:
     target_hours, target_minutes = map(int, target_time.split(":"))
-    chip_hours, chip_minutes, chip_seconds = map(int, chip_time.split(":"))
+    chip_parts = [int(part) for part in chip_time.split(":")]
+    if len(chip_parts) == 2:
+        chip_hours = 0
+        chip_minutes, chip_seconds = chip_parts
+    elif len(chip_parts) == 3:
+        chip_hours, chip_minutes, chip_seconds = chip_parts
+    else:
+        raise ValueError(f"Unsupported chip time format: {chip_time!r}")
     target_seconds = target_hours * 3600 + target_minutes * 60
     actual_seconds = chip_hours * 3600 + chip_minutes * 60 + chip_seconds
     return actual_seconds - target_seconds
