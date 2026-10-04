@@ -87,6 +87,11 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Зеркальный допуск" in response.text
     assert "Формула рейтинга" not in response.text
     assert "rating-chart-line" in response.text
+    assert 'data-rating-chart data-rating-mode="strict"' in response.text
+    assert 'data-rating-chart data-rating-mode="symmetric"' in response.text
+    assert "±45 секунд" in response.text
+    assert 'aria-label="Показать, как считается рейтинг"' in response.text
+    assert 'aria-controls="rating-methodology"' in response.text
     assert "Детали результата" in response.text
     assert "Здесь появится список выступлений" not in response.text
     assert "Все соревнования" in response.text

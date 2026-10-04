@@ -652,12 +652,42 @@ tbody tr:hover { background: #fbfcfc; }
   gap: 0.4rem;
 }
 
-.registry-filter-field > label {
+.registry-filter-field label {
   color: #71807b;
   font-size: 0.72rem;
   font-weight: 720;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.registry-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rating-help {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 1px solid #9caca7;
+  border-radius: 50%;
+  background: transparent;
+  color: #53645e;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  place-items: center;
+  cursor: pointer;
+}
+
+.rating-help:hover,
+.rating-help:focus-visible {
+  border-color: #278168;
+  color: #176f59;
+  outline: none;
 }
 
 .registry-filter-select {
@@ -1007,6 +1037,7 @@ tbody tr:hover { background: #fbfcfc; }
 }
 
 .rating-methodology {
+  scroll-margin-top: 1rem;
   margin-top: 1rem;
   border: 1px solid #dfe7e4;
   border-radius: 1rem;
@@ -1137,6 +1168,7 @@ tbody tr:hover { background: #fbfcfc; }
 }
 
 .rating-chart {
+  position: relative;
   padding: 0.35rem 0.35rem 0;
   border-radius: 0.7rem;
   background: #f7f9f8;
@@ -1147,6 +1179,13 @@ tbody tr:hover { background: #fbfcfc; }
   width: 100%;
   height: auto;
   overflow: visible;
+  border-radius: 0.55rem;
+  outline: none;
+  touch-action: pan-y;
+}
+
+.rating-chart svg:focus-visible {
+  box-shadow: 0 0 0 0.2rem rgba(39, 129, 104, 0.2);
 }
 
 .rating-chart text {
@@ -1159,6 +1198,7 @@ tbody tr:hover { background: #fbfcfc; }
   fill: none;
   stroke: #dce5e2;
   stroke-width: 1;
+  pointer-events: none;
 }
 
 .rating-chart-line {
@@ -1167,12 +1207,77 @@ tbody tr:hover { background: #fbfcfc; }
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 4;
+  pointer-events: none;
 }
 
-.rating-chart-note {
-  fill: #527169 !important;
-  font-size: 10px !important;
-  font-weight: 700;
+.rating-chart-axis {
+  pointer-events: none;
+}
+
+.rating-chart-key-points circle {
+  fill: #fff;
+  stroke: #278168;
+  stroke-width: 3;
+  pointer-events: none;
+}
+
+.rating-chart-cursor {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.rating-chart--active .rating-chart-cursor {
+  opacity: 1;
+}
+
+.rating-chart-cursor line {
+  stroke: #173c32;
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+}
+
+.rating-chart-cursor circle {
+  fill: #fff;
+  stroke: #173c32;
+  stroke-width: 3;
+}
+
+.rating-chart-hit {
+  fill: transparent;
+  cursor: crosshair;
+  pointer-events: all;
+}
+
+.rating-chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  min-width: 5.7rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid #b9ccc5;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: #23483e;
+  box-shadow: 0 0.4rem 1rem rgba(25, 65, 54, 0.13);
+  font-size: 0.65rem;
+  line-height: 1.25;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 0.45rem));
+}
+
+.rating-chart-tooltip[hidden] {
+  display: none;
+}
+
+.rating-chart-tooltip--below {
+  transform: translate(-50%, 0.75rem);
+}
+
+.rating-chart-tooltip strong {
+  color: #173c32;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .rating-example { color: #43564f; }

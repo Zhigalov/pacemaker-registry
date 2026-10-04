@@ -35,10 +35,10 @@ TARGET_TIME_PATTERN = re.compile(r"^[0-9]{1,2}:[0-5][0-9]$")
 
 def _rating_chart_points(rating_mode: str) -> str:
     points = []
-    for difference in range(-300, 301, 15):
+    for difference in range(-75, 76, 3):
         rating = calculate_rating_for_difference(difference, rating_mode)
-        x = 36 + (difference + 300) / 600 * 488
-        y = 18 + (10 - rating) / 10 * 152
+        x = 48 + (difference + 75) / 150 * 564
+        y = 18 + (10 - rating) / 10 * 184
         points.append(f"{x:.1f},{y:.1f}")
     return " ".join(points)
 

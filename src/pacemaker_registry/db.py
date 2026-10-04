@@ -323,15 +323,15 @@ def resolve_rating_mode(target_time: str, rating_mode: str) -> str:
 def calculate_rating_for_difference(difference: int, rating_mode: str) -> float:
     if rating_mode == RATING_MODE_SYMMETRIC:
         absolute_difference = abs(difference)
-        if absolute_difference <= 90:
-            return 10 - 2 * absolute_difference / 90
-        return 8 * exp(-(absolute_difference - 90) / 180)
+        if absolute_difference <= 45:
+            return 10 - absolute_difference / 15
+        return 7 * exp(-(absolute_difference - 45) / 30)
 
-    if difference < -90:
-        return 8 * exp((difference + 90) / 180)
+    if difference < -45:
+        return 7 * exp((difference + 45) / 30)
     if difference <= 0:
-        return 10 + 2 * difference / 90
-    return 10 * exp(-difference / 80)
+        return 10 + difference / 15
+    return 10 * exp(-difference / 30)
 
 
 def calculate_pacemaker_rating(

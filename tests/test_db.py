@@ -30,8 +30,9 @@ def test_calculate_target_pace_rounds_to_nearest_second() -> None:
     ("chip_time", "expected"),
     [
         ("02:00:00", 10),
-        ("01:59:15", 9),
-        ("01:58:30", 8),
+        ("01:59:45", 9),
+        ("01:59:30", 8),
+        ("01:59:15", 7),
     ],
 )
 def test_rating_is_linear_in_the_target_zone(
@@ -40,16 +41,16 @@ def test_rating_is_linear_in_the_target_zone(
     assert calculate_pacemaker_rating("02:00", chip_time) == pytest.approx(expected)
 
 
-def test_symmetric_rating_treats_ninety_six_seconds_as_just_outside_corridor() -> None:
+def test_symmetric_rating_falls_quickly_outside_the_corridor() -> None:
     rating = calculate_pacemaker_rating("01:39", "01:40:36")
 
-    assert rating == pytest.approx(7.74, abs=0.01)
+    assert rating == pytest.approx(1.28, abs=0.01)
 
 
 def test_rating_accepts_sub_hour_chip_time_without_hours() -> None:
     rating = calculate_pacemaker_rating("00:59", "59:05")
 
-    assert rating == pytest.approx(9.89, abs=0.01)
+    assert rating == pytest.approx(9.67, abs=0.01)
 
 
 def test_automatic_mode_selects_model_from_target_minutes() -> None:
@@ -59,11 +60,28 @@ def test_automatic_mode_selects_model_from_target_minutes() -> None:
     assert resolve_rating_mode("01:59", RATING_MODE_AUTOMATIC) == RATING_MODE_SYMMETRIC
 
 
-def test_symmetric_mode_scores_equal_deviations_equally() -> None:
-    early = calculate_rating_for_difference(-45, RATING_MODE_SYMMETRIC)
-    late = calculate_rating_for_difference(45, RATING_MODE_SYMMETRIC)
+@pytest.mark.parametrize(("difference", "expected"), [(15, 9), (30, 8), (45, 7)])
+def test_symmetric_mode_has_linear_fifteen_second_steps(
+    difference: int, expected: float
+) -> None:
+    assert calculate_rating_for_difference(-difference, RATING_MODE_SYMMETRIC) == expected
+    assert calculate_rating_for_difference(difference, RATING_MODE_SYMMETRIC) == expected
 
-    assert early == late == 9
+
+@pytest.mark.parametrize(("difference", "expected"), [(-15, 9), (-30, 8), (-45, 7)])
+def test_strict_mode_has_linear_steps_before_target(
+    difference: int, expected: float
+) -> None:
+    assert calculate_rating_for_difference(difference, RATING_MODE_STRICT) == expected
+
+
+def test_exponential_penalty_is_steep_after_linear_corridor() -> None:
+    assert calculate_rating_for_difference(75, RATING_MODE_SYMMETRIC) == pytest.approx(
+        2.58, abs=0.01
+    )
+    assert calculate_rating_for_difference(45, RATING_MODE_STRICT) == pytest.approx(
+        2.23, abs=0.01
+    )
 
 
 def test_strict_mode_penalizes_late_finish_more_than_early_finish() -> None:

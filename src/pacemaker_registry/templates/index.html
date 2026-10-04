@@ -52,7 +52,16 @@
               </span>
             </div>
             <div class="registry-filter-field registry-filter-field--rating">
-              <label for="rating-mode-filter">Модель рейтинга</label>
+              <div class="registry-filter-label">
+                <label for="rating-mode-filter">Модель рейтинга</label>
+                <button
+                  class="rating-help"
+                  type="button"
+                  aria-label="Показать, как считается рейтинг"
+                  aria-controls="rating-methodology"
+                  data-rating-help
+                >?</button>
+              </div>
               <span class="registry-filter-select">
                 <select id="rating-mode-filter" name="rating_mode" data-registry-filter>
                   <option value="automatic" {% if registry.rating_mode == "automatic" %}selected{% endif %}>Автопилот</option>
@@ -176,7 +185,7 @@
           {% endfor %}
         </section>
 
-        <details class="rating-methodology">
+        <details class="rating-methodology" id="rating-methodology">
           <summary>
             <span>Как считается рейтинг</span>
             <span class="rating-methodology-hint">Три модели оценки</span>
@@ -215,18 +224,37 @@
                   {% if registry.rating_mode == "strict" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
                 </header>
                 <p>
-                  Небольшой запас допустим: до 90 секунд раньше оценка снижается
+                  Небольшой запас допустим: до 45 секунд раньше оценка снижается
                   плавно. Слишком ранний финиш штрафуется сильнее, а опоздание — сразу.
                 </p>
-                <div class="rating-chart">
-                  <svg viewBox="0 0 560 210" role="img" aria-labelledby="strict-chart-title strict-chart-description">
+                <div class="rating-chart" data-rating-chart data-rating-mode="strict">
+                  <div class="rating-chart-tooltip" data-rating-chart-tooltip hidden>
+                    <strong data-rating-chart-time>ровно</strong>
+                    <span data-rating-chart-score>10,0 балла</span>
+                  </div>
+                  <svg class="rating-chart-svg" viewBox="0 0 660 260" role="img" tabindex="0" aria-labelledby="strict-chart-title strict-chart-description">
                     <title id="strict-chart-title">График модели «Строгий финиш»</title>
-                    <desc id="strict-chart-description">До цели оценка плавно растёт к десяти, после цели резко снижается.</desc>
-                    <path class="rating-chart-grid" d="M36 18H524 M36 48.4H524 M36 170H524 M280 18V170 M206.8 18V170" />
+                    <desc id="strict-chart-description">Интерактивный график от минус 75 до плюс 75 секунд. Наведите указатель, чтобы узнать оценку.</desc>
+                    <path class="rating-chart-grid" d="M48 18H612 M48 36.4H612 M48 54.8H612 M48 73.2H612 M48 202H612 M160.8 18V202 M217.2 18V202 M273.6 18V202 M330 18V202 M386.4 18V202 M442.8 18V202 M499.2 18V202" />
                     <polyline class="rating-chart-line" points="{{ rating_charts.strict }}" />
-                    <text x="36" y="197">раньше</text><text x="280" y="197" text-anchor="middle">цель</text><text x="524" y="197" text-anchor="end">позже</text>
-                    <text x="29" y="22" text-anchor="end">10</text><text x="29" y="52" text-anchor="end">8</text>
-                    <text class="rating-chart-note" x="206.8" y="68" text-anchor="middle">−90 с</text>
+                    <g class="rating-chart-key-points" aria-hidden="true">
+                      <circle cx="160.8" cy="73.2" r="4" /><circle cx="217.2" cy="54.8" r="4" />
+                      <circle cx="273.6" cy="36.4" r="4" /><circle cx="330" cy="18" r="4" />
+                    </g>
+                    <g class="rating-chart-cursor" data-rating-chart-cursor aria-hidden="true">
+                      <line x1="330" x2="330" y1="18" y2="202" />
+                      <circle cx="330" cy="18" r="6" />
+                    </g>
+                    <rect class="rating-chart-hit" x="48" y="18" width="564" height="184" />
+                    <g class="rating-chart-axis" aria-hidden="true">
+                      <text x="40" y="22" text-anchor="end">10</text><text x="40" y="40.4" text-anchor="end">9</text>
+                      <text x="40" y="58.8" text-anchor="end">8</text><text x="40" y="77.2" text-anchor="end">7</text>
+                      <text x="160.8" y="224" text-anchor="middle">−45</text><text x="217.2" y="224" text-anchor="middle">−30</text>
+                      <text x="273.6" y="224" text-anchor="middle">−15</text><text x="330" y="224" text-anchor="middle">0</text>
+                      <text x="386.4" y="224" text-anchor="middle">+15</text><text x="442.8" y="224" text-anchor="middle">+30</text>
+                      <text x="499.2" y="224" text-anchor="middle">+45</text>
+                      <text x="48" y="250">раньше</text><text x="612" y="250" text-anchor="end">позже</text>
+                    </g>
                   </svg>
                 </div>
               </article>
@@ -241,18 +269,39 @@
                 </header>
                 <p>
                   Одинаковое отклонение раньше или позже получает одинаковую оценку.
-                  В коридоре ±90 секунд снижение плавное, за его пределами ускоряется.
+                  В коридоре ±45 секунд каждые 15 секунд снимают один балл,
+                  за его пределами снижение резко ускоряется.
                 </p>
-                <div class="rating-chart">
-                  <svg viewBox="0 0 560 210" role="img" aria-labelledby="symmetric-chart-title symmetric-chart-description">
+                <div class="rating-chart" data-rating-chart data-rating-mode="symmetric">
+                  <div class="rating-chart-tooltip" data-rating-chart-tooltip hidden>
+                    <strong data-rating-chart-time>ровно</strong>
+                    <span data-rating-chart-score>10,0 балла</span>
+                  </div>
+                  <svg class="rating-chart-svg" viewBox="0 0 660 260" role="img" tabindex="0" aria-labelledby="symmetric-chart-title symmetric-chart-description">
                     <title id="symmetric-chart-title">График модели «Зеркальный допуск»</title>
-                    <desc id="symmetric-chart-description">Оценка симметрично растёт к десяти в цели и снижается по обе стороны.</desc>
-                    <path class="rating-chart-grid" d="M36 18H524 M36 48.4H524 M36 170H524 M280 18V170 M206.8 18V170 M353.2 18V170" />
+                    <desc id="symmetric-chart-description">Интерактивный график от минус 75 до плюс 75 секунд. Наведите указатель, чтобы узнать оценку.</desc>
+                    <path class="rating-chart-grid" d="M48 18H612 M48 36.4H612 M48 54.8H612 M48 73.2H612 M48 202H612 M160.8 18V202 M217.2 18V202 M273.6 18V202 M330 18V202 M386.4 18V202 M442.8 18V202 M499.2 18V202" />
                     <polyline class="rating-chart-line" points="{{ rating_charts.symmetric }}" />
-                    <text x="36" y="197">раньше</text><text x="280" y="197" text-anchor="middle">цель</text><text x="524" y="197" text-anchor="end">позже</text>
-                    <text x="29" y="22" text-anchor="end">10</text><text x="29" y="52" text-anchor="end">8</text>
-                    <text class="rating-chart-note" x="206.8" y="68" text-anchor="middle">−90 с</text>
-                    <text class="rating-chart-note" x="353.2" y="68" text-anchor="middle">+90 с</text>
+                    <g class="rating-chart-key-points" aria-hidden="true">
+                      <circle cx="160.8" cy="73.2" r="4" /><circle cx="217.2" cy="54.8" r="4" />
+                      <circle cx="273.6" cy="36.4" r="4" /><circle cx="330" cy="18" r="4" />
+                      <circle cx="386.4" cy="36.4" r="4" /><circle cx="442.8" cy="54.8" r="4" />
+                      <circle cx="499.2" cy="73.2" r="4" />
+                    </g>
+                    <g class="rating-chart-cursor" data-rating-chart-cursor aria-hidden="true">
+                      <line x1="330" x2="330" y1="18" y2="202" />
+                      <circle cx="330" cy="18" r="6" />
+                    </g>
+                    <rect class="rating-chart-hit" x="48" y="18" width="564" height="184" />
+                    <g class="rating-chart-axis" aria-hidden="true">
+                      <text x="40" y="22" text-anchor="end">10</text><text x="40" y="40.4" text-anchor="end">9</text>
+                      <text x="40" y="58.8" text-anchor="end">8</text><text x="40" y="77.2" text-anchor="end">7</text>
+                      <text x="160.8" y="224" text-anchor="middle">−45</text><text x="217.2" y="224" text-anchor="middle">−30</text>
+                      <text x="273.6" y="224" text-anchor="middle">−15</text><text x="330" y="224" text-anchor="middle">0</text>
+                      <text x="386.4" y="224" text-anchor="middle">+15</text><text x="442.8" y="224" text-anchor="middle">+30</text>
+                      <text x="499.2" y="224" text-anchor="middle">+45</text>
+                      <text x="48" y="250">раньше</text><text x="612" y="250" text-anchor="end">позже</text>
+                    </g>
                   </svg>
                 </div>
               </article>
