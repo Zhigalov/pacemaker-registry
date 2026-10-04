@@ -1317,6 +1317,11 @@ tbody tr:hover { background: #fbfcfc; }
   stroke-width: 4;
 }
 
+.custom-rating-points .custom-rating-point--inactive {
+  opacity: 0.32;
+  stroke-dasharray: 2 2;
+}
+
 .custom-rating-status {
   display: flex;
   align-items: center;

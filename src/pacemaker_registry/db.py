@@ -30,8 +30,10 @@ DEFAULT_CUSTOM_RATING_POINTS = (7.0, 8.0, 9.0, 10.0, 9.0, 8.0, 7.0)
 @dataclass(frozen=True, slots=True)
 class CustomRatingConfig:
     points: tuple[float, ...] = DEFAULT_CUSTOM_RATING_POINTS
-    exponent_start: int = 45
-    decay: int = 30
+    left_exponent_start: int = 45
+    right_exponent_start: int = 45
+    left_decay: int = 30
+    right_decay: int = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,8 +333,12 @@ def normalize_rating_mode(rating_mode: str) -> str:
 
 def parse_custom_rating_config(
     serialized_points: str | None,
-    exponent_start: str | None,
-    decay: str | None,
+    left_exponent_start: str | None,
+    right_exponent_start: str | None,
+    left_decay: str | None,
+    right_decay: str | None,
+    legacy_exponent_start: str | None = None,
+    legacy_decay: str | None = None,
 ) -> CustomRatingConfig:
     points = DEFAULT_CUSTOM_RATING_POINTS
     if serialized_points:
@@ -343,19 +349,27 @@ def parse_custom_rating_config(
         except ValueError:
             pass
 
-    try:
-        parsed_start = int(exponent_start) if exponent_start else 45
-    except ValueError:
-        parsed_start = 45
-    try:
-        parsed_decay = int(decay) if decay else 30
-    except ValueError:
-        parsed_decay = 30
+    def parse_integer(value: str | None, fallback: str | None, default: int) -> int:
+        try:
+            return int(value or fallback or default)
+        except ValueError:
+            return default
+
+    parsed_left_start = parse_integer(
+        left_exponent_start, legacy_exponent_start, 45
+    )
+    parsed_right_start = parse_integer(
+        right_exponent_start, legacy_exponent_start, 45
+    )
+    parsed_left_decay = parse_integer(left_decay, legacy_decay, 30)
+    parsed_right_decay = parse_integer(right_decay, legacy_decay, 30)
 
     return CustomRatingConfig(
         points=points,
-        exponent_start=min(65, max(45, parsed_start)),
-        decay=min(90, max(10, parsed_decay)),
+        left_exponent_start=min(65, max(0, parsed_left_start)),
+        right_exponent_start=min(65, max(0, parsed_right_start)),
+        left_decay=min(90, max(10, parsed_left_decay)),
+        right_decay=min(90, max(10, parsed_right_decay)),
     )
 
 
@@ -410,33 +424,39 @@ def _calculate_custom_rating(
     difference: int,
     config: CustomRatingConfig,
 ) -> float:
-    points = config.points
-    if -45 <= difference <= 45:
-        position = (difference + 45) / 15
-        left_index = min(int(position), len(points) - 2)
-        fraction = position - left_index
-        return points[left_index] + (points[left_index + 1] - points[left_index]) * fraction
+    if difference < 0:
+        boundary = -config.left_exponent_start
+        if difference >= boundary:
+            return _calculate_custom_linear_rating(difference, config.points)
+        boundary_score = _calculate_custom_linear_rating(boundary, config.points)
+        return boundary_score * exp(
+            (difference + config.left_exponent_start) / config.left_decay
+        )
 
+    boundary = config.right_exponent_start
+    if difference <= boundary:
+        return _calculate_custom_linear_rating(difference, config.points)
+    boundary_score = _calculate_custom_linear_rating(boundary, config.points)
+    return boundary_score * exp(
+        -(difference - config.right_exponent_start) / config.right_decay
+    )
+
+
+def _calculate_custom_linear_rating(
+    difference: int,
+    points: tuple[float, ...],
+) -> float:
     if difference < -45:
         edge_slope = (points[1] - points[0]) / 15
-        boundary_score = _clamp_rating(
-            points[0] + edge_slope * (45 - config.exponent_start)
-        )
-        if difference >= -config.exponent_start:
-            return _clamp_rating(points[0] + edge_slope * (difference + 45))
-        return boundary_score * exp(
-            (difference + config.exponent_start) / config.decay
-        )
-
-    edge_slope = (points[-1] - points[-2]) / 15
-    boundary_score = _clamp_rating(
-        points[-1] + edge_slope * (config.exponent_start - 45)
-    )
-    if difference <= config.exponent_start:
+        return _clamp_rating(points[0] + edge_slope * (difference + 45))
+    if difference > 45:
+        edge_slope = (points[-1] - points[-2]) / 15
         return _clamp_rating(points[-1] + edge_slope * (difference - 45))
-    return boundary_score * exp(
-        -(difference - config.exponent_start) / config.decay
-    )
+
+    position = (difference + 45) / 15
+    left_index = min(int(position), len(points) - 2)
+    fraction = position - left_index
+    return points[left_index] + (points[left_index + 1] - points[left_index]) * fraction
 
 
 def _clamp_rating(rating: float) -> float:

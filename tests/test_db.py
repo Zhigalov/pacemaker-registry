@@ -122,12 +122,47 @@ def test_custom_rating_parser_sanitizes_query_parameters() -> None:
     config = parse_custom_rating_config(
         "-2,2,3,11,5,6,7",
         "100",
+        "-5",
         "2",
+        "200",
     )
 
     assert config.points == (0.1, 2, 3, 10, 5, 6, 7)
-    assert config.exponent_start == 65
-    assert config.decay == 10
+    assert config.left_exponent_start == 65
+    assert config.right_exponent_start == 0
+    assert config.left_decay == 10
+    assert config.right_decay == 90
+
+
+def test_custom_rating_has_independent_exponential_sides() -> None:
+    config = CustomRatingConfig(
+        left_exponent_start=15,
+        right_exponent_start=45,
+        left_decay=10,
+        right_decay=60,
+    )
+
+    assert calculate_rating_for_difference(-30, RATING_MODE_CUSTOM, config) < 3
+    assert calculate_rating_for_difference(30, RATING_MODE_CUSTOM, config) == 8
+    assert calculate_rating_for_difference(-75, RATING_MODE_CUSTOM, config) < 0.1
+    assert calculate_rating_for_difference(75, RATING_MODE_CUSTOM, config) > 4
+
+
+def test_custom_rating_parser_supports_legacy_shared_parameters() -> None:
+    config = parse_custom_rating_config(
+        None,
+        None,
+        None,
+        None,
+        None,
+        "55",
+        "20",
+    )
+
+    assert config.left_exponent_start == 55
+    assert config.right_exponent_start == 55
+    assert config.left_decay == 20
+    assert config.right_decay == 20
 
 
 def test_late_finish_is_worse_than_equally_early_finish() -> None:

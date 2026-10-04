@@ -148,7 +148,8 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
         await client.get("/?event_id=0")
         custom_response = await client.get(
             "/?rating_mode=custom&custom_points=6,7,8,10,8,7,6"
-            "&custom_start=55&custom_decay=20"
+            "&custom_left_start=15&custom_right_start=55"
+            "&custom_left_decay=20&custom_right_decay=40"
         )
 
     assert response.status_code == 200
@@ -164,11 +165,14 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
     assert 'href="/?rating_mode=symmetric"' in response.text
     assert requested_filters[-1][2] == CustomRatingConfig(
         points=(6, 7, 8, 10, 8, 7, 6),
-        exponent_start=55,
-        decay=20,
+        left_exponent_start=15,
+        right_exponent_start=55,
+        left_decay=20,
+        right_decay=40,
     )
     assert '<option value="custom" selected>' in custom_response.text
-    assert 'name="custom_start" value="55"' in custom_response.text
+    assert 'name="custom_left_start" value="15"' in custom_response.text
+    assert 'name="custom_right_start" value="55"' in custom_response.text
 
 
 @pytest.mark.anyio

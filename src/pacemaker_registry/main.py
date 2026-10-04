@@ -82,12 +82,20 @@ def home(
     event_id: int | None = None,
     rating_mode: str = RATING_MODE_AUTOMATIC,
     custom_points: str | None = None,
+    custom_left_start: str | None = None,
+    custom_right_start: str | None = None,
+    custom_left_decay: str | None = None,
+    custom_right_decay: str | None = None,
     custom_start: str | None = None,
     custom_decay: str | None = None,
 ) -> HTMLResponse:
     registry_error = None
     custom_rating = parse_custom_rating_config(
         custom_points,
+        custom_left_start,
+        custom_right_start,
+        custom_left_decay,
+        custom_right_decay,
         custom_start,
         custom_decay,
     )

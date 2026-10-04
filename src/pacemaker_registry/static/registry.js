@@ -5,14 +5,18 @@ const ratingMethodology = document.querySelector("#rating-methodology");
 const ratingCharts = document.querySelectorAll("[data-rating-chart]");
 const ratingModeFilter = document.querySelector("#rating-mode-filter");
 const customPointsInput = document.querySelector("[data-custom-points-input]");
-const customStartInput = document.querySelector("[data-custom-start-input]");
-const customDecayInput = document.querySelector("[data-custom-decay-input]");
+const customLeftStartInput = document.querySelector("[data-custom-left-start-input]");
+const customRightStartInput = document.querySelector("[data-custom-right-start-input]");
+const customLeftDecayInput = document.querySelector("[data-custom-left-decay-input]");
+const customRightDecayInput = document.querySelector("[data-custom-right-decay-input]");
 const customEditor = document.querySelector("[data-custom-editor]");
 const customStorageKey = "pacemaker-custom-rating-v1";
 const defaultCustomConfig = {
   points: [7, 8, 9, 10, 9, 8, 7],
-  start: 45,
-  decay: 30,
+  leftStart: 45,
+  rightStart: 45,
+  leftDecay: 30,
+  rightDecay: 30,
 };
 let activePopover = null;
 
@@ -24,18 +28,26 @@ function sanitizeCustomConfig(value) {
   const points = Array.isArray(value?.points) && value.points.length === 7
     ? value.points.map((point) => clamp(Number(point) || 0.1, 0.1, 10))
     : [...defaultCustomConfig.points];
+  const numericOrDefault = (candidate, fallback) => {
+    const numeric = Number(candidate);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  };
   return {
     points,
-    start: Math.round(clamp(Number(value?.start) || 45, 45, 65)),
-    decay: Math.round(clamp(Number(value?.decay) || 30, 10, 90)),
+    leftStart: Math.round(clamp(numericOrDefault(value?.leftStart ?? value?.start, 45), 0, 65)),
+    rightStart: Math.round(clamp(numericOrDefault(value?.rightStart ?? value?.start, 45), 0, 65)),
+    leftDecay: Math.round(clamp(numericOrDefault(value?.leftDecay ?? value?.decay, 30), 10, 90)),
+    rightDecay: Math.round(clamp(numericOrDefault(value?.rightDecay ?? value?.decay, 30), 10, 90)),
   };
 }
 
 function configFromInputs() {
   return sanitizeCustomConfig({
     points: customPointsInput?.value.split(",").map(Number),
-    start: customStartInput?.value,
-    decay: customDecayInput?.value,
+    leftStart: customLeftStartInput?.value,
+    rightStart: customRightStartInput?.value,
+    leftDecay: customLeftDecayInput?.value,
+    rightDecay: customRightDecayInput?.value,
   });
 }
 
@@ -57,7 +69,13 @@ function saveCustomConfig(config) {
 }
 
 function setCustomInputsEnabled(enabled) {
-  [customPointsInput, customStartInput, customDecayInput].forEach((input) => {
+  [
+    customPointsInput,
+    customLeftStartInput,
+    customRightStartInput,
+    customLeftDecayInput,
+    customRightDecayInput,
+  ].forEach((input) => {
     if (input) input.disabled = !enabled;
   });
 }
@@ -68,18 +86,30 @@ function writeCustomConfig(config) {
       .map((point) => Number(point.toFixed(1)))
       .join(",");
   }
-  if (customStartInput) customStartInput.value = config.start;
-  if (customDecayInput) customDecayInput.value = config.decay;
+  if (customLeftStartInput) customLeftStartInput.value = config.leftStart;
+  if (customRightStartInput) customRightStartInput.value = config.rightStart;
+  if (customLeftDecayInput) customLeftDecayInput.value = config.leftDecay;
+  if (customRightDecayInput) customRightDecayInput.value = config.rightDecay;
   if (customEditor) {
     customEditor.dataset.customPoints = customPointsInput?.value || "";
-    customEditor.dataset.customStart = config.start;
-    customEditor.dataset.customDecay = config.decay;
+    customEditor.dataset.customLeftStart = config.leftStart;
+    customEditor.dataset.customRightStart = config.rightStart;
+    customEditor.dataset.customLeftDecay = config.leftDecay;
+    customEditor.dataset.customRightDecay = config.rightDecay;
   }
 }
 
 const query = new URLSearchParams(window.location.search);
-const queryHasCustomConfig = ["custom_points", "custom_start", "custom_decay"]
-  .every((parameter) => query.has(parameter));
+const queryHasCustomConfig = [
+  "custom_points",
+  "custom_left_start",
+  "custom_right_start",
+  "custom_left_decay",
+  "custom_right_decay",
+]
+  .every((parameter) => query.has(parameter))
+  || ["custom_points", "custom_start", "custom_decay"]
+    .every((parameter) => query.has(parameter));
 const storedCustomConfig = loadStoredCustomConfig();
 let customConfig = queryHasCustomConfig
   ? configFromInputs()
@@ -123,37 +153,32 @@ if (window.location.hash === "#rating-methodology" && ratingMethodology) {
 }
 
 function calculateCustomRating(difference, config) {
-  if (difference >= -45 && difference <= 45) {
-    const position = (difference + 45) / 15;
-    const leftIndex = Math.min(Math.floor(position), config.points.length - 2);
-    const fraction = position - leftIndex;
-    return config.points[leftIndex]
-      + (config.points[leftIndex + 1] - config.points[leftIndex]) * fraction;
+  if (difference < 0) {
+    const boundary = -config.leftStart;
+    if (difference >= boundary) return calculateCustomLinearRating(difference, config.points);
+    const boundaryRating = calculateCustomLinearRating(boundary, config.points);
+    return boundaryRating * Math.exp((difference + config.leftStart) / config.leftDecay);
   }
 
+  const boundary = config.rightStart;
+  if (difference <= boundary) return calculateCustomLinearRating(difference, config.points);
+  const boundaryRating = calculateCustomLinearRating(boundary, config.points);
+  return boundaryRating * Math.exp(-(difference - config.rightStart) / config.rightDecay);
+}
+
+function calculateCustomLinearRating(difference, points) {
   if (difference < -45) {
-    const edgeSlope = (config.points[1] - config.points[0]) / 15;
-    const boundary = clamp(
-      config.points[0] + edgeSlope * (45 - config.start),
-      0.1,
-      10,
-    );
-    if (difference >= -config.start) {
-      return clamp(config.points[0] + edgeSlope * (difference + 45), 0.1, 10);
-    }
-    return boundary * Math.exp((difference + config.start) / config.decay);
+    const edgeSlope = (points[1] - points[0]) / 15;
+    return clamp(points[0] + edgeSlope * (difference + 45), 0.1, 10);
   }
-
-  const edgeSlope = (config.points[6] - config.points[5]) / 15;
-  const boundary = clamp(
-    config.points[6] + edgeSlope * (config.start - 45),
-    0.1,
-    10,
-  );
-  if (difference <= config.start) {
-    return clamp(config.points[6] + edgeSlope * (difference - 45), 0.1, 10);
+  if (difference > 45) {
+    const edgeSlope = (points[6] - points[5]) / 15;
+    return clamp(points[6] + edgeSlope * (difference - 45), 0.1, 10);
   }
-  return boundary * Math.exp(-(difference - config.start) / config.decay);
+  const position = (difference + 45) / 15;
+  const leftIndex = Math.min(Math.floor(position), points.length - 2);
+  const fraction = position - leftIndex;
+  return points[leftIndex] + (points[leftIndex + 1] - points[leftIndex]) * fraction;
 }
 
 function calculateChartRating(difference, mode) {
@@ -195,10 +220,14 @@ function renderCustomEditor() {
   const pointElements = customEditor.querySelectorAll("[data-custom-point]");
   const boundaryLeft = customEditor.querySelector("[data-custom-boundary-left]");
   const boundaryRight = customEditor.querySelector("[data-custom-boundary-right]");
-  const boundaryHandle = customEditor.querySelector("[data-custom-boundary-handle]");
-  const decayHandle = customEditor.querySelector("[data-custom-decay-handle]");
-  const startDisplay = document.querySelector("[data-custom-start-display]");
-  const decayDisplay = document.querySelector("[data-custom-decay-display]");
+  const leftBoundaryHandle = customEditor.querySelector('[data-custom-boundary-handle="left"]');
+  const rightBoundaryHandle = customEditor.querySelector('[data-custom-boundary-handle="right"]');
+  const leftDecayHandle = customEditor.querySelector('[data-custom-decay-handle="left"]');
+  const rightDecayHandle = customEditor.querySelector('[data-custom-decay-handle="right"]');
+  const leftStartDisplay = document.querySelector("[data-custom-left-start-display]");
+  const rightStartDisplay = document.querySelector("[data-custom-right-start-display]");
+  const leftDecayDisplay = document.querySelector("[data-custom-left-decay-display]");
+  const rightDecayDisplay = document.querySelector("[data-custom-right-decay-display]");
 
   const pathPoints = [];
   for (let difference = -75; difference <= 75; difference += 1) {
@@ -210,25 +239,38 @@ function renderCustomEditor() {
 
   pointElements.forEach((point, index) => {
     point.setAttribute("cy", ratingToY(customConfig.points[index]));
+    const difference = -45 + index * 15;
+    const inactive = difference < -customConfig.leftStart
+      || difference > customConfig.rightStart;
+    point.classList.toggle("custom-rating-point--inactive", inactive);
   });
 
-  const rightX = differenceToX(customConfig.start);
-  const leftX = differenceToX(-customConfig.start);
-  [boundaryLeft, boundaryRight].forEach((line, index) => {
-    const x = index === 0 ? leftX : rightX;
-    line?.setAttribute("x1", x);
-    line?.setAttribute("x2", x);
-  });
-  boundaryHandle?.setAttribute(
+  const leftX = differenceToX(-customConfig.leftStart);
+  const rightX = differenceToX(customConfig.rightStart);
+  boundaryLeft?.setAttribute("x1", leftX);
+  boundaryLeft?.setAttribute("x2", leftX);
+  boundaryRight?.setAttribute("x1", rightX);
+  boundaryRight?.setAttribute("x2", rightX);
+  leftBoundaryHandle?.setAttribute(
+    "d",
+    `M${leftX} 191 L${leftX + 11} 202 L${leftX} 213 L${leftX - 11} 202 Z`,
+  );
+  rightBoundaryHandle?.setAttribute(
     "d",
     `M${rightX} 191 L${rightX + 11} 202 L${rightX} 213 L${rightX - 11} 202 Z`,
   );
-  decayHandle?.setAttribute(
+  leftDecayHandle?.setAttribute(
+    "cy",
+    ratingToY(calculateCustomRating(-75, customConfig)),
+  );
+  rightDecayHandle?.setAttribute(
     "cy",
     ratingToY(calculateCustomRating(75, customConfig)),
   );
-  if (startDisplay) startDisplay.textContent = `${customConfig.start} с`;
-  if (decayDisplay) decayDisplay.textContent = customConfig.decay;
+  if (leftStartDisplay) leftStartDisplay.textContent = `−${customConfig.leftStart} с`;
+  if (rightStartDisplay) rightStartDisplay.textContent = `+${customConfig.rightStart} с`;
+  if (leftDecayDisplay) leftDecayDisplay.textContent = customConfig.leftDecay;
+  if (rightDecayDisplay) rightDecayDisplay.textContent = customConfig.rightDecay;
   writeCustomConfig(customConfig);
 }
 
@@ -248,16 +290,25 @@ if (customEditor) {
       customConfig.points[dragControl.index] = rating;
     } else if (dragControl.type === "boundary") {
       const difference = (position.x - 48) / 564 * 150 - 75;
-      customConfig.start = Math.round(clamp(difference, 45, 65));
+      if (dragControl.side === "left") {
+        customConfig.leftStart = Math.round(clamp(-difference, 0, 65));
+      } else {
+        customConfig.rightStart = Math.round(clamp(difference, 0, 65));
+      }
     } else if (dragControl.type === "decay") {
       const targetRating = clamp(10 - (position.y - 18) / 184 * 10, 0.1, 9.9);
-      const boundaryRating = calculateCustomRating(customConfig.start, customConfig);
+      const isLeft = dragControl.side === "left";
+      const start = isLeft ? customConfig.leftStart : customConfig.rightStart;
+      const boundary = isLeft ? -start : start;
+      const boundaryRating = calculateCustomLinearRating(boundary, customConfig.points);
       const ratio = clamp(targetRating / boundaryRating, 0.02, 0.98);
-      customConfig.decay = Math.round(clamp(
-        -(75 - customConfig.start) / Math.log(ratio),
+      const decay = Math.round(clamp(
+        -(75 - start) / Math.log(ratio),
         10,
         90,
       ));
+      if (isLeft) customConfig.leftDecay = decay;
+      else customConfig.rightDecay = decay;
     }
     renderCustomEditor();
   };
@@ -270,7 +321,11 @@ if (customEditor) {
     event.preventDefault();
     dragControl = point
       ? { type: "point", index: Number(point.dataset.customPoint) }
-      : { type: boundary ? "boundary" : "decay" };
+      : {
+        type: boundary ? "boundary" : "decay",
+        side: (boundary || decay).dataset.customBoundaryHandle
+          || (boundary || decay).dataset.customDecayHandle,
+      };
     svg.setPointerCapture?.(event.pointerId);
     updateDraggedControl(event);
   });
