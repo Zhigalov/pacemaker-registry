@@ -1097,8 +1097,9 @@ tbody tr:hover { background: #fbfcfc; }
   }
 
   .registry-filter select {
-    width: 100%;
+    width: auto;
     min-width: 0;
+    flex: 1 1 0;
   }
 
   .registry-filter-submit {
