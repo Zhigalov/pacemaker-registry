@@ -67,13 +67,17 @@
                   <option value="automatic" {% if registry.rating_mode == "automatic" %}selected{% endif %}>Автопилот</option>
                   <option value="strict" {% if registry.rating_mode == "strict" %}selected{% endif %}>Строгий финиш</option>
                   <option value="symmetric" {% if registry.rating_mode == "symmetric" %}selected{% endif %}>Зеркальный допуск</option>
+                  <option value="custom" {% if registry.rating_mode == "custom" %}selected{% endif %}>Конструктор</option>
                 </select>
               </span>
             </div>
+            <input type="hidden" name="custom_points" value="{{ custom_points }}" data-custom-points-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
+            <input type="hidden" name="custom_start" value="{{ registry.custom_rating.exponent_start }}" data-custom-start-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
+            <input type="hidden" name="custom_decay" value="{{ registry.custom_rating.decay }}" data-custom-decay-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
             <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
           </form>
           {% if registry.selected_event_id is not none %}
-            <a class="quiet-link registry-filter-reset" href="/?rating_mode={{ registry.rating_mode }}">Показать все</a>
+            <a class="quiet-link registry-filter-reset" href="/?rating_mode={{ registry.rating_mode }}{% if registry.rating_mode == 'custom' %}&custom_points={{ custom_points }}&custom_start={{ registry.custom_rating.exponent_start }}&custom_decay={{ registry.custom_rating.decay }}{% endif %}">Показать все</a>
           {% endif %}
         </section>
       {% endif %}
@@ -304,6 +308,80 @@
                     </g>
                   </svg>
                 </div>
+              </article>
+
+              <article class="rating-model rating-model--custom {% if registry.rating_mode == 'custom' %}rating-model--selected{% endif %}">
+                <header>
+                  <div>
+                    <span class="rating-model-kicker">Настройка мышкой</span>
+                    <h3>Конструктор</h3>
+                  </div>
+                  {% if registry.rating_mode == "custom" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
+                </header>
+                <p>
+                  Перетаскивайте круглые точки вверх и вниз, ромб — влево и вправо,
+                  а крайнюю ручку — по вертикали. Так задаются баллы, момент перехода
+                  к экспоненте и резкость её снижения.
+                </p>
+                <div
+                  class="rating-chart rating-chart--editor"
+                  data-rating-chart
+                  data-rating-mode="custom"
+                  data-custom-editor
+                  data-custom-points="{{ custom_points }}"
+                  data-custom-start="{{ registry.custom_rating.exponent_start }}"
+                  data-custom-decay="{{ registry.custom_rating.decay }}"
+                >
+                  <div class="rating-chart-tooltip" data-rating-chart-tooltip hidden>
+                    <strong data-rating-chart-time>ровно</strong>
+                    <span data-rating-chart-score>10,0 балла</span>
+                  </div>
+                  <svg class="rating-chart-svg" viewBox="0 0 660 260" role="img" tabindex="0" aria-labelledby="custom-chart-title custom-chart-description">
+                    <title id="custom-chart-title">График модели «Конструктор»</title>
+                    <desc id="custom-chart-description">Перетаскивайте опорные точки, границу экспоненты и ручку резкости, чтобы настроить рейтинг.</desc>
+                    <path class="rating-chart-grid" d="M48 18H612 M48 36.4H612 M48 54.8H612 M48 73.2H612 M48 202H612 M160.8 18V202 M217.2 18V202 M273.6 18V202 M330 18V202 M386.4 18V202 M442.8 18V202 M499.2 18V202" />
+                    <polyline class="rating-chart-line" points="{{ custom_chart }}" data-custom-path />
+                    <rect class="rating-chart-hit" x="48" y="18" width="564" height="184" />
+                    <g class="custom-rating-boundaries" aria-hidden="true">
+                      <line data-custom-boundary-left x1="160.8" x2="160.8" y1="18" y2="202" />
+                      <line data-custom-boundary-right x1="499.2" x2="499.2" y1="18" y2="202" />
+                      <path class="custom-boundary-handle" data-custom-boundary-handle d="M499.2 193 L508.2 202 L499.2 211 L490.2 202 Z" />
+                    </g>
+                    <g class="custom-rating-points" aria-label="Опорные точки рейтинга">
+                      <circle data-custom-point="0" cx="160.8" cy="73.2" r="7" />
+                      <circle data-custom-point="1" cx="217.2" cy="54.8" r="7" />
+                      <circle data-custom-point="2" cx="273.6" cy="36.4" r="7" />
+                      <circle data-custom-point="3" cx="330" cy="18" r="7" />
+                      <circle data-custom-point="4" cx="386.4" cy="36.4" r="7" />
+                      <circle data-custom-point="5" cx="442.8" cy="54.8" r="7" />
+                      <circle data-custom-point="6" cx="499.2" cy="73.2" r="7" />
+                    </g>
+                    <g class="custom-decay-control" aria-hidden="true">
+                      <line data-custom-decay-guide x1="612" x2="612" y1="18" y2="202" />
+                      <circle data-custom-decay-handle cx="612" cy="154" r="8" />
+                    </g>
+                    <g class="rating-chart-cursor" data-rating-chart-cursor aria-hidden="true">
+                      <line x1="330" x2="330" y1="18" y2="202" />
+                      <circle cx="330" cy="18" r="6" />
+                    </g>
+                    <g class="rating-chart-axis" aria-hidden="true">
+                      <text x="40" y="22" text-anchor="end">10</text><text x="40" y="40.4" text-anchor="end">9</text>
+                      <text x="40" y="58.8" text-anchor="end">8</text><text x="40" y="77.2" text-anchor="end">7</text>
+                      <text x="160.8" y="224" text-anchor="middle">−45</text><text x="217.2" y="224" text-anchor="middle">−30</text>
+                      <text x="273.6" y="224" text-anchor="middle">−15</text><text x="330" y="224" text-anchor="middle">0</text>
+                      <text x="386.4" y="224" text-anchor="middle">+15</text><text x="442.8" y="224" text-anchor="middle">+30</text>
+                      <text x="499.2" y="224" text-anchor="middle">+45</text>
+                      <text x="48" y="250">раньше</text><text x="612" y="250" text-anchor="end">позже</text>
+                    </g>
+                  </svg>
+                </div>
+                <div class="custom-rating-status">
+                  <span>Экспонента с <strong data-custom-start-display>{{ registry.custom_rating.exponent_start }} с</strong></span>
+                  <span>Резкость <strong data-custom-decay-display>{{ registry.custom_rating.decay }}</strong></span>
+                  <button type="button" class="quiet-link custom-rating-reset" data-custom-reset>Сбросить</button>
+                  <button type="button" class="button custom-rating-apply" data-custom-apply>Применить</button>
+                </div>
+                <p class="custom-rating-note">Настройки сохраняются в этом браузере. Нажмите «Применить», чтобы пересчитать и отсортировать реестр.</p>
               </article>
             </div>
             <p class="rating-example">Рейтинг пейсмейкера — среднее всех его выступлений в выбранной модели.</p>

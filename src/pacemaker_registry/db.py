@@ -14,13 +14,24 @@ from pacemaker_registry.russiarunning import RaceResult, RussiaRunningError
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 RATING_MODE_AUTOMATIC = "automatic"
+RATING_MODE_CUSTOM = "custom"
 RATING_MODE_STRICT = "strict"
 RATING_MODE_SYMMETRIC = "symmetric"
 RATING_MODES = {
     RATING_MODE_AUTOMATIC,
+    RATING_MODE_CUSTOM,
     RATING_MODE_STRICT,
     RATING_MODE_SYMMETRIC,
 }
+CUSTOM_RATING_SECONDS = (-45, -30, -15, 0, 15, 30, 45)
+DEFAULT_CUSTOM_RATING_POINTS = (7.0, 8.0, 9.0, 10.0, 9.0, 8.0, 7.0)
+
+
+@dataclass(frozen=True, slots=True)
+class CustomRatingConfig:
+    points: tuple[float, ...] = DEFAULT_CUSTOM_RATING_POINTS
+    exponent_start: int = 45
+    decay: int = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +74,7 @@ class Registry:
     events: tuple[RegistryEvent, ...] = ()
     selected_event_id: int | None = None
     rating_mode: str = RATING_MODE_AUTOMATIC
+    custom_rating: CustomRatingConfig = CustomRatingConfig()
 
 
 def connect_database() -> Connection[Any]:
@@ -104,6 +116,7 @@ def check_database() -> None:
 def load_registry(
     event_id: int | None = None,
     rating_mode: str = RATING_MODE_AUTOMATIC,
+    custom_rating: CustomRatingConfig = CustomRatingConfig(),
 ) -> Registry:
     rating_mode = normalize_rating_mode(rating_mode)
     with connect_database() as connection:
@@ -179,7 +192,12 @@ def load_registry(
                 "results": [],
             },
         )
-        rating = calculate_pacemaker_rating(target_time, chip_time, rating_mode)
+        rating = calculate_pacemaker_rating(
+            target_time,
+            chip_time,
+            rating_mode,
+            custom_rating,
+        )
         pacemaker["results"].append(
             RegistryResult(
                 id=result_id,
@@ -220,6 +238,7 @@ def load_registry(
         events=events,
         selected_event_id=selected_event_id,
         rating_mode=rating_mode,
+        custom_rating=custom_rating,
     )
 
 
@@ -310,6 +329,40 @@ def normalize_rating_mode(rating_mode: str) -> str:
     return rating_mode if rating_mode in RATING_MODES else RATING_MODE_AUTOMATIC
 
 
+def parse_custom_rating_config(
+    serialized_points: str | None,
+    exponent_start: str | None,
+    decay: str | None,
+) -> CustomRatingConfig:
+    points = DEFAULT_CUSTOM_RATING_POINTS
+    if serialized_points:
+        try:
+            parsed = tuple(float(value) for value in serialized_points.split(","))
+            if len(parsed) == len(CUSTOM_RATING_SECONDS):
+                points = tuple(min(10.0, max(0.1, value)) for value in parsed)
+        except ValueError:
+            pass
+
+    try:
+        parsed_start = int(exponent_start) if exponent_start else 45
+    except ValueError:
+        parsed_start = 45
+    try:
+        parsed_decay = int(decay) if decay else 30
+    except ValueError:
+        parsed_decay = 30
+
+    return CustomRatingConfig(
+        points=points,
+        exponent_start=min(65, max(45, parsed_start)),
+        decay=min(90, max(10, parsed_decay)),
+    )
+
+
+def serialize_custom_rating_points(config: CustomRatingConfig) -> str:
+    return ",".join(f"{point:g}" for point in config.points)
+
+
 def resolve_rating_mode(target_time: str, rating_mode: str) -> str:
     rating_mode = normalize_rating_mode(rating_mode)
     if rating_mode != RATING_MODE_AUTOMATIC:
@@ -320,7 +373,14 @@ def resolve_rating_mode(target_time: str, rating_mode: str) -> str:
     return RATING_MODE_STRICT
 
 
-def calculate_rating_for_difference(difference: int, rating_mode: str) -> float:
+def calculate_rating_for_difference(
+    difference: int,
+    rating_mode: str,
+    custom_rating: CustomRatingConfig = CustomRatingConfig(),
+) -> float:
+    if rating_mode == RATING_MODE_CUSTOM:
+        return _calculate_custom_rating(difference, custom_rating)
+
     if rating_mode == RATING_MODE_SYMMETRIC:
         absolute_difference = abs(difference)
         if absolute_difference <= 45:
@@ -338,11 +398,49 @@ def calculate_pacemaker_rating(
     target_time: str,
     chip_time: str,
     rating_mode: str = RATING_MODE_AUTOMATIC,
+    custom_rating: CustomRatingConfig = CustomRatingConfig(),
 ) -> float:
     """Rate how closely the chip time matches the flag time on a 0–10 scale."""
     difference = _time_difference_seconds(target_time, chip_time)
     resolved_mode = resolve_rating_mode(target_time, rating_mode)
-    return calculate_rating_for_difference(difference, resolved_mode)
+    return calculate_rating_for_difference(difference, resolved_mode, custom_rating)
+
+
+def _calculate_custom_rating(
+    difference: int,
+    config: CustomRatingConfig,
+) -> float:
+    points = config.points
+    if -45 <= difference <= 45:
+        position = (difference + 45) / 15
+        left_index = min(int(position), len(points) - 2)
+        fraction = position - left_index
+        return points[left_index] + (points[left_index + 1] - points[left_index]) * fraction
+
+    if difference < -45:
+        edge_slope = (points[1] - points[0]) / 15
+        boundary_score = _clamp_rating(
+            points[0] + edge_slope * (45 - config.exponent_start)
+        )
+        if difference >= -config.exponent_start:
+            return _clamp_rating(points[0] + edge_slope * (difference + 45))
+        return boundary_score * exp(
+            (difference + config.exponent_start) / config.decay
+        )
+
+    edge_slope = (points[-1] - points[-2]) / 15
+    boundary_score = _clamp_rating(
+        points[-1] + edge_slope * (config.exponent_start - 45)
+    )
+    if difference <= config.exponent_start:
+        return _clamp_rating(points[-1] + edge_slope * (difference - 45))
+    return boundary_score * exp(
+        -(difference - config.exponent_start) / config.decay
+    )
+
+
+def _clamp_rating(rating: float) -> float:
+    return min(10.0, max(0.1, rating))
 
 
 def _time_difference_seconds(target_time: str, chip_time: str) -> int:

@@ -13,14 +13,18 @@ from psycopg import Error as PsycopgError
 
 from pacemaker_registry.db import (
     RATING_MODE_AUTOMATIC,
+    RATING_MODE_CUSTOM,
     RATING_MODE_STRICT,
     RATING_MODE_SYMMETRIC,
+    CustomRatingConfig,
     Registry,
     calculate_rating_for_difference,
     check_database,
     initialize_database,
     load_registry,
+    parse_custom_rating_config,
     save_race_result,
+    serialize_custom_rating_points,
 )
 from pacemaker_registry.russiarunning import (
     InvalidResultUrl,
@@ -33,10 +37,17 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 TARGET_TIME_PATTERN = re.compile(r"^[0-9]{1,2}:[0-5][0-9]$")
 
 
-def _rating_chart_points(rating_mode: str) -> str:
+def _rating_chart_points(
+    rating_mode: str,
+    custom_rating: CustomRatingConfig = CustomRatingConfig(),
+) -> str:
     points = []
     for difference in range(-75, 76, 3):
-        rating = calculate_rating_for_difference(difference, rating_mode)
+        rating = calculate_rating_for_difference(
+            difference,
+            rating_mode,
+            custom_rating,
+        )
         x = 48 + (difference + 75) / 150 * 564
         y = 18 + (10 - rating) / 10 * 184
         points.append(f"{x:.1f},{y:.1f}")
@@ -70,15 +81,29 @@ def home(
     request: Request,
     event_id: int | None = None,
     rating_mode: str = RATING_MODE_AUTOMATIC,
+    custom_points: str | None = None,
+    custom_start: str | None = None,
+    custom_decay: str | None = None,
 ) -> HTMLResponse:
     registry_error = None
+    custom_rating = parse_custom_rating_config(
+        custom_points,
+        custom_start,
+        custom_decay,
+    )
     try:
         registry = load_registry(
             event_id if event_id and event_id > 0 else None,
             rating_mode,
+            custom_rating,
         )
     except (PsycopgError, RuntimeError):
-        registry = Registry(pacemakers=(), event_count=0, result_count=0)
+        registry = Registry(
+            pacemakers=(),
+            event_count=0,
+            result_count=0,
+            custom_rating=custom_rating,
+        )
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
     return templates.TemplateResponse(
         request=request,
@@ -87,6 +112,11 @@ def home(
             "registry": registry,
             "registry_error": registry_error,
             "rating_charts": RATING_CHARTS,
+            "custom_chart": _rating_chart_points(
+                RATING_MODE_CUSTOM,
+                custom_rating,
+            ),
+            "custom_points": serialize_custom_rating_points(custom_rating),
         },
     )
 

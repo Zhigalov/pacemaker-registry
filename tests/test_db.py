@@ -4,8 +4,10 @@ import pytest
 
 from pacemaker_registry.db import (
     RATING_MODE_AUTOMATIC,
+    RATING_MODE_CUSTOM,
     RATING_MODE_STRICT,
     RATING_MODE_SYMMETRIC,
+    CustomRatingConfig,
     RegistryPacemaker,
     _calculate_target_pace,
     _format_time_difference,
@@ -14,6 +16,7 @@ from pacemaker_registry.db import (
     calculate_pacemaker_rating,
     load_registry,
     normalize_rating_mode,
+    parse_custom_rating_config,
     resolve_rating_mode,
 )
 
@@ -93,6 +96,38 @@ def test_strict_mode_penalizes_late_finish_more_than_early_finish() -> None:
 
 def test_unknown_rating_mode_falls_back_to_automatic() -> None:
     assert normalize_rating_mode("unknown") == RATING_MODE_AUTOMATIC
+
+
+def test_default_custom_rating_matches_symmetric_rating() -> None:
+    for difference in (-75, -45, -30, -15, 0, 15, 30, 45, 75):
+        assert calculate_rating_for_difference(
+            difference,
+            RATING_MODE_CUSTOM,
+        ) == pytest.approx(
+            calculate_rating_for_difference(difference, RATING_MODE_SYMMETRIC)
+        )
+
+
+def test_custom_rating_interpolates_user_support_points() -> None:
+    config = CustomRatingConfig(points=(5, 6, 7, 9, 8, 7, 6))
+
+    assert calculate_rating_for_difference(-45, RATING_MODE_CUSTOM, config) == 5
+    assert calculate_rating_for_difference(-22, RATING_MODE_CUSTOM, config) == pytest.approx(
+        6.5333, abs=0.001
+    )
+    assert calculate_rating_for_difference(0, RATING_MODE_CUSTOM, config) == 9
+
+
+def test_custom_rating_parser_sanitizes_query_parameters() -> None:
+    config = parse_custom_rating_config(
+        "-2,2,3,11,5,6,7",
+        "100",
+        "2",
+    )
+
+    assert config.points == (0.1, 2, 3, 10, 5, 6, 7)
+    assert config.exponent_start == 65
+    assert config.decay == 10
 
 
 def test_late_finish_is_worse_than_equally_early_finish() -> None:
