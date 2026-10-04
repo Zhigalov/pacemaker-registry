@@ -88,6 +88,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Все соревнования" in response.text
     assert "Московский марафон" in response.text
     assert '<option value="0" selected>' in response.text
+    assert 'class="registry-filter-select"' in response.text
+    assert '<noscript><button class="button registry-filter-submit"' in response.text
 
 
 @pytest.mark.anyio

@@ -40,15 +40,17 @@
           <form class="registry-filter" method="get" action="/">
             <label for="event-filter">Соревнование</label>
             <div class="registry-filter-controls">
-              <select id="event-filter" name="event_id" data-event-filter>
-                <option value="0" {% if registry.selected_event_id is none %}selected{% endif %}>Все соревнования</option>
-                {% for event in registry.events %}
-                  <option value="{{ event.id }}" {% if event.id == registry.selected_event_id %}selected{% endif %}>
-                    {{ event.name }}
-                  </option>
-                {% endfor %}
-              </select>
-              <button class="button registry-filter-submit" type="submit">Показать</button>
+              <span class="registry-filter-select">
+                <select id="event-filter" name="event_id" data-event-filter>
+                  <option value="0" {% if registry.selected_event_id is none %}selected{% endif %}>Все соревнования</option>
+                  {% for event in registry.events %}
+                    <option value="{{ event.id }}" {% if event.id == registry.selected_event_id %}selected{% endif %}>
+                      {{ event.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </span>
+              <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
             </div>
           </form>
           {% if registry.selected_event_id is not none %}

@@ -660,10 +660,29 @@ tbody tr:hover { background: #fbfcfc; }
   gap: 0.6rem;
 }
 
-.registry-filter select {
+.registry-filter-select {
+  position: relative;
+  display: block;
   width: min(30rem, 64vw);
+}
+
+.registry-filter-select::after {
+  position: absolute;
+  top: 50%;
+  right: 1.1rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid #42524c;
+  border-bottom: 2px solid #42524c;
+  content: "";
+  pointer-events: none;
+  transform: translateY(-70%) rotate(45deg);
+}
+
+.registry-filter select {
+  width: 100%;
   min-height: 2.85rem;
-  padding: 0.65rem 2.5rem 0.65rem 0.85rem;
+  padding: 0.65rem 3rem 0.65rem 0.85rem;
   border: 1px solid #cfdcd7;
   border-radius: 0.75rem;
   background: #fff;
@@ -671,7 +690,9 @@ tbody tr:hover { background: #fbfcfc; }
   font: inherit;
   font-size: 0.92rem;
   font-weight: 680;
+  appearance: none;
   cursor: pointer;
+  -webkit-appearance: none;
 }
 
 .registry-filter select:focus-visible {
@@ -1096,8 +1117,8 @@ tbody tr:hover { background: #fbfcfc; }
     gap: 0.25rem;
   }
 
-  .registry-filter select {
-    width: auto;
+  .registry-filter-select {
+    width: 100%;
     min-width: 0;
     flex: 1 1 0;
   }
