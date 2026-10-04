@@ -12,7 +12,11 @@ from fastapi.templating import Jinja2Templates
 from psycopg import Error as PsycopgError
 
 from pacemaker_registry.db import (
+    RATING_MODE_AUTOMATIC,
+    RATING_MODE_STRICT,
+    RATING_MODE_SYMMETRIC,
     Registry,
+    calculate_rating_for_difference,
     check_database,
     initialize_database,
     load_registry,
@@ -27,6 +31,22 @@ from pacemaker_registry.russiarunning import (
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 TARGET_TIME_PATTERN = re.compile(r"^[0-9]{1,2}:[0-5][0-9]$")
+
+
+def _rating_chart_points(rating_mode: str) -> str:
+    points = []
+    for difference in range(-300, 301, 15):
+        rating = calculate_rating_for_difference(difference, rating_mode)
+        x = 36 + (difference + 300) / 600 * 488
+        y = 18 + (10 - rating) / 10 * 152
+        points.append(f"{x:.1f},{y:.1f}")
+    return " ".join(points)
+
+
+RATING_CHARTS = {
+    RATING_MODE_STRICT: _rating_chart_points(RATING_MODE_STRICT),
+    RATING_MODE_SYMMETRIC: _rating_chart_points(RATING_MODE_SYMMETRIC),
+}
 
 
 @asynccontextmanager
@@ -46,17 +66,28 @@ templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request, event_id: int | None = None) -> HTMLResponse:
+def home(
+    request: Request,
+    event_id: int | None = None,
+    rating_mode: str = RATING_MODE_AUTOMATIC,
+) -> HTMLResponse:
     registry_error = None
     try:
-        registry = load_registry(event_id if event_id and event_id > 0 else None)
+        registry = load_registry(
+            event_id if event_id and event_id > 0 else None,
+            rating_mode,
+        )
     except (PsycopgError, RuntimeError):
         registry = Registry(pacemakers=(), event_count=0, result_count=0)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"registry": registry, "registry_error": registry_error},
+        context={
+            "registry": registry,
+            "registry_error": registry_error,
+            "rating_charts": RATING_CHARTS,
+        },
     )
 
 

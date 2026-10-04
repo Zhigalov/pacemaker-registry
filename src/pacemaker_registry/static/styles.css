@@ -641,12 +641,18 @@ tbody tr:hover { background: #fbfcfc; }
 
 .registry-filter {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.registry-filter-field {
+  display: flex;
   flex-direction: column;
   gap: 0.4rem;
 }
 
-.registry-filter > label {
+.registry-filter-field > label {
   color: #71807b;
   font-size: 0.72rem;
   font-weight: 720;
@@ -654,16 +660,17 @@ tbody tr:hover { background: #fbfcfc; }
   text-transform: uppercase;
 }
 
-.registry-filter-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
 .registry-filter-select {
   position: relative;
   display: block;
-  width: min(30rem, 64vw);
+}
+
+.registry-filter-field--event .registry-filter-select {
+  width: min(27rem, 48vw);
+}
+
+.registry-filter-field--rating .registry-filter-select {
+  width: min(16rem, 34vw);
 }
 
 .registry-filter-select::after {
@@ -1046,39 +1053,126 @@ tbody tr:hover { background: #fbfcfc; }
 
 .rating-methodology-content > p { margin: 1rem 0; }
 
-.rating-zones {
+.rating-models {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.7rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
 }
 
-.rating-zones div {
+.rating-model {
   display: grid;
-  gap: 0.3rem;
-  padding: 0.8rem;
-  border-radius: 0.75rem;
-  background: #f5f8f7;
-}
-
-.rating-zones strong { color: #273a34; font-size: 0.78rem; }
-.rating-zones span { font-size: 0.75rem; }
-
-.rating-formula {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.45rem;
-  margin-top: 0.7rem;
-}
-
-.rating-formula code {
-  padding: 0.65rem 0.7rem;
+  align-content: start;
+  gap: 0.75rem;
+  padding: 1rem;
   border: 1px solid #dfe7e4;
-  border-radius: 0.65rem;
+  border-radius: 0.9rem;
   background: #fff;
-  color: #234d41;
+}
+
+.rating-model:first-child {
+  grid-column: 1 / -1;
+}
+
+.rating-model--selected {
+  border-color: #72ad9d;
+  box-shadow: inset 0 0 0 1px #72ad9d;
+  background: #f7fcfa;
+}
+
+.rating-model header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rating-model h3 {
+  margin: 0.1rem 0 0;
+  color: #22332e;
+  font-size: 1rem;
+}
+
+.rating-model p {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.rating-model-kicker {
+  color: #71807b;
+  font-size: 0.62rem;
+  font-weight: 720;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.rating-model-badge {
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: #dff1eb;
+  color: #176f59;
+  font-size: 0.64rem;
+  font-weight: 760;
+}
+
+.rating-auto-map {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.rating-auto-map span {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem;
+  border-radius: 0.7rem;
+  background: #edf5f2;
+  color: #3f534c;
   font-size: 0.72rem;
-  text-align: center;
-  white-space: nowrap;
+}
+
+.rating-auto-map strong {
+  color: #1f3931;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-chart {
+  padding: 0.35rem 0.35rem 0;
+  border-radius: 0.7rem;
+  background: #f7f9f8;
+}
+
+.rating-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.rating-chart text {
+  fill: #71807b;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.rating-chart-grid {
+  fill: none;
+  stroke: #dce5e2;
+  stroke-width: 1;
+}
+
+.rating-chart-line {
+  fill: none;
+  stroke: #278168;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.rating-chart-note {
+  fill: #527169 !important;
+  font-size: 10px !important;
+  font-weight: 700;
 }
 
 .rating-example { color: #43564f; }
@@ -1107,7 +1201,10 @@ tbody tr:hover { background: #fbfcfc; }
 
   .registry-toolbar,
   .registry-filter,
-  .registry-filter-controls {
+  .registry-filter-field,
+  .registry-filter-select,
+  .registry-filter-field--event .registry-filter-select,
+  .registry-filter-field--rating .registry-filter-select {
     width: 100%;
   }
 
@@ -1118,7 +1215,6 @@ tbody tr:hover { background: #fbfcfc; }
   }
 
   .registry-filter-select {
-    width: 100%;
     min-width: 0;
     flex: 1 1 0;
   }
@@ -1177,12 +1273,12 @@ tbody tr:hover { background: #fbfcfc; }
 
   .rating-methodology-hint { display: none; }
 
-  .rating-zones,
-  .rating-formula {
+  .rating-models,
+  .rating-auto-map {
     grid-template-columns: 1fr;
   }
 
-  .rating-formula code { text-align: left; }
+  .rating-model:first-child { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

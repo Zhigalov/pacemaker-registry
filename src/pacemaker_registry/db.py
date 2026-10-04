@@ -13,6 +13,14 @@ from pacemaker_registry.russiarunning import RaceResult, RussiaRunningError
 
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+RATING_MODE_AUTOMATIC = "automatic"
+RATING_MODE_STRICT = "strict"
+RATING_MODE_SYMMETRIC = "symmetric"
+RATING_MODES = {
+    RATING_MODE_AUTOMATIC,
+    RATING_MODE_STRICT,
+    RATING_MODE_SYMMETRIC,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +62,7 @@ class Registry:
     result_count: int
     events: tuple[RegistryEvent, ...] = ()
     selected_event_id: int | None = None
+    rating_mode: str = RATING_MODE_AUTOMATIC
 
 
 def connect_database() -> Connection[Any]:
@@ -92,7 +101,11 @@ def check_database() -> None:
         connection.execute("SELECT 1").fetchone()
 
 
-def load_registry(event_id: int | None = None) -> Registry:
+def load_registry(
+    event_id: int | None = None,
+    rating_mode: str = RATING_MODE_AUTOMATIC,
+) -> Registry:
+    rating_mode = normalize_rating_mode(rating_mode)
     with connect_database() as connection:
         event_rows = connection.execute(
             """
@@ -166,7 +179,7 @@ def load_registry(event_id: int | None = None) -> Registry:
                 "results": [],
             },
         )
-        rating = calculate_pacemaker_rating(target_time, chip_time)
+        rating = calculate_pacemaker_rating(target_time, chip_time, rating_mode)
         pacemaker["results"].append(
             RegistryResult(
                 id=result_id,
@@ -206,6 +219,7 @@ def load_registry(event_id: int | None = None) -> Registry:
         result_count=len(rows),
         events=events,
         selected_event_id=selected_event_id,
+        rating_mode=rating_mode,
     )
 
 
@@ -292,14 +306,43 @@ def _calculate_target_pace(target_time: str, distance_km: Decimal) -> str:
     return f"{seconds_per_km // 60:02d}:{seconds_per_km % 60:02d} /км"
 
 
-def calculate_pacemaker_rating(target_time: str, chip_time: str) -> float:
+def normalize_rating_mode(rating_mode: str) -> str:
+    return rating_mode if rating_mode in RATING_MODES else RATING_MODE_AUTOMATIC
+
+
+def resolve_rating_mode(target_time: str, rating_mode: str) -> str:
+    rating_mode = normalize_rating_mode(rating_mode)
+    if rating_mode != RATING_MODE_AUTOMATIC:
+        return rating_mode
+    _, target_minutes = map(int, target_time.split(":"))
+    if target_minutes % 10 in {4, 9}:
+        return RATING_MODE_SYMMETRIC
+    return RATING_MODE_STRICT
+
+
+def calculate_rating_for_difference(difference: int, rating_mode: str) -> float:
+    if rating_mode == RATING_MODE_SYMMETRIC:
+        absolute_difference = abs(difference)
+        if absolute_difference <= 90:
+            return 10 - 2 * absolute_difference / 90
+        return 8 * exp(-(absolute_difference - 90) / 180)
+
+    if difference < -90:
+        return 8 * exp((difference + 90) / 180)
+    if difference <= 0:
+        return 10 + 2 * difference / 90
+    return 10 * exp(-difference / 80)
+
+
+def calculate_pacemaker_rating(
+    target_time: str,
+    chip_time: str,
+    rating_mode: str = RATING_MODE_AUTOMATIC,
+) -> float:
     """Rate how closely the chip time matches the flag time on a 0–10 scale."""
     difference = _time_difference_seconds(target_time, chip_time)
-    if difference < -30:
-        return 8 * exp((difference + 30) / 90)
-    if difference <= 0:
-        return 10 + difference / 15
-    return 10 * exp(-difference / 80)
+    resolved_mode = resolve_rating_mode(target_time, rating_mode)
+    return calculate_rating_for_difference(difference, resolved_mode)
 
 
 def _time_difference_seconds(target_time: str, chip_time: str) -> int:

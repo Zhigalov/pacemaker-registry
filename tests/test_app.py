@@ -59,7 +59,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
         ),
     )
     monkeypatch.setattr(
-        "pacemaker_registry.main.load_registry", lambda event_id=None: registry
+        "pacemaker_registry.main.load_registry",
+        lambda event_id=None, rating_mode="automatic": registry,
     )
 
     async with AsyncClient(
@@ -81,20 +82,24 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert ">Факт<" in response.text
     assert "−7 с" in response.text
     assert "Как считается рейтинг" in response.text
-    assert "1:36" in response.text
-    assert "3,0 балла" in response.text
+    assert "Автопилот" in response.text
+    assert "Строгий финиш" in response.text
+    assert "Зеркальный допуск" in response.text
+    assert "Формула рейтинга" not in response.text
+    assert "rating-chart-line" in response.text
     assert "Детали результата" in response.text
     assert "Здесь появится список выступлений" not in response.text
     assert "Все соревнования" in response.text
     assert "Московский марафон" in response.text
     assert '<option value="0" selected>' in response.text
-    assert 'class="registry-filter-select"' in response.text
+    assert 'name="rating_mode"' in response.text
+    assert '<option value="automatic" selected>' in response.text
     assert '<noscript><button class="button registry-filter-submit"' in response.text
 
 
 @pytest.mark.anyio
 async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
-    requested_events: list[int | None] = []
+    requested_filters: list[tuple[int | None, str]] = []
     registry = Registry(
         pacemakers=(),
         event_count=1,
@@ -106,9 +111,19 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
         selected_event_id=2,
     )
 
-    def fake_load_registry(event_id: int | None = None) -> Registry:
-        requested_events.append(event_id)
-        return registry
+    def fake_load_registry(
+        event_id: int | None = None,
+        rating_mode: str = "automatic",
+    ) -> Registry:
+        requested_filters.append((event_id, rating_mode))
+        return Registry(
+            pacemakers=registry.pacemakers,
+            event_count=registry.event_count,
+            result_count=registry.result_count,
+            events=registry.events,
+            selected_event_id=registry.selected_event_id,
+            rating_mode=rating_mode,
+        )
 
     monkeypatch.setattr(
         "pacemaker_registry.main.load_registry", fake_load_registry
@@ -117,14 +132,20 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        response = await client.get("/?event_id=2")
-        await client.get("/?event_id=1")
+        response = await client.get("/?event_id=2&rating_mode=symmetric")
+        await client.get("/?event_id=1&rating_mode=strict")
         await client.get("/?event_id=0")
 
     assert response.status_code == 200
-    assert requested_events == [2, 1, None]
+    assert requested_filters == [
+        (2, "symmetric"),
+        (1, "strict"),
+        (None, "automatic"),
+    ]
     assert '<option value="2" selected>' in response.text
+    assert '<option value="symmetric" selected>' in response.text
     assert "Показать все" in response.text
+    assert 'href="/?rating_mode=symmetric"' in response.text
 
 
 @pytest.mark.anyio

@@ -38,10 +38,10 @@
       {% if registry.events %}
         <section class="registry-toolbar" aria-label="Фильтр реестра">
           <form class="registry-filter" method="get" action="/">
-            <label for="event-filter">Соревнование</label>
-            <div class="registry-filter-controls">
+            <div class="registry-filter-field registry-filter-field--event">
+              <label for="event-filter">Соревнование</label>
               <span class="registry-filter-select">
-                <select id="event-filter" name="event_id" data-event-filter>
+                <select id="event-filter" name="event_id" data-registry-filter>
                   <option value="0" {% if registry.selected_event_id is none %}selected{% endif %}>Все соревнования</option>
                   {% for event in registry.events %}
                     <option value="{{ event.id }}" {% if event.id == registry.selected_event_id %}selected{% endif %}>
@@ -50,11 +50,21 @@
                   {% endfor %}
                 </select>
               </span>
-              <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
             </div>
+            <div class="registry-filter-field registry-filter-field--rating">
+              <label for="rating-mode-filter">Модель рейтинга</label>
+              <span class="registry-filter-select">
+                <select id="rating-mode-filter" name="rating_mode" data-registry-filter>
+                  <option value="automatic" {% if registry.rating_mode == "automatic" %}selected{% endif %}>Автопилот</option>
+                  <option value="strict" {% if registry.rating_mode == "strict" %}selected{% endif %}>Строгий финиш</option>
+                  <option value="symmetric" {% if registry.rating_mode == "symmetric" %}selected{% endif %}>Зеркальный допуск</option>
+                </select>
+              </span>
+            </div>
+            <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
           </form>
           {% if registry.selected_event_id is not none %}
-            <a class="quiet-link registry-filter-reset" href="/">Показать все</a>
+            <a class="quiet-link registry-filter-reset" href="/?rating_mode={{ registry.rating_mode }}">Показать все</a>
           {% endif %}
         </section>
       {% endif %}
@@ -169,38 +179,85 @@
         <details class="rating-methodology">
           <summary>
             <span>Как считается рейтинг</span>
-            <span class="rating-methodology-hint">Формула и логика оценки</span>
+            <span class="rating-methodology-hint">Три модели оценки</span>
           </summary>
           <div class="rating-methodology-content">
             <p>
-              Сначала считаем отклонение <strong>Δ</strong> в секундах:
-              фактическое чип-время минус время на флаге. Отрицательное значение
-              означает финиш раньше цели, положительное — опоздание.
+              Рейтинг показывает, насколько точно пейсмейкер попал во время на флаге.
+              <strong>10 баллов</strong> — финиш ровно в цель. Чем дальше результат
+              от цели, тем ниже оценка; нуля она не достигает.
             </p>
-            <div class="rating-zones">
-              <div>
-                <strong>От −30 до 0 секунд</strong>
-                <span>Оценка растёт линейно от 8 до 10. Финиш ровно в цель даёт 10.</span>
-              </div>
-              <div>
-                <strong>Раньше чем на 30 секунд</strong>
-                <span>Оценка плавно снижается по экспоненте с масштабом 90 секунд.</span>
-              </div>
-              <div>
-                <strong>Позже цели</strong>
-                <span>Оценка снижается немного быстрее — опоздание для пейсера критичнее.</span>
-              </div>
+            <div class="rating-models">
+              <article class="rating-model {% if registry.rating_mode == 'automatic' %}rating-model--selected{% endif %}">
+                <header>
+                  <div>
+                    <span class="rating-model-kicker">Рекомендуемая</span>
+                    <h3>Автопилот</h3>
+                  </div>
+                  {% if registry.rating_mode == "automatic" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
+                </header>
+                <p>
+                  Для круглого времени включает «Строгий финиш». Если минуты
+                  заканчиваются на 4 или 9, включает «Зеркальный допуск».
+                </p>
+                <div class="rating-auto-map" aria-label="Правило автоматического выбора">
+                  <span><strong>1:30 · 1:35 · 1:40</strong>Строгий финиш</span>
+                  <span><strong>1:29 · 1:34 · 1:39</strong>Зеркальный допуск</span>
+                </div>
+              </article>
+
+              <article class="rating-model {% if registry.rating_mode == 'strict' %}rating-model--selected{% endif %}">
+                <header>
+                  <div>
+                    <span class="rating-model-kicker">Для круглого времени</span>
+                    <h3>Строгий финиш</h3>
+                  </div>
+                  {% if registry.rating_mode == "strict" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
+                </header>
+                <p>
+                  Небольшой запас допустим: до 90 секунд раньше оценка снижается
+                  плавно. Слишком ранний финиш штрафуется сильнее, а опоздание — сразу.
+                </p>
+                <div class="rating-chart">
+                  <svg viewBox="0 0 560 210" role="img" aria-labelledby="strict-chart-title strict-chart-description">
+                    <title id="strict-chart-title">График модели «Строгий финиш»</title>
+                    <desc id="strict-chart-description">До цели оценка плавно растёт к десяти, после цели резко снижается.</desc>
+                    <path class="rating-chart-grid" d="M36 18H524 M36 48.4H524 M36 170H524 M280 18V170 M206.8 18V170" />
+                    <polyline class="rating-chart-line" points="{{ rating_charts.strict }}" />
+                    <text x="36" y="197">раньше</text><text x="280" y="197" text-anchor="middle">цель</text><text x="524" y="197" text-anchor="end">позже</text>
+                    <text x="29" y="22" text-anchor="end">10</text><text x="29" y="52" text-anchor="end">8</text>
+                    <text class="rating-chart-note" x="206.8" y="68" text-anchor="middle">−90 с</text>
+                  </svg>
+                </div>
+              </article>
+
+              <article class="rating-model {% if registry.rating_mode == 'symmetric' %}rating-model--selected{% endif %}">
+                <header>
+                  <div>
+                    <span class="rating-model-kicker">Для времени на 4 или 9</span>
+                    <h3>Зеркальный допуск</h3>
+                  </div>
+                  {% if registry.rating_mode == "symmetric" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
+                </header>
+                <p>
+                  Одинаковое отклонение раньше или позже получает одинаковую оценку.
+                  В коридоре ±90 секунд снижение плавное, за его пределами ускоряется.
+                </p>
+                <div class="rating-chart">
+                  <svg viewBox="0 0 560 210" role="img" aria-labelledby="symmetric-chart-title symmetric-chart-description">
+                    <title id="symmetric-chart-title">График модели «Зеркальный допуск»</title>
+                    <desc id="symmetric-chart-description">Оценка симметрично растёт к десяти в цели и снижается по обе стороны.</desc>
+                    <path class="rating-chart-grid" d="M36 18H524 M36 48.4H524 M36 170H524 M280 18V170 M206.8 18V170 M353.2 18V170" />
+                    <polyline class="rating-chart-line" points="{{ rating_charts.symmetric }}" />
+                    <text x="36" y="197">раньше</text><text x="280" y="197" text-anchor="middle">цель</text><text x="524" y="197" text-anchor="end">позже</text>
+                    <text x="29" y="22" text-anchor="end">10</text><text x="29" y="52" text-anchor="end">8</text>
+                    <text class="rating-chart-note" x="206.8" y="68" text-anchor="middle">−90 с</text>
+                    <text class="rating-chart-note" x="353.2" y="68" text-anchor="middle">+90 с</text>
+                  </svg>
+                </div>
+              </article>
             </div>
-            <div class="rating-formula" aria-label="Формула рейтинга">
-              <code>−30 ≤ Δ ≤ 0: 10 + Δ / 15</code>
-              <code>Δ &lt; −30: 8 × e<sup>(Δ + 30) / 90</sup></code>
-              <code>Δ &gt; 0: 10 × e<sup>−Δ / 80</sup></code>
-            </div>
-            <p class="rating-example">
-              Для ориентира: опоздание на <strong>1:36</strong> даёт примерно
-              <strong>3,0 балла</strong>. Оценка стремится к нулю, но не достигает его.
-              Рейтинг пейсера — среднее всех его выступлений.
-            </p>
+            <p class="rating-example">Рейтинг пейсмейкера — среднее всех его выступлений в выбранной модели.</p>
           </div>
         </details>
       {% else %}

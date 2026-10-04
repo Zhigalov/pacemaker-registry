@@ -1,9 +1,9 @@
 const cards = document.querySelectorAll(".result-summary");
-const eventFilter = document.querySelector("[data-event-filter]");
+const registryFilters = document.querySelectorAll("[data-registry-filter]");
 let activePopover = null;
 
-eventFilter?.addEventListener("change", () => {
-  eventFilter.form?.requestSubmit();
+registryFilters.forEach((filter) => {
+  filter.addEventListener("change", () => filter.form?.requestSubmit());
 });
 
 function hidePopover(popover) {
