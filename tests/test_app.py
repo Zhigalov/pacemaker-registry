@@ -1,7 +1,12 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pacemaker_registry.db import Registry, RegistryPacemaker, RegistryResult
+from pacemaker_registry.db import (
+    Registry,
+    RegistryEvent,
+    RegistryPacemaker,
+    RegistryResult,
+)
 from pacemaker_registry.main import app
 from pacemaker_registry.russiarunning import Checkpoint, RaceResult
 
@@ -48,8 +53,14 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
         ),
         event_count=1,
         result_count=1,
+        events=(
+            RegistryEvent(id=1, name="Международный Когалымский полумарафон"),
+            RegistryEvent(id=2, name="Московский марафон"),
+        ),
     )
-    monkeypatch.setattr("pacemaker_registry.main.load_registry", lambda: registry)
+    monkeypatch.setattr(
+        "pacemaker_registry.main.load_registry", lambda event_id=None: registry
+    )
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -74,6 +85,44 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "3,0 балла" in response.text
     assert "Детали результата" in response.text
     assert "Здесь появится список выступлений" not in response.text
+    assert "Все соревнования" in response.text
+    assert "Московский марафон" in response.text
+    assert '<option value="0" selected>' in response.text
+
+
+@pytest.mark.anyio
+async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
+    requested_events: list[int | None] = []
+    registry = Registry(
+        pacemakers=(),
+        event_count=1,
+        result_count=0,
+        events=(
+            RegistryEvent(id=1, name="Когалымский полумарафон"),
+            RegistryEvent(id=2, name="Московский марафон"),
+        ),
+        selected_event_id=2,
+    )
+
+    def fake_load_registry(event_id: int | None = None) -> Registry:
+        requested_events.append(event_id)
+        return registry
+
+    monkeypatch.setattr(
+        "pacemaker_registry.main.load_registry", fake_load_registry
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/?event_id=2")
+        await client.get("/?event_id=1")
+        await client.get("/?event_id=0")
+
+    assert response.status_code == 200
+    assert requested_events == [2, 1, None]
+    assert '<option value="2" selected>' in response.text
+    assert "Показать все" in response.text
 
 
 @pytest.mark.anyio

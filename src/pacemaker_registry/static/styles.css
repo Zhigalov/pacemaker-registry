@@ -631,6 +631,68 @@ tbody tr:hover { background: #fbfcfc; }
   font-weight: 780;
 }
 
+.registry-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.registry-filter {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.registry-filter > label {
+  color: #71807b;
+  font-size: 0.72rem;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.registry-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.registry-filter select {
+  width: min(30rem, 64vw);
+  min-height: 2.85rem;
+  padding: 0.65rem 2.5rem 0.65rem 0.85rem;
+  border: 1px solid #cfdcd7;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #17231f;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.registry-filter select:focus-visible {
+  outline: 0.2rem solid rgba(25, 122, 98, 0.2);
+  outline-offset: 0.15rem;
+}
+
+.registry-filter-submit {
+  border-color: #cfdcd7;
+  background: #fff;
+  color: #176f59;
+}
+
+.registry-filter-submit:hover {
+  background: #edf5f2;
+}
+
+.registry-filter-reset {
+  padding: 0.65rem 0;
+}
+
 .registry-list {
   overflow: hidden;
   border: 1px solid #dfe7e4;
@@ -1020,6 +1082,31 @@ tbody tr:hover { background: #fbfcfc; }
     min-width: 0;
     flex: 1;
     padding: 0.65rem;
+  }
+
+  .registry-toolbar,
+  .registry-filter,
+  .registry-filter-controls {
+    width: 100%;
+  }
+
+  .registry-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .registry-filter select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .registry-filter-submit {
+    flex: 0 0 auto;
+  }
+
+  .registry-filter-reset {
+    align-self: flex-start;
   }
 
   .registry-columns {

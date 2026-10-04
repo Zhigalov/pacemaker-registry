@@ -46,10 +46,10 @@ templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request) -> HTMLResponse:
+def home(request: Request, event_id: int | None = None) -> HTMLResponse:
     registry_error = None
     try:
-        registry = load_registry()
+        registry = load_registry(event_id if event_id and event_id > 0 else None)
     except (PsycopgError, RuntimeError):
         registry = Registry(pacemakers=(), event_count=0, result_count=0)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."

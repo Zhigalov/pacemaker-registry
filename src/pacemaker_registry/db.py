@@ -42,10 +42,18 @@ class RegistryPacemaker:
 
 
 @dataclass(frozen=True, slots=True)
+class RegistryEvent:
+    id: int
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
 class Registry:
     pacemakers: tuple[RegistryPacemaker, ...]
     event_count: int
     result_count: int
+    events: tuple[RegistryEvent, ...] = ()
+    selected_event_id: int | None = None
 
 
 def connect_database() -> Connection[Any]:
@@ -84,10 +92,26 @@ def check_database() -> None:
         connection.execute("SELECT 1").fetchone()
 
 
-def load_registry() -> Registry:
+def load_registry(event_id: int | None = None) -> Registry:
     with connect_database() as connection:
-        rows = connection.execute(
+        event_rows = connection.execute(
             """
+            SELECT e.id, e.name
+            FROM events AS e
+            WHERE EXISTS (
+                SELECT 1
+                FROM race_results AS rr
+                WHERE rr.event_id = e.id
+            )
+            ORDER BY lower(e.name), e.id
+            """
+        ).fetchall()
+        events = tuple(RegistryEvent(id=row[0], name=row[1]) for row in event_rows)
+        selected_event_id = (
+            event_id if event_id in {event.id for event in events} else None
+        )
+
+        query = """
             SELECT
                 p.id,
                 p.last_name,
@@ -103,13 +127,19 @@ def load_registry() -> Registry:
             FROM pacemakers AS p
             JOIN race_results AS rr ON rr.pacemaker_id = p.id
             JOIN events AS e ON e.id = rr.event_id
+        """
+        parameters: tuple[int, ...] = ()
+        if selected_event_id is not None:
+            query += " WHERE e.id = %s"
+            parameters = (selected_event_id,)
+        query += """
             ORDER BY
                 lower(p.last_name),
                 lower(p.first_name),
                 rr.created_at DESC,
                 lower(e.name)
-            """
-        ).fetchall()
+        """
+        rows = connection.execute(query, parameters).fetchall()
 
     grouped: dict[int, dict[str, Any]] = {}
     event_ids: set[int] = set()
@@ -174,6 +204,8 @@ def load_registry() -> Registry:
         pacemakers=_sort_pacemakers(pacemakers),
         event_count=len(event_ids),
         result_count=len(rows),
+        events=events,
+        selected_event_id=selected_event_id,
     )
 
 

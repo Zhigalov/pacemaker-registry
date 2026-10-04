@@ -1,5 +1,10 @@
 const cards = document.querySelectorAll(".result-summary");
+const eventFilter = document.querySelector("[data-event-filter]");
 let activePopover = null;
+
+eventFilter?.addEventListener("change", () => {
+  eventFilter.form?.requestSubmit();
+});
 
 function hidePopover(popover) {
   if (!popover) return;

@@ -8,6 +8,7 @@ from pacemaker_registry.db import (
     _format_time_difference,
     _sort_pacemakers,
     calculate_pacemaker_rating,
+    load_registry,
 )
 
 
@@ -79,3 +80,58 @@ def test_pacemakers_are_sorted_by_rating_then_name() -> None:
         "Сидоров Семён",
         "Петров Пётр",
     ]
+
+
+def test_load_registry_filters_results_and_keeps_all_event_options(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, tuple[int, ...]]] = []
+    event_rows = [(1, "Когалымский полумарафон"), (2, "Московский марафон")]
+    result_rows = [
+        (
+            7,
+            "Петров",
+            "Пётр",
+            11,
+            2,
+            "Московский марафон",
+            Decimal("10"),
+            "00:55",
+            "00:54:53",
+            "05:29 /км",
+            [],
+        )
+    ]
+
+    class FakeQueryResult:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def fetchall(self):
+            return self.rows
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def execute(self, query: str, parameters=()):
+            calls.append((query, parameters))
+            return FakeQueryResult(event_rows if len(calls) == 1 else result_rows)
+
+    monkeypatch.setattr(
+        "pacemaker_registry.db.connect_database", lambda: FakeConnection()
+    )
+
+    registry = load_registry(event_id=2)
+
+    assert [(event.id, event.name) for event in registry.events] == event_rows
+    assert registry.selected_event_id == 2
+    assert calls[1][1] == (2,)
+    assert [pacemaker.full_name for pacemaker in registry.pacemakers] == [
+        "Петров Пётр"
+    ]
+    assert registry.event_count == 1
+    assert registry.result_count == 1

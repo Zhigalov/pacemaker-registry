@@ -35,6 +35,28 @@
         {% endif %}
       </section>
 
+      {% if registry.events %}
+        <section class="registry-toolbar" aria-label="Фильтр реестра">
+          <form class="registry-filter" method="get" action="/">
+            <label for="event-filter">Соревнование</label>
+            <div class="registry-filter-controls">
+              <select id="event-filter" name="event_id" data-event-filter>
+                <option value="0" {% if registry.selected_event_id is none %}selected{% endif %}>Все соревнования</option>
+                {% for event in registry.events %}
+                  <option value="{{ event.id }}" {% if event.id == registry.selected_event_id %}selected{% endif %}>
+                    {{ event.name }}
+                  </option>
+                {% endfor %}
+              </select>
+              <button class="button registry-filter-submit" type="submit">Показать</button>
+            </div>
+          </form>
+          {% if registry.selected_event_id is not none %}
+            <a class="quiet-link registry-filter-reset" href="/">Показать все</a>
+          {% endif %}
+        </section>
+      {% endif %}
+
       {% if registry_error %}
         <div class="error-message registry-load-error" role="alert">{{ registry_error }}</div>
       {% elif registry.pacemakers %}
