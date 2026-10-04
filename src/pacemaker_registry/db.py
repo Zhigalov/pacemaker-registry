@@ -25,6 +25,9 @@ RATING_MODES = {
 }
 CUSTOM_RATING_SECONDS = (-45, -30, -15, 0, 15, 30, 45)
 DEFAULT_CUSTOM_RATING_POINTS = (7.0, 8.0, 9.0, 10.0, 9.0, 8.0, 7.0)
+FINISH_RATING_WEIGHT = 0.6
+SPLITS_RATING_WEIGHT = 0.4
+MIN_SPLITS_COVERAGE = Decimal("0.8")
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +49,8 @@ class RegistryResult:
     target_pace: str
     chip_time: str
     actual_pace: str
+    finish_rating: float
+    splits_rating: float | None
     rating: float
     rating_tone: str
     time_difference: str
@@ -77,6 +82,7 @@ class Registry:
     selected_event_id: int | None = None
     rating_mode: str = RATING_MODE_AUTOMATIC
     custom_rating: CustomRatingConfig = CustomRatingConfig()
+    include_splits: bool = True
 
 
 def connect_database() -> Connection[Any]:
@@ -119,6 +125,7 @@ def load_registry(
     event_id: int | None = None,
     rating_mode: str = RATING_MODE_AUTOMATIC,
     custom_rating: CustomRatingConfig = CustomRatingConfig(),
+    include_splits: bool = True,
 ) -> Registry:
     rating_mode = normalize_rating_mode(rating_mode)
     with connect_database() as connection:
@@ -194,11 +201,21 @@ def load_registry(
                 "results": [],
             },
         )
-        rating = calculate_pacemaker_rating(
+        finish_rating = calculate_pacemaker_rating(
             target_time,
             chip_time,
             rating_mode,
             custom_rating,
+        )
+        splits_rating = calculate_splits_rating(
+            target_time,
+            distance,
+            checkpoints,
+        )
+        rating = calculate_combined_rating(
+            finish_rating,
+            splits_rating,
+            include_splits,
         )
         pacemaker["results"].append(
             RegistryResult(
@@ -210,6 +227,8 @@ def load_registry(
                 target_pace=_calculate_target_pace(target_time, distance),
                 chip_time=chip_time,
                 actual_pace=actual_pace,
+                finish_rating=finish_rating,
+                splits_rating=splits_rating,
                 rating=rating,
                 rating_tone=_rating_tone(rating),
                 time_difference=_format_time_difference(
@@ -241,6 +260,7 @@ def load_registry(
         selected_event_id=selected_event_id,
         rating_mode=rating_mode,
         custom_rating=custom_rating,
+        include_splits=include_splits,
     )
 
 
@@ -420,6 +440,63 @@ def calculate_pacemaker_rating(
     return calculate_rating_for_difference(difference, resolved_mode, custom_rating)
 
 
+def calculate_split_rating(deviation_seconds_per_km: float) -> float:
+    """Rate an absolute pace deviation in seconds per kilometre."""
+    deviation = abs(deviation_seconds_per_km)
+    if deviation <= 3:
+        return 10 - deviation / 3
+    if deviation <= 6:
+        return 9 - (deviation - 3) / 3
+    if deviation <= 10:
+        return 8 - (deviation - 6) / 4
+    return 7 * exp(-(deviation - 10) / 15)
+
+
+def calculate_splits_rating(
+    target_time: str,
+    distance_km: Decimal,
+    checkpoints: list[dict[str, str]] | tuple[dict[str, str], ...],
+) -> float | None:
+    """Return a distance-weighted rating for checkpoint segment paces."""
+    if distance_km <= 0:
+        return None
+
+    target_pace_seconds = _target_time_seconds(target_time) / float(distance_km)
+    weighted_rating = 0.0
+    covered_distance = Decimal("0")
+    for checkpoint in checkpoints:
+        try:
+            segment_distance = Decimal(
+                str(checkpoint["segment_distance_km"]).replace(",", ".")
+            )
+            pace_seconds = _pace_seconds(str(checkpoint["pace_per_km"]))
+        except (KeyError, ValueError, ArithmeticError):
+            continue
+        if segment_distance <= 0:
+            continue
+        weighted_rating += calculate_split_rating(
+            pace_seconds - target_pace_seconds
+        ) * float(segment_distance)
+        covered_distance += segment_distance
+
+    if covered_distance < distance_km * MIN_SPLITS_COVERAGE:
+        return None
+    return weighted_rating / float(covered_distance)
+
+
+def calculate_combined_rating(
+    finish_rating: float,
+    splits_rating: float | None,
+    include_splits: bool = True,
+) -> float:
+    if not include_splits or splits_rating is None:
+        return finish_rating
+    return (
+        finish_rating * FINISH_RATING_WEIGHT
+        + splits_rating * SPLITS_RATING_WEIGHT
+    )
+
+
 def _calculate_custom_rating(
     difference: int,
     config: CustomRatingConfig,
@@ -476,6 +553,17 @@ def _time_difference_seconds(target_time: str, chip_time: str) -> int:
     target_seconds = target_hours * 3600 + target_minutes * 60
     actual_seconds = chip_hours * 3600 + chip_minutes * 60 + chip_seconds
     return actual_seconds - target_seconds
+
+
+def _target_time_seconds(target_time: str) -> int:
+    hours, minutes = map(int, target_time.split(":"))
+    return hours * 3600 + minutes * 60
+
+
+def _pace_seconds(pace: str) -> int:
+    normalized = pace.replace("/км", "").strip()
+    minutes, seconds = map(int, normalized.split(":"))
+    return minutes * 60 + seconds
 
 
 def _format_time_difference(seconds: int) -> str:

@@ -37,7 +37,9 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
                         target_pace="05:24 /км",
                         chip_time="01:53:53",
                         actual_pace="05:23 /км",
-                        rating=9.533,
+                        finish_rating=9.533,
+                        splits_rating=8.7,
+                        rating=9.2,
                         rating_tone="excellent",
                         time_difference="−7 с",
                         checkpoints=(
@@ -61,7 +63,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "pacemaker_registry.main.load_registry",
-        lambda event_id=None, rating_mode="automatic", custom_rating=None: registry,
+        lambda event_id=None, rating_mode="automatic", custom_rating=None, include_splits=True: registry,
     )
 
     async with AsyncClient(
@@ -81,6 +83,13 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Рейтинг 9,5 из 10" in response.text
     assert ">Цель<" in response.text
     assert ">Факт<" in response.text
+    assert ">Финиш<" in response.text
+    assert ">Темп<" in response.text
+    assert ">Итог<" in response.text
+    assert "60% финиш + 40% темп" in response.text
+    assert "Международный Когалымский полумарафон</strong>" in response.text
+    assert 'name="include_splits"' in response.text
+    assert '<option value="true" selected>' in response.text
     assert "−7 с" in response.text
     assert "Как считается рейтинг" in response.text
     assert "Автопилот" in response.text
@@ -108,7 +117,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
 
 @pytest.mark.anyio
 async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
-    requested_filters: list[tuple[int | None, str, CustomRatingConfig]] = []
+    requested_filters: list[tuple[int | None, str, CustomRatingConfig, bool]] = []
     registry = Registry(
         pacemakers=(),
         event_count=1,
@@ -124,8 +133,9 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
         event_id: int | None = None,
         rating_mode: str = "automatic",
         custom_rating: CustomRatingConfig = CustomRatingConfig(),
+        include_splits: bool = True,
     ) -> Registry:
-        requested_filters.append((event_id, rating_mode, custom_rating))
+        requested_filters.append((event_id, rating_mode, custom_rating, include_splits))
         return Registry(
             pacemakers=registry.pacemakers,
             event_count=registry.event_count,
@@ -134,6 +144,7 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
             selected_event_id=registry.selected_event_id,
             rating_mode=rating_mode,
             custom_rating=custom_rating,
+            include_splits=include_splits,
         )
 
     monkeypatch.setattr(
@@ -143,7 +154,9 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        response = await client.get("/?event_id=2&rating_mode=symmetric")
+        response = await client.get(
+            "/?event_id=2&rating_mode=symmetric&include_splits=false"
+        )
         await client.get("/?event_id=1&rating_mode=strict")
         await client.get("/?event_id=0")
         custom_response = await client.get(
@@ -153,7 +166,7 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
         )
 
     assert response.status_code == 200
-    assert [(event_id, mode) for event_id, mode, _ in requested_filters] == [
+    assert [(event_id, mode) for event_id, mode, _, _ in requested_filters] == [
         (2, "symmetric"),
         (1, "strict"),
         (None, "automatic"),
@@ -162,7 +175,9 @@ async def test_home_page_passes_selected_event_to_registry(monkeypatch) -> None:
     assert '<option value="2" selected>' in response.text
     assert '<option value="symmetric" selected>' in response.text
     assert "Показать все" in response.text
-    assert 'href="/?rating_mode=symmetric"' in response.text
+    assert 'href="/?rating_mode=symmetric&include_splits=false"' in response.text
+    assert requested_filters[0][3] is False
+    assert '<option value="false" selected>' in response.text
     assert requested_filters[-1][2] == CustomRatingConfig(
         points=(6, 7, 8, 10, 8, 7, 6),
         left_exponent_start=15,

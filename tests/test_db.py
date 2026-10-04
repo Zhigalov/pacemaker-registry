@@ -12,8 +12,11 @@ from pacemaker_registry.db import (
     _calculate_target_pace,
     _format_time_difference,
     _sort_pacemakers,
+    calculate_combined_rating,
     calculate_rating_for_difference,
     calculate_pacemaker_rating,
+    calculate_split_rating,
+    calculate_splits_rating,
     load_registry,
     normalize_rating_mode,
     parse_custom_rating_config,
@@ -178,6 +181,50 @@ def test_exponential_rating_never_reaches_zero_for_realistic_result() -> None:
 
 
 @pytest.mark.parametrize(
+    ("deviation", "expected"),
+    [(0, 10), (3, 9), (6, 8), (10, 7), (-6, 8)],
+)
+def test_split_rating_uses_symmetric_pace_corridor(
+    deviation: float, expected: float
+) -> None:
+    assert calculate_split_rating(deviation) == pytest.approx(expected)
+
+
+def test_split_rating_falls_exponentially_after_ten_seconds() -> None:
+    assert calculate_split_rating(25) == pytest.approx(7 / 2.718281828, abs=0.01)
+    assert calculate_split_rating(1000) > 0
+
+
+def test_splits_rating_is_weighted_by_segment_distance() -> None:
+    rating = calculate_splits_rating(
+        "00:50",
+        Decimal("10"),
+        [
+            {"segment_distance_km": "2", "pace_per_km": "05:00"},
+            {"segment_distance_km": "8", "pace_per_km": "05:06"},
+        ],
+    )
+
+    assert rating == pytest.approx(8.4)
+
+
+def test_splits_rating_requires_eighty_percent_distance_coverage() -> None:
+    rating = calculate_splits_rating(
+        "00:50",
+        Decimal("10"),
+        [{"segment_distance_km": "7,9", "pace_per_km": "05:00"}],
+    )
+
+    assert rating is None
+
+
+def test_combined_rating_can_ignore_splits() -> None:
+    assert calculate_combined_rating(9, 7, True) == pytest.approx(8.2)
+    assert calculate_combined_rating(9, 7, False) == 9
+    assert calculate_combined_rating(9, None, True) == 9
+
+
+@pytest.mark.parametrize(
     ("seconds", "expected"),
     [(0, "ровно"), (-7, "−7 с"), (10, "+10 с"), (-70, "−1:10")],
 )
@@ -244,11 +291,16 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
         "pacemaker_registry.db.connect_database", lambda: FakeConnection()
     )
 
-    registry = load_registry(event_id=2, rating_mode=RATING_MODE_SYMMETRIC)
+    registry = load_registry(
+        event_id=2,
+        rating_mode=RATING_MODE_SYMMETRIC,
+        include_splits=False,
+    )
 
     assert [(event.id, event.name) for event in registry.events] == event_rows
     assert registry.selected_event_id == 2
     assert registry.rating_mode == RATING_MODE_SYMMETRIC
+    assert registry.include_splits is False
     assert calls[1][1] == (2,)
     assert [pacemaker.full_name for pacemaker in registry.pacemakers] == [
         "Петров Пётр"

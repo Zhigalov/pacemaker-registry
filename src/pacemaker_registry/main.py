@@ -81,6 +81,7 @@ def home(
     request: Request,
     event_id: int | None = None,
     rating_mode: str = RATING_MODE_AUTOMATIC,
+    include_splits: bool = True,
     custom_points: str | None = None,
     custom_left_start: str | None = None,
     custom_right_start: str | None = None,
@@ -104,13 +105,16 @@ def home(
             event_id if event_id and event_id > 0 else None,
             rating_mode,
             custom_rating,
+            include_splits,
         )
     except (PsycopgError, RuntimeError):
         registry = Registry(
             pacemakers=(),
             event_count=0,
             result_count=0,
+            rating_mode=rating_mode,
             custom_rating=custom_rating,
+            include_splits=include_splits,
         )
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
     return templates.TemplateResponse(

@@ -71,6 +71,15 @@
                 </select>
               </span>
             </div>
+            <div class="registry-filter-field registry-filter-field--splits">
+              <label for="splits-filter">Отсечки</label>
+              <span class="registry-filter-select">
+                <select id="splits-filter" name="include_splits" data-registry-filter>
+                  <option value="true" {% if registry.include_splits %}selected{% endif %}>Учитывать в итоге</option>
+                  <option value="false" {% if not registry.include_splits %}selected{% endif %}>Не учитывать</option>
+                </select>
+              </span>
+            </div>
             <input type="hidden" name="custom_points" value="{{ custom_points }}" data-custom-points-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
             <input type="hidden" name="custom_left_start" value="{{ registry.custom_rating.left_exponent_start }}" data-custom-left-start-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
             <input type="hidden" name="custom_right_start" value="{{ registry.custom_rating.right_exponent_start }}" data-custom-right-start-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
@@ -79,7 +88,7 @@
             <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
           </form>
           {% if registry.selected_event_id is not none %}
-            <a class="quiet-link registry-filter-reset" href="/?rating_mode={{ registry.rating_mode }}{% if registry.rating_mode == 'custom' %}&custom_points={{ custom_points }}&custom_left_start={{ registry.custom_rating.left_exponent_start }}&custom_right_start={{ registry.custom_rating.right_exponent_start }}&custom_left_decay={{ registry.custom_rating.left_decay }}&custom_right_decay={{ registry.custom_rating.right_decay }}{% endif %}">Показать все</a>
+            <a class="quiet-link registry-filter-reset" href="/?rating_mode={{ registry.rating_mode }}&include_splits={{ 'true' if registry.include_splits else 'false' }}{% if registry.rating_mode == 'custom' %}&custom_points={{ custom_points }}&custom_left_start={{ registry.custom_rating.left_exponent_start }}&custom_right_start={{ registry.custom_rating.right_exponent_start }}&custom_left_decay={{ registry.custom_rating.left_decay }}&custom_right_decay={{ registry.custom_rating.right_decay }}{% endif %}">Показать все</a>
           {% endif %}
         </section>
       {% endif %}
@@ -119,24 +128,22 @@
                     type="button"
                     data-tooltip-id="result-details-{{ result.id }}"
                     aria-describedby="result-details-{{ result.id }}"
-                    aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time }}, факт {{ result.chip_time }}, оценка {{ '%.1f'|format(result.rating) }} из 10"
+                    aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time }}, факт {{ result.chip_time }}, финиш {{ '%.1f'|format(result.finish_rating) }}, темп {% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating) }}{% else %}нет данных{% endif %}, итог {{ '%.1f'|format(result.rating) }} из 10"
                   >
                     <span class="result-summary-data">
-                      <span>
-                        <small>Дистанция</small>
-                        <strong>{{ result.distance_km }} км</strong>
+                      <span class="result-summary-head">
+                        <strong class="result-event-name" title="{{ result.event_name }}">{{ result.event_name }}</strong>
+                        <strong class="result-distance">{{ result.distance_km }} км</strong>
                       </span>
-                      <span>
-                        <small>Цель</small>
-                        <strong>{{ result.target_time }}</strong>
+                      <span class="result-summary-times">
+                        <small>Цель</small><strong>{{ result.target_time }}</strong>
+                        <span aria-hidden="true">→</span>
+                        <small>Факт</small><strong>{{ result.chip_time }}</strong>
                       </span>
-                      <span>
-                        <small>Факт</small>
-                        <strong>{{ result.chip_time }}</strong>
-                      </span>
-                      <span class="result-rating result-rating--{{ result.rating_tone }}">
-                        <small>Оценка</small>
-                        <strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong>
+                      <span class="result-summary-ratings">
+                        <span title="Оценка за финиш"><small>Финиш</small><strong>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }}</strong></span>
+                        <span title="Оценка за темп на отсечках"><small>Темп</small><strong>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }}{% else %}—{% endif %}</strong></span>
+                        <span class="result-rating result-rating--{{ result.rating_tone }}" title="Итоговая оценка"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
                       </span>
                     </span>
                   </button>
@@ -158,8 +165,10 @@
                       <div><dt>Чип-тайм</dt><dd>{{ result.chip_time }}</dd></div>
                       <div><dt>Фактический темп</dt><dd>{{ result.actual_pace }}</dd></div>
                       <div><dt>Отклонение</dt><dd>{{ result.time_difference }}</dd></div>
+                      <div><dt>Оценка за финиш</dt><dd>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }} / 10</dd></div>
+                      <div><dt>Оценка за темп</dt><dd>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }} / 10{% else %}Нет данных{% endif %}</dd></div>
                       <div class="popover-rating popover-rating--{{ result.rating_tone }}">
-                        <dt>Оценка</dt><dd>{{ "%.1f"|format(result.rating)|replace(".", ",") }} / 10</dd>
+                        <dt>Итоговая оценка</dt><dd>{{ "%.1f"|format(result.rating)|replace(".", ",") }} / 10</dd>
                       </div>
                     </dl>
                     {% if result.checkpoints %}
@@ -194,14 +203,38 @@
         <details class="rating-methodology" id="rating-methodology">
           <summary>
             <span>Как считается рейтинг</span>
-            <span class="rating-methodology-hint">Три модели оценки</span>
+            <span class="rating-methodology-hint">Финиш + ровность темпа</span>
           </summary>
           <div class="rating-methodology-content">
-            <p>
-              Рейтинг показывает, насколько точно пейсмейкер попал во время на флаге.
-              <strong>10 баллов</strong> — финиш ровно в цель. Чем дальше результат
-              от цели, тем ниже оценка; нуля она не достигает.
-            </p>
+            <p>Итог учитывает не только финиш, но и то, насколько ровно пейсмейкер вёл группу по дистанции.</p>
+            <section class="rating-composition" aria-labelledby="rating-composition-title">
+              <div class="rating-composition-heading">
+                <div>
+                  <span class="rating-model-kicker">Итоговая оценка</span>
+                  <h3 id="rating-composition-title">60% финиш + 40% темп</h3>
+                </div>
+                <span class="rating-composition-state">{% if registry.include_splits %}Отсечки включены{% else %}Отсечки выключены{% endif %}</span>
+              </div>
+              <div class="rating-composition-bar" aria-label="60 процентов оценки за финиш и 40 процентов за темп">
+                <span class="rating-composition-finish"><strong>60%</strong> финиш</span>
+                <span class="rating-composition-splits"><strong>40%</strong> темп</span>
+              </div>
+              <div class="rating-composition-flow" aria-label="Как считается оценка за темп">
+                <span><strong>1</strong> Сравниваем темп каждого отрезка с целевым</span>
+                <b aria-hidden="true">→</b>
+                <span><strong>2</strong> Умножаем оценку на километры отрезка</span>
+                <b aria-hidden="true">→</b>
+                <span><strong>3</strong> Получаем среднюю по дистанции</span>
+              </div>
+              <div class="splits-score-scale" aria-label="Шкала оценки отклонения темпа">
+                <span><strong>0</strong><small>сек/км</small><b>10</b></span>
+                <span><strong>3</strong><small>сек/км</small><b>9</b></span>
+                <span><strong>6</strong><small>сек/км</small><b>8</b></span>
+                <span><strong>10</strong><small>сек/км</small><b>7</b></span>
+                <span class="splits-score-scale-fade"><strong>&gt;10</strong><small>сек/км</small><b>штраф растёт</b></span>
+              </div>
+              <p>Раньше или позже целевого темпа — штраф одинаковый. Длинный отрезок влияет сильнее короткого. Если отсечек недостаточно или они выключены, итог равен оценке за финиш.</p>
+            </section>
             <div class="rating-models">
               <article class="rating-model {% if registry.rating_mode == 'automatic' %}rating-model--selected{% endif %}">
                 <header>
