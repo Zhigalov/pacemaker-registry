@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS race_results (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE events ADD COLUMN IF NOT EXISTS rating_config JSONB
+    CHECK (rating_config IS NULL OR jsonb_typeof(rating_config) = 'object');
+
 CREATE INDEX IF NOT EXISTS race_results_pacemaker_id_idx
     ON race_results (pacemaker_id);
 

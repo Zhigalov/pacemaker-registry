@@ -1,32 +1,28 @@
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, Form, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from psycopg import Error as PsycopgError
 
 from pacemaker_registry.db import (
-    RATING_MODE_AUTOMATIC,
-    RATING_MODE_CUSTOM,
-    RATING_MODE_STRICT,
-    RATING_MODE_SYMMETRIC,
-    CustomRatingConfig,
     Registry,
-    calculate_rating_for_difference,
+    get_event,
+    save_event_rating,
     check_database,
     get_event_target_time_type,
     initialize_database,
     load_registry,
-    parse_custom_rating_config,
     save_race_result,
-    serialize_custom_rating_points,
 )
+from pacemaker_registry.rating import default_event_rating, parse_event_rating
 from pacemaker_registry.russiarunning import (
     InvalidResultUrl,
     RaceResult,
@@ -38,29 +34,6 @@ from pacemaker_registry.sources import load_race_result
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 TARGET_TIME_PATTERN = re.compile(r"^[0-9]{1,2}:[0-5][0-9]$")
-
-
-def _rating_chart_points(
-    rating_mode: str,
-    custom_rating: CustomRatingConfig = CustomRatingConfig(),
-) -> str:
-    points = []
-    for difference in range(-75, 76, 3):
-        rating = calculate_rating_for_difference(
-            difference,
-            rating_mode,
-            custom_rating,
-        )
-        x = 48 + (difference + 75) / 150 * 564
-        y = 18 + (10 - rating) / 10 * 184
-        points.append(f"{x:.1f},{y:.1f}")
-    return " ".join(points)
-
-
-RATING_CHARTS = {
-    RATING_MODE_STRICT: _rating_chart_points(RATING_MODE_STRICT),
-    RATING_MODE_SYMMETRIC: _rating_chart_points(RATING_MODE_SYMMETRIC),
-}
 
 
 def _apply_event_target_time_type(result: RaceResult) -> RaceResult:
@@ -96,57 +69,71 @@ templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 def home(
     request: Request,
     event_id: int | None = None,
-    rating_mode: str = RATING_MODE_AUTOMATIC,
     include_splits: bool = True,
-    custom_points: str | None = None,
-    custom_left_start: str | None = None,
-    custom_right_start: str | None = None,
-    custom_left_decay: str | None = None,
-    custom_right_decay: str | None = None,
-    custom_start: str | None = None,
-    custom_decay: str | None = None,
 ) -> HTMLResponse:
     registry_error = None
-    custom_rating = parse_custom_rating_config(
-        custom_points,
-        custom_left_start,
-        custom_right_start,
-        custom_left_decay,
-        custom_right_decay,
-        custom_start,
-        custom_decay,
-    )
     try:
         registry = load_registry(
             event_id if event_id and event_id > 0 else None,
-            rating_mode,
-            custom_rating,
-            include_splits,
-        )
-    except (PsycopgError, RuntimeError):
-        registry = Registry(
-            pacemakers=(),
-            event_count=0,
-            result_count=0,
-            rating_mode=rating_mode,
-            custom_rating=custom_rating,
             include_splits=include_splits,
         )
+    except (PsycopgError, RuntimeError):
+        registry = Registry((), 0, 0, include_splits=include_splits)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
     return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "registry": registry,
-            "registry_error": registry_error,
-            "rating_charts": RATING_CHARTS,
-            "custom_chart": _rating_chart_points(
-                RATING_MODE_CUSTOM,
-                custom_rating,
-            ),
-            "custom_points": serialize_custom_rating_points(custom_rating),
-        },
+        request=request, name="index.html",
+        context={"registry": registry, "registry_error": registry_error},
     )
+
+
+def _load_event_or_404(event_id: int):
+    try:
+        event = get_event(event_id)
+    except (PsycopgError, RuntimeError) as error:
+        raise HTTPException(503, "Не удалось загрузить соревнование. Попробуйте позже.") from error
+    if event is None:
+        raise HTTPException(404, "Соревнование не найдено.")
+    return event
+
+
+def _event_response(request, event, *, values=None, error=None, saved=False, status_code=200):
+    return templates.TemplateResponse(
+        request=request, name="event.html",
+        context={
+            "event": event,
+            "values": values if values is not None else asdict(event.formula),
+            "defaults": asdict(default_event_rating(event.target_time_type)),
+            "error": error, "saved": saved,
+        },
+        status_code=status_code,
+    )
+
+
+@app.get("/events/{event_id}", response_class=HTMLResponse)
+def event_page(request: Request, event_id: int, saved: bool = False):
+    return _event_response(request, _load_event_or_404(event_id), saved=saved)
+
+
+@app.post("/events/{event_id}/rating", response_class=HTMLResponse)
+async def update_event_rating(request: Request, event_id: int):
+    event = await run_in_threadpool(_load_event_or_404, event_id)
+    form = await request.form()
+    values = dict(form)
+    try:
+        config = parse_event_rating(values)
+    except ValueError as error:
+        return _event_response(request, event, values=values, error=str(error), status_code=422)
+    try:
+        updated = await run_in_threadpool(save_event_rating, event_id, config)
+    except (PsycopgError, RuntimeError):
+        return _event_response(
+            request, event, values=values,
+            error="Не удалось сохранить формулу. Настройки остались в форме — попробуйте ещё раз.",
+            status_code=503,
+        )
+    if not updated:
+        raise HTTPException(404, "Соревнование не найдено.")
+    return RedirectResponse(f"/events/{event_id}?saved=true", status_code=303)
 
 
 @app.get("/add", response_class=HTMLResponse)

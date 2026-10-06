@@ -17,31 +17,15 @@ from pacemaker_registry.russiarunning import (
 )
 
 
+from pacemaker_registry.rating import (
+    EventRatingConfig, calculate_rating_for_difference, default_event_rating, parse_event_rating,
+)
+
+
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-RATING_MODE_AUTOMATIC = "automatic"
-RATING_MODE_CUSTOM = "custom"
-RATING_MODE_STRICT = "strict"
-RATING_MODE_SYMMETRIC = "symmetric"
-RATING_MODES = {
-    RATING_MODE_AUTOMATIC,
-    RATING_MODE_CUSTOM,
-    RATING_MODE_STRICT,
-    RATING_MODE_SYMMETRIC,
-}
-CUSTOM_RATING_SECONDS = (-45, -30, -15, 0, 15, 30, 45)
-DEFAULT_CUSTOM_RATING_POINTS = (7.0, 8.0, 9.0, 10.0, 9.0, 8.0, 7.0)
 FINISH_RATING_WEIGHT = 0.6
 SPLITS_RATING_WEIGHT = 0.4
 MIN_SPLITS_COVERAGE = Decimal("0.8")
-
-
-@dataclass(frozen=True, slots=True)
-class CustomRatingConfig:
-    points: tuple[float, ...] = DEFAULT_CUSTOM_RATING_POINTS
-    left_exponent_start: int = 45
-    right_exponent_start: int = 45
-    left_decay: int = 30
-    right_decay: int = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +60,12 @@ class RegistryPacemaker:
 class RegistryEvent:
     id: int
     name: str
+    target_time_type: str | None = None
+    rating_config: EventRatingConfig | None = None
+
+    @property
+    def formula(self) -> EventRatingConfig:
+        return self.rating_config or default_event_rating(self.target_time_type)
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,8 +75,6 @@ class Registry:
     result_count: int
     events: tuple[RegistryEvent, ...] = ()
     selected_event_id: int | None = None
-    rating_mode: str = RATING_MODE_AUTOMATIC
-    custom_rating: CustomRatingConfig = CustomRatingConfig()
     include_splits: bool = True
 
 
@@ -141,15 +129,14 @@ def get_event_target_time_type(source_event_id: str) -> str | None:
 
 def load_registry(
     event_id: int | None = None,
-    rating_mode: str = RATING_MODE_AUTOMATIC,
-    custom_rating: CustomRatingConfig = CustomRatingConfig(),
     include_splits: bool = True,
 ) -> Registry:
-    rating_mode = normalize_rating_mode(rating_mode)
     with connect_database() as connection:
+        # Both queries must see the same events and formulas during concurrent saves.
+        connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         event_rows = connection.execute(
             """
-            SELECT e.id, e.name
+            SELECT e.id, e.name, e.target_time_type, e.rating_config
             FROM events AS e
             WHERE EXISTS (
                 SELECT 1
@@ -159,7 +146,8 @@ def load_registry(
             ORDER BY lower(e.name), e.id
             """
         ).fetchall()
-        events = tuple(RegistryEvent(id=row[0], name=row[1]) for row in event_rows)
+        events = tuple(_event_from_row(row) for row in event_rows)
+        events_by_id = {event.id: event for event in events}
         selected_event_id = (
             event_id if event_id in {event.id for event in events} else None
         )
@@ -222,8 +210,7 @@ def load_registry(
         finish_rating = calculate_pacemaker_rating(
             target_time,
             chip_time,
-            rating_mode,
-            custom_rating,
+            events_by_id[event_id].formula,
         )
         splits_rating = calculate_splits_rating(
             target_time,
@@ -276,8 +263,6 @@ def load_registry(
         result_count=len(rows),
         events=events,
         selected_event_id=selected_event_id,
-        rating_mode=rating_mode,
-        custom_rating=custom_rating,
         include_splits=include_splits,
     )
 
@@ -378,97 +363,39 @@ def _calculate_target_pace(target_time: str, distance_km: Decimal) -> str:
     return f"{seconds_per_km // 60:02d}:{seconds_per_km % 60:02d} /км"
 
 
-def normalize_rating_mode(rating_mode: str) -> str:
-    return rating_mode if rating_mode in RATING_MODES else RATING_MODE_AUTOMATIC
-
-
-def parse_custom_rating_config(
-    serialized_points: str | None,
-    left_exponent_start: str | None,
-    right_exponent_start: str | None,
-    left_decay: str | None,
-    right_decay: str | None,
-    legacy_exponent_start: str | None = None,
-    legacy_decay: str | None = None,
-) -> CustomRatingConfig:
-    points = DEFAULT_CUSTOM_RATING_POINTS
-    if serialized_points:
-        try:
-            parsed = tuple(float(value) for value in serialized_points.split(","))
-            if len(parsed) == len(CUSTOM_RATING_SECONDS):
-                points = tuple(min(10.0, max(0.1, value)) for value in parsed)
-        except ValueError:
-            pass
-
-    def parse_integer(value: str | None, fallback: str | None, default: int) -> int:
-        try:
-            return int(value or fallback or default)
-        except ValueError:
-            return default
-
-    parsed_left_start = parse_integer(
-        left_exponent_start, legacy_exponent_start, 45
-    )
-    parsed_right_start = parse_integer(
-        right_exponent_start, legacy_exponent_start, 45
-    )
-    parsed_left_decay = parse_integer(left_decay, legacy_decay, 30)
-    parsed_right_decay = parse_integer(right_decay, legacy_decay, 30)
-
-    return CustomRatingConfig(
-        points=points,
-        left_exponent_start=min(65, max(0, parsed_left_start)),
-        right_exponent_start=min(65, max(0, parsed_right_start)),
-        left_decay=min(90, max(10, parsed_left_decay)),
-        right_decay=min(90, max(10, parsed_right_decay)),
-    )
-
-
-def serialize_custom_rating_points(config: CustomRatingConfig) -> str:
-    return ",".join(f"{point:g}" for point in config.points)
-
-
-def resolve_rating_mode(target_time: str, rating_mode: str) -> str:
-    rating_mode = normalize_rating_mode(rating_mode)
-    if rating_mode != RATING_MODE_AUTOMATIC:
-        return rating_mode
-    _, target_minutes = map(int, target_time.split(":"))
-    if target_minutes % 10 in {4, 9}:
-        return RATING_MODE_SYMMETRIC
-    return RATING_MODE_STRICT
-
-
-def calculate_rating_for_difference(
-    difference: int,
-    rating_mode: str,
-    custom_rating: CustomRatingConfig = CustomRatingConfig(),
-) -> float:
-    if rating_mode == RATING_MODE_CUSTOM:
-        return _calculate_custom_rating(difference, custom_rating)
-
-    if rating_mode == RATING_MODE_SYMMETRIC:
-        absolute_difference = abs(difference)
-        if absolute_difference <= 45:
-            return 10 - absolute_difference / 15
-        return 7 * exp(-(absolute_difference - 45) / 30)
-
-    if difference < -45:
-        return 7 * exp((difference + 45) / 30)
-    if difference <= 0:
-        return 10 + difference / 15
-    return 10 * exp(-difference / 30)
-
-
 def calculate_pacemaker_rating(
     target_time: str,
     chip_time: str,
-    rating_mode: str = RATING_MODE_AUTOMATIC,
-    custom_rating: CustomRatingConfig = CustomRatingConfig(),
+    config: EventRatingConfig,
 ) -> float:
-    """Rate how closely the chip time matches the flag time on a 0–10 scale."""
-    difference = _time_difference_seconds(target_time, chip_time)
-    resolved_mode = resolve_rating_mode(target_time, rating_mode)
-    return calculate_rating_for_difference(difference, resolved_mode, custom_rating)
+    return calculate_rating_for_difference(
+        _time_difference_seconds(target_time, chip_time), config
+    )
+
+
+def _event_from_row(row: tuple) -> RegistryEvent:
+    return RegistryEvent(
+        id=row[0], name=row[1], target_time_type=row[2],
+        rating_config=parse_event_rating(row[3]) if row[3] is not None else None,
+    )
+
+
+def get_event(event_id: int) -> RegistryEvent | None:
+    with connect_database() as connection:
+        row = connection.execute(
+            "SELECT id, name, target_time_type, rating_config FROM events WHERE id = %s",
+            (event_id,),
+        ).fetchone()
+    return _event_from_row(row) if row else None
+
+
+def save_event_rating(event_id: int, config: EventRatingConfig) -> bool:
+    with connect_database() as connection:
+        row = connection.execute(
+            "UPDATE events SET rating_config = %s WHERE id = %s RETURNING id",
+            (Jsonb(asdict(config)), event_id),
+        ).fetchone()
+    return row is not None
 
 
 def calculate_split_rating(deviation_seconds_per_km: float) -> float:
@@ -528,49 +455,6 @@ def calculate_combined_rating(
     )
 
 
-def _calculate_custom_rating(
-    difference: int,
-    config: CustomRatingConfig,
-) -> float:
-    if difference < 0:
-        boundary = -config.left_exponent_start
-        if difference >= boundary:
-            return _calculate_custom_linear_rating(difference, config.points)
-        boundary_score = _calculate_custom_linear_rating(boundary, config.points)
-        return boundary_score * exp(
-            (difference + config.left_exponent_start) / config.left_decay
-        )
-
-    boundary = config.right_exponent_start
-    if difference <= boundary:
-        return _calculate_custom_linear_rating(difference, config.points)
-    boundary_score = _calculate_custom_linear_rating(boundary, config.points)
-    return boundary_score * exp(
-        -(difference - config.right_exponent_start) / config.right_decay
-    )
-
-
-def _calculate_custom_linear_rating(
-    difference: int,
-    points: tuple[float, ...],
-) -> float:
-    if difference < -45:
-        edge_slope = (points[1] - points[0]) / 15
-        return _clamp_rating(points[0] + edge_slope * (difference + 45))
-    if difference > 45:
-        edge_slope = (points[-1] - points[-2]) / 15
-        return _clamp_rating(points[-1] + edge_slope * (difference - 45))
-
-    position = (difference + 45) / 15
-    left_index = min(int(position), len(points) - 2)
-    fraction = position - left_index
-    return points[left_index] + (points[left_index + 1] - points[left_index]) * fraction
-
-
-def _clamp_rating(rating: float) -> float:
-    return min(10.0, max(0.1, rating))
-
-
 def _time_difference_seconds(target_time: str, chip_time: str) -> int:
     target_hours, target_minutes = map(int, target_time.split(":"))
     chip_parts = [int(part) for part in chip_time.split(":")]
@@ -609,12 +493,10 @@ def _format_time_difference(seconds: int) -> str:
 
 
 def _rating_tone(rating: float) -> str:
-    if rating >= 9:
+    if rating >= 10:
         return "excellent"
     if rating >= 8:
         return "good"
-    if rating >= 6:
-        return "fair"
     return "low"
 
 

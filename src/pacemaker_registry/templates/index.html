@@ -7,8 +7,8 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css">
-    <script src="/static/registry.js" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=event-rating">
+    <script src="/static/registry.js?v=event-rating" defer></script>
   </head>
   <body>
     <main class="app-shell app-shell--registry">
@@ -53,46 +53,27 @@
                 </select>
               </span>
             </div>
-            <div class="registry-filter-field registry-filter-field--rating">
-              <div class="registry-filter-label">
-                <label for="rating-mode-filter">Модель рейтинга</label>
-                <button
-                  class="rating-help"
-                  type="button"
-                  aria-label="Показать, как считается рейтинг"
-                  aria-controls="rating-methodology"
-                  data-rating-help
-                >?</button>
-              </div>
-              <span class="registry-filter-select">
-                <select id="rating-mode-filter" name="rating_mode" data-registry-filter>
-                  <option value="automatic" {% if registry.rating_mode == "automatic" %}selected{% endif %}>Автопилот</option>
-                  <option value="strict" {% if registry.rating_mode == "strict" %}selected{% endif %}>Строгий финиш</option>
-                  <option value="symmetric" {% if registry.rating_mode == "symmetric" %}selected{% endif %}>Зеркальный допуск</option>
-                  <option value="custom" {% if registry.rating_mode == "custom" %}selected{% endif %}>Конструктор</option>
-                </select>
-              </span>
-            </div>
-            <div class="registry-filter-field registry-filter-field--splits">
-              <label for="splits-filter">Отсечки</label>
-              <span class="registry-filter-select">
-                <select id="splits-filter" name="include_splits" data-registry-filter>
-                  <option value="true" {% if registry.include_splits %}selected{% endif %}>Учитывать в итоге</option>
-                  <option value="false" {% if not registry.include_splits %}selected{% endif %}>Не учитывать</option>
-                </select>
-              </span>
-            </div>
-            <input type="hidden" name="custom_points" value="{{ custom_points }}" data-custom-points-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
-            <input type="hidden" name="custom_left_start" value="{{ registry.custom_rating.left_exponent_start }}" data-custom-left-start-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
-            <input type="hidden" name="custom_right_start" value="{{ registry.custom_rating.right_exponent_start }}" data-custom-right-start-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
-            <input type="hidden" name="custom_left_decay" value="{{ registry.custom_rating.left_decay }}" data-custom-left-decay-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
-            <input type="hidden" name="custom_right_decay" value="{{ registry.custom_rating.right_decay }}" data-custom-right-decay-input {% if registry.rating_mode != "custom" %}disabled{% endif %}>
+            <input type="hidden" name="include_splits" value="false">
+            <label class="splits-toggle">
+              <input type="checkbox" name="include_splits" value="true" data-registry-filter {% if registry.include_splits %}checked{% endif %}>
+              Учитывать темп на дистанции
+            </label>
             <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
           </form>
           {% if registry.selected_event_id is not none %}
-            <a class="quiet-link registry-filter-reset" href="/?rating_mode={{ registry.rating_mode }}&include_splits={{ 'true' if registry.include_splits else 'false' }}{% if registry.rating_mode == 'custom' %}&custom_points={{ custom_points }}&custom_left_start={{ registry.custom_rating.left_exponent_start }}&custom_right_start={{ registry.custom_rating.right_exponent_start }}&custom_left_decay={{ registry.custom_rating.left_decay }}&custom_right_decay={{ registry.custom_rating.right_decay }}{% endif %}">Показать все</a>
+            <a class="quiet-link" href="/events/{{ registry.selected_event_id }}">Настройки соревнования →</a>
+            <a class="quiet-link registry-filter-reset" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}">Показать все</a>
           {% endif %}
         </section>
+      {% endif %}
+
+      {% if registry.events %}
+        <details class="event-directory">
+          <summary>Соревнования и настройки рейтинга</summary>
+          <nav aria-label="Страницы соревнований">
+            {% for event in registry.events %}<a href="/events/{{ event.id }}">{{ event.name }}</a>{% endfor %}
+          </nav>
+        </details>
       {% endif %}
 
       {% if registry_error %}
@@ -212,7 +193,7 @@
             <section class="rating-composition" aria-labelledby="rating-composition-title">
               <div class="rating-composition-heading">
                 <div>
-                  <span class="rating-model-kicker">Итоговая оценка</span>
+                  <span class="eyebrow">Итоговая оценка</span>
                   <h3 id="rating-composition-title">60% финиш + 40% темп</h3>
                 </div>
                 <span class="rating-composition-state">{% if registry.include_splits %}Отсечки включены{% else %}Отсечки выключены{% endif %}</span>
@@ -237,196 +218,8 @@
               </div>
               <p>Отклонение до 5 секунд на километр не штрафуется. Затем оценка плавно снижается: 9 баллов при отклонении 10 секунд, 8 при 20 и 7 при 30. После 30 секунд штраф растёт по экспоненте. Раньше или позже целевого темпа — штраф одинаковый. Длинный отрезок влияет сильнее короткого. Если отсечек недостаточно или они выключены, итог равен оценке за финиш.</p>
             </section>
-            <div class="rating-models">
-              <article class="rating-model {% if registry.rating_mode == 'automatic' %}rating-model--selected{% endif %}">
-                <header>
-                  <div>
-                    <span class="rating-model-kicker">Рекомендуемая</span>
-                    <h3>Автопилот</h3>
-                  </div>
-                  {% if registry.rating_mode == "automatic" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
-                </header>
-                <p>
-                  Для круглого времени включает «Строгий финиш». Если минуты
-                  заканчиваются на 4 или 9, включает «Зеркальный допуск».
-                </p>
-                <div class="rating-auto-map" aria-label="Правило автоматического выбора">
-                  <span><strong>1:30 · 1:35 · 1:40</strong>Строгий финиш</span>
-                  <span><strong>1:29 · 1:34 · 1:39</strong>Зеркальный допуск</span>
-                </div>
-              </article>
-
-              <article class="rating-model {% if registry.rating_mode == 'strict' %}rating-model--selected{% endif %}">
-                <header>
-                  <div>
-                    <span class="rating-model-kicker">Для круглого времени</span>
-                    <h3>Строгий финиш</h3>
-                  </div>
-                  {% if registry.rating_mode == "strict" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
-                </header>
-                <p>
-                  Небольшой запас допустим: до 45 секунд раньше оценка снижается
-                  плавно. Слишком ранний финиш штрафуется сильнее, а опоздание — сразу.
-                </p>
-                <div class="rating-chart" data-rating-chart data-rating-mode="strict">
-                  <div class="rating-chart-tooltip" data-rating-chart-tooltip hidden>
-                    <strong data-rating-chart-time>ровно</strong>
-                    <span data-rating-chart-score>10,0 балла</span>
-                  </div>
-                  <svg class="rating-chart-svg" viewBox="0 0 660 260" role="img" tabindex="0" aria-labelledby="strict-chart-title strict-chart-description">
-                    <title id="strict-chart-title">График модели «Строгий финиш»</title>
-                    <desc id="strict-chart-description">Интерактивный график от минус 75 до плюс 75 секунд. Наведите указатель, чтобы узнать оценку.</desc>
-                    <path class="rating-chart-grid" d="M48 18H612 M48 36.4H612 M48 54.8H612 M48 73.2H612 M48 202H612 M160.8 18V202 M217.2 18V202 M273.6 18V202 M330 18V202 M386.4 18V202 M442.8 18V202 M499.2 18V202" />
-                    <polyline class="rating-chart-line" points="{{ rating_charts.strict }}" />
-                    <g class="rating-chart-key-points" aria-hidden="true">
-                      <circle cx="160.8" cy="73.2" r="4" /><circle cx="217.2" cy="54.8" r="4" />
-                      <circle cx="273.6" cy="36.4" r="4" /><circle cx="330" cy="18" r="4" />
-                    </g>
-                    <g class="rating-chart-cursor" data-rating-chart-cursor aria-hidden="true">
-                      <line x1="330" x2="330" y1="18" y2="202" />
-                      <circle cx="330" cy="18" r="6" />
-                    </g>
-                    <rect class="rating-chart-hit" x="48" y="18" width="564" height="184" />
-                    <g class="rating-chart-axis" aria-hidden="true">
-                      <text x="40" y="22" text-anchor="end">10</text><text x="40" y="40.4" text-anchor="end">9</text>
-                      <text x="40" y="58.8" text-anchor="end">8</text><text x="40" y="77.2" text-anchor="end">7</text>
-                      <text x="160.8" y="224" text-anchor="middle">−45</text><text x="217.2" y="224" text-anchor="middle">−30</text>
-                      <text x="273.6" y="224" text-anchor="middle">−15</text><text x="330" y="224" text-anchor="middle">0</text>
-                      <text x="386.4" y="224" text-anchor="middle">+15</text><text x="442.8" y="224" text-anchor="middle">+30</text>
-                      <text x="499.2" y="224" text-anchor="middle">+45</text>
-                      <text x="48" y="250">раньше</text><text x="612" y="250" text-anchor="end">позже</text>
-                    </g>
-                  </svg>
-                </div>
-              </article>
-
-              <article class="rating-model {% if registry.rating_mode == 'symmetric' %}rating-model--selected{% endif %}">
-                <header>
-                  <div>
-                    <span class="rating-model-kicker">Для времени на 4 или 9</span>
-                    <h3>Зеркальный допуск</h3>
-                  </div>
-                  {% if registry.rating_mode == "symmetric" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
-                </header>
-                <p>
-                  Одинаковое отклонение раньше или позже получает одинаковую оценку.
-                  В коридоре ±45 секунд каждые 15 секунд снимают один балл,
-                  за его пределами снижение резко ускоряется.
-                </p>
-                <div class="rating-chart" data-rating-chart data-rating-mode="symmetric">
-                  <div class="rating-chart-tooltip" data-rating-chart-tooltip hidden>
-                    <strong data-rating-chart-time>ровно</strong>
-                    <span data-rating-chart-score>10,0 балла</span>
-                  </div>
-                  <svg class="rating-chart-svg" viewBox="0 0 660 260" role="img" tabindex="0" aria-labelledby="symmetric-chart-title symmetric-chart-description">
-                    <title id="symmetric-chart-title">График модели «Зеркальный допуск»</title>
-                    <desc id="symmetric-chart-description">Интерактивный график от минус 75 до плюс 75 секунд. Наведите указатель, чтобы узнать оценку.</desc>
-                    <path class="rating-chart-grid" d="M48 18H612 M48 36.4H612 M48 54.8H612 M48 73.2H612 M48 202H612 M160.8 18V202 M217.2 18V202 M273.6 18V202 M330 18V202 M386.4 18V202 M442.8 18V202 M499.2 18V202" />
-                    <polyline class="rating-chart-line" points="{{ rating_charts.symmetric }}" />
-                    <g class="rating-chart-key-points" aria-hidden="true">
-                      <circle cx="160.8" cy="73.2" r="4" /><circle cx="217.2" cy="54.8" r="4" />
-                      <circle cx="273.6" cy="36.4" r="4" /><circle cx="330" cy="18" r="4" />
-                      <circle cx="386.4" cy="36.4" r="4" /><circle cx="442.8" cy="54.8" r="4" />
-                      <circle cx="499.2" cy="73.2" r="4" />
-                    </g>
-                    <g class="rating-chart-cursor" data-rating-chart-cursor aria-hidden="true">
-                      <line x1="330" x2="330" y1="18" y2="202" />
-                      <circle cx="330" cy="18" r="6" />
-                    </g>
-                    <rect class="rating-chart-hit" x="48" y="18" width="564" height="184" />
-                    <g class="rating-chart-axis" aria-hidden="true">
-                      <text x="40" y="22" text-anchor="end">10</text><text x="40" y="40.4" text-anchor="end">9</text>
-                      <text x="40" y="58.8" text-anchor="end">8</text><text x="40" y="77.2" text-anchor="end">7</text>
-                      <text x="160.8" y="224" text-anchor="middle">−45</text><text x="217.2" y="224" text-anchor="middle">−30</text>
-                      <text x="273.6" y="224" text-anchor="middle">−15</text><text x="330" y="224" text-anchor="middle">0</text>
-                      <text x="386.4" y="224" text-anchor="middle">+15</text><text x="442.8" y="224" text-anchor="middle">+30</text>
-                      <text x="499.2" y="224" text-anchor="middle">+45</text>
-                      <text x="48" y="250">раньше</text><text x="612" y="250" text-anchor="end">позже</text>
-                    </g>
-                  </svg>
-                </div>
-              </article>
-
-              <article class="rating-model rating-model--custom {% if registry.rating_mode == 'custom' %}rating-model--selected{% endif %}">
-                <header>
-                  <div>
-                    <span class="rating-model-kicker">Настройка мышкой</span>
-                    <h3>Конструктор</h3>
-                  </div>
-                  {% if registry.rating_mode == "custom" %}<span class="rating-model-badge">Выбрана</span>{% endif %}
-                </header>
-                <p>
-                  Перетаскивайте круглые точки вверх и вниз. Каждый ромб задаёт свой
-                  момент перехода к экспоненте, а крайние ручки — независимую резкость
-                  снижения слева и справа.
-                </p>
-                <div
-                  class="rating-chart rating-chart--editor"
-                  data-rating-chart
-                  data-rating-mode="custom"
-                  data-custom-editor
-                  data-custom-points="{{ custom_points }}"
-                  data-custom-left-start="{{ registry.custom_rating.left_exponent_start }}"
-                  data-custom-right-start="{{ registry.custom_rating.right_exponent_start }}"
-                  data-custom-left-decay="{{ registry.custom_rating.left_decay }}"
-                  data-custom-right-decay="{{ registry.custom_rating.right_decay }}"
-                >
-                  <div class="rating-chart-tooltip" data-rating-chart-tooltip hidden>
-                    <strong data-rating-chart-time>ровно</strong>
-                    <span data-rating-chart-score>10,0 балла</span>
-                  </div>
-                  <svg class="rating-chart-svg" viewBox="0 0 660 260" role="img" tabindex="0" aria-labelledby="custom-chart-title custom-chart-description">
-                    <title id="custom-chart-title">График модели «Конструктор»</title>
-                    <desc id="custom-chart-description">Перетаскивайте опорные точки, границу экспоненты и ручку резкости, чтобы настроить рейтинг.</desc>
-                    <path class="rating-chart-grid" d="M48 18H612 M48 36.4H612 M48 54.8H612 M48 73.2H612 M48 202H612 M160.8 18V202 M217.2 18V202 M273.6 18V202 M330 18V202 M386.4 18V202 M442.8 18V202 M499.2 18V202" />
-                    <polyline class="rating-chart-line" points="{{ custom_chart }}" data-custom-path />
-                    <rect class="rating-chart-hit" x="48" y="18" width="564" height="184" />
-                    <g class="custom-rating-boundaries" aria-hidden="true">
-                      <line data-custom-boundary-left x1="160.8" x2="160.8" y1="18" y2="202" />
-                      <line data-custom-boundary-right x1="499.2" x2="499.2" y1="18" y2="202" />
-                      <path class="custom-boundary-handle" data-custom-boundary-handle="left" d="M160.8 193 L171.8 202 L160.8 213 L149.8 202 Z" />
-                      <path class="custom-boundary-handle" data-custom-boundary-handle="right" d="M499.2 193 L510.2 202 L499.2 213 L488.2 202 Z" />
-                    </g>
-                    <g class="custom-rating-points" aria-label="Опорные точки рейтинга">
-                      <circle data-custom-point="0" cx="160.8" cy="73.2" r="7" />
-                      <circle data-custom-point="1" cx="217.2" cy="54.8" r="7" />
-                      <circle data-custom-point="2" cx="273.6" cy="36.4" r="7" />
-                      <circle data-custom-point="3" cx="330" cy="18" r="7" />
-                      <circle data-custom-point="4" cx="386.4" cy="36.4" r="7" />
-                      <circle data-custom-point="5" cx="442.8" cy="54.8" r="7" />
-                      <circle data-custom-point="6" cx="499.2" cy="73.2" r="7" />
-                    </g>
-                    <g class="custom-decay-control" aria-hidden="true">
-                      <line data-custom-decay-guide="left" x1="48" x2="48" y1="18" y2="202" />
-                      <circle data-custom-decay-handle="left" cx="48" cy="154" r="8" />
-                      <line data-custom-decay-guide="right" x1="612" x2="612" y1="18" y2="202" />
-                      <circle data-custom-decay-handle="right" cx="612" cy="154" r="8" />
-                    </g>
-                    <g class="rating-chart-cursor" data-rating-chart-cursor aria-hidden="true">
-                      <line x1="330" x2="330" y1="18" y2="202" />
-                      <circle cx="330" cy="18" r="6" />
-                    </g>
-                    <g class="rating-chart-axis" aria-hidden="true">
-                      <text x="40" y="22" text-anchor="end">10</text><text x="40" y="40.4" text-anchor="end">9</text>
-                      <text x="40" y="58.8" text-anchor="end">8</text><text x="40" y="77.2" text-anchor="end">7</text>
-                      <text x="160.8" y="224" text-anchor="middle">−45</text><text x="217.2" y="224" text-anchor="middle">−30</text>
-                      <text x="273.6" y="224" text-anchor="middle">−15</text><text x="330" y="224" text-anchor="middle">0</text>
-                      <text x="386.4" y="224" text-anchor="middle">+15</text><text x="442.8" y="224" text-anchor="middle">+30</text>
-                      <text x="499.2" y="224" text-anchor="middle">+45</text>
-                      <text x="48" y="250">раньше</text><text x="612" y="250" text-anchor="end">позже</text>
-                    </g>
-                  </svg>
-                </div>
-                <div class="custom-rating-status">
-                  <span>Слева: с <strong data-custom-left-start-display>−{{ registry.custom_rating.left_exponent_start }} с</strong>, резкость <strong data-custom-left-decay-display>{{ registry.custom_rating.left_decay }}</strong></span>
-                  <span>Справа: с <strong data-custom-right-start-display>+{{ registry.custom_rating.right_exponent_start }} с</strong>, резкость <strong data-custom-right-decay-display>{{ registry.custom_rating.right_decay }}</strong></span>
-                  <button type="button" class="quiet-link custom-rating-reset" data-custom-reset>Сбросить</button>
-                  <button type="button" class="button custom-rating-apply" data-custom-apply>Применить</button>
-                </div>
-                <p class="custom-rating-note">Настройки сохраняются в этом браузере. Нажмите «Применить», чтобы пересчитать и отсортировать реестр.</p>
-              </article>
-            </div>
-            <p class="rating-example">Рейтинг пейсмейкера — среднее всех его выступлений в выбранной модели.</p>
+            <p>Оценка за финиш считается по настройкам соревнования. В зелёной зоне допуска — 10 баллов, в жёлтых зонах оценка линейно снижается до 8, в красных — убывает по экспоненте.</p>
+            <p>Границы и график доступны на странице каждого соревнования. Рейтинг пейсмейкера — среднее итоговых оценок его выступлений; список отсортирован по убыванию рейтинга.</p>
           </div>
         </details>
       {% else %}
