@@ -12,12 +12,12 @@ from pacemaker_registry.russiarunning import (
     InvalidResultUrl,
     RaceResult,
     RussiaRunningError,
-    SLUG_PATTERN,
     guess_target_time,
 )
 
 
 RUNC_ORIGIN = "https://results.runc.run"
+EVENT_CODE_PATTERN = re.compile(r"^[A-Za-z0-9_,-]+$")
 RESULT_ID_PATTERN = re.compile(r"^[0-9]+$")
 TAG_PATTERN = re.compile(r"<[^>]+>")
 
@@ -46,7 +46,7 @@ def parse_result_url(value: str) -> RuncResultLink:
         raise InvalidResultUrl("Ссылка должна вести на результат участника RUNC.")
 
     _, event_code, _, result_id = parts
-    if not SLUG_PATTERN.fullmatch(event_code):
+    if not EVENT_CODE_PATTERN.fullmatch(event_code):
         raise InvalidResultUrl("В ссылке некорректный код мероприятия.")
     if not RESULT_ID_PATTERN.fullmatch(result_id):
         raise InvalidResultUrl("В ссылке некорректный идентификатор результата.")

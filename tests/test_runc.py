@@ -46,6 +46,14 @@ def test_parse_result_url() -> None:
     assert link.result_id == "27050"
 
 
+def test_parse_result_url_accepts_comma_in_runc_event_code() -> None:
+    link = parse_result_url(
+        "https://results.runc.run/event/moscow_marathon_42,2km_2026/result/27944/"
+    )
+
+    assert link.event_code == "moscow_marathon_42,2km_2026"
+
+
 @pytest.mark.parametrize(
     "url",
     [
