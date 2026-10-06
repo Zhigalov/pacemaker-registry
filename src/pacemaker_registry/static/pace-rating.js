@@ -1,6 +1,7 @@
-document.querySelectorAll('[data-pace-rating]').forEach(form => {
+document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form => {
+  const editable = form.matches('[data-pace-rating]');
   const defaults = JSON.parse(form.querySelector('[data-pace-defaults]').textContent);
-  const fields = Object.fromEntries(Object.keys(defaults).map(key => [key, form.elements.namedItem(key)]));
+  const fields = editable ? Object.fromEntries(Object.keys(defaults).map(key => [key, form.elements.namedItem(key)])) : {};
   const chart = form.querySelector('[data-pace-chart]');
   const readout = form.querySelector('[data-readout]');
   const state = form.querySelector('[data-save-state]');
@@ -33,6 +34,7 @@ document.querySelectorAll('[data-pace-rating]').forEach(form => {
   }
 
   function readFields() {
+    if (!editable) return true;
     const c = Object.fromEntries(Object.entries(fields).map(([key, input]) => [key, input.valueAsNumber]));
     const valid = Object.values(c).every(Number.isFinite)
       && 0 <= c.tolerance && c.tolerance < c.checkpoint && c.checkpoint < c.bad && c.bad <= 600
@@ -94,6 +96,8 @@ document.querySelectorAll('[data-pace-rating]').forEach(form => {
     }
     points.push([extent, score(extent)]);
     line(points, '#bc4c43');
+    if (!chart.querySelector('[data-hover]').hasAttribute('hidden')) inspect(inspected);
+    if (!editable) return;
     [['tolerance', 10, '#176f59'], ['checkpoint', config.checkpoint_score, '#b98216'], ['bad', config.bad_score, '#bc4c43']].forEach(([key, value, fill]) => {
       const handle = element('circle', {cx: x(config[key]), cy: y(value), r: 8, fill, class: 'event-handle', 'data-pace-handle': key}, handles);
       element('title', {}, handle, `${format(config[key])} с/км: ${format(value)} баллов`);
@@ -107,6 +111,7 @@ document.querySelectorAll('[data-pace-rating]').forEach(form => {
     return new DOMPoint(event.clientX, event.clientY).matrixTransform(chart.getScreenCTM().inverse());
   }
   chart.addEventListener('pointerdown', event => {
+    if (!editable) return;
     const key = event.target.dataset.paceHandle;
     if (!key || !readFields()) return;
     drag = {key, probe: config.bad + config.decay};
@@ -142,6 +147,9 @@ document.querySelectorAll('[data-pace-rating]').forEach(form => {
     event.preventDefault();
     inspect(event.key === 'Home' ? 0 : event.key === 'End' ? extent : inspected + (event.key === 'ArrowLeft' ? -1 : 1));
   });
+  readFields(); render();
+  if (window.ResizeObserver) new ResizeObserver(() => { if (!drag) render(); }).observe(chart);
+  if (!editable) return;
   Object.values(fields).forEach(input => input.addEventListener('input', () => {
     if (readFields()) { state.textContent = 'Есть несохранённые изменения оценки темпа.'; render(); }
   }));
@@ -152,6 +160,4 @@ document.querySelectorAll('[data-pace-rating]').forEach(form => {
     submit.disabled = true; submit.textContent = 'Сохраняем…';
   });
   window.addEventListener('pageshow', () => { submit.disabled = false; submit.textContent = 'Сохранить темп'; });
-  readFields(); render();
-  if (window.ResizeObserver) new ResizeObserver(() => { if (!drag) render(); }).observe(chart);
 });

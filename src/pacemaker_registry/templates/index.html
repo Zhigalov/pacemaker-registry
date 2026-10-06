@@ -7,8 +7,8 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=compact-toolbar">
-    <script src="/static/registry.js?v=event-rating" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=result-detail">
+    <script src="/static/registry.js?v=result-detail" defer></script>
   </head>
   <body>
     <main class="app-shell app-shell--registry">
@@ -95,9 +95,9 @@
 
               <div class="results-strip">
                 {% for result in pacemaker.results %}
-                  <button
+                  <a
                     class="result-summary"
-                    type="button"
+                    href="/results/{{ result.id }}?event_id={{ registry.selected_event_id or 0 }}&amp;include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}"
                     data-tooltip-id="result-details-{{ result.id }}"
                     aria-describedby="result-details-{{ result.id }}"
                     aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time }}, факт {{ result.chip_time }}, финиш {{ '%.1f'|format(result.finish_rating) }}, темп {% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating) }}{% else %}нет данных{% endif %}, итог {{ '%.1f'|format(result.rating) }} из 10"
@@ -118,7 +118,7 @@
                         <span class="result-rating result-rating--{{ result.rating_tone }}" style="{{ result.rating | rating_color }}" title="Итоговая оценка"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
                       </span>
                     </span>
-                  </button>
+                  </a>
 
                   <div
                     class="result-popover"

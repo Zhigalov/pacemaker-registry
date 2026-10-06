@@ -48,9 +48,13 @@ cards.forEach((card) => {
   const popover = document.getElementById(card.dataset.tooltipId);
   if (!popover) return;
 
-  card.addEventListener("mouseenter", () => showPopover(card, popover));
+  card.addEventListener("mouseenter", () => {
+    if (window.matchMedia('(hover: hover)').matches) showPopover(card, popover);
+  });
   card.addEventListener("mouseleave", () => hidePopover(popover));
-  card.addEventListener("focus", () => showPopover(card, popover));
+  card.addEventListener("focus", () => {
+    if (card.matches(':focus-visible')) showPopover(card, popover);
+  });
   card.addEventListener("blur", () => hidePopover(popover));
 });
 

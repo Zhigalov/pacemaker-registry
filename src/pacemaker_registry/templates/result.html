@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ details.athlete_name }} · {{ event.name }} — Реестр пейсмейкеров</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
+    <link rel="stylesheet" href="/static/styles.css?v=result-detail">
+    <script src="/static/event-rating.js?v=event-list" defer></script>
+    <script src="/static/pace-rating.js?v=result-detail" defer></script>
+  </head>
+  <body>
+    <main class="app-shell event-shell result-detail">
+      {% include '_navigation.html' %}
+      <section class="event-heading">
+        <a class="button result-back" href="{{ back_url }}">← Обратно к списку</a>
+        <h1>{{ details.athlete_name }}</h1>
+        <h2><a href="/events/{{ event.id }}">{{ event.name }}</a> · {{ result.distance_km }} км</h2>
+        <p>Время на флаге: {% if event.target_time_type == 'sub_minute' %}саб-минута{% elif event.target_time_type == 'round' %}ровное{% else %}тип ещё не определён{% endif %}</p>
+        <nav class="result-links" aria-label="Ссылки на соревнование">
+          <a href="/?event_id={{ event.id }}&amp;include_splits={{ 'true' if include_splits else 'false' }}">Все пейсеры соревнования</a>
+          <a href="/events/{{ event.id }}">Настройки соревнования</a>
+          {% if source_event_url %}<a href="{{ source_event_url }}" target="_blank" rel="noopener noreferrer">Соревнование на сайте организатора ↗</a>{% endif %}
+          {% if source_url %}<a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Исходный результат ↗</a>{% endif %}
+        </nav>
+      </section>
+      <section class="event-editor" aria-label="Показатели выступления">
+        <dl class="result-facts">
+          <div><dt>Цель · время на флаге</dt><dd>{{ result.target_time }}</dd></div>
+          <div><dt>Факт · чип-тайм</dt><dd>{{ result.chip_time }}</dd></div>
+          <div><dt>Отклонение финиша</dt><dd>{{ result.time_difference }}</dd></div>
+          <div><dt>Целевой темп</dt><dd>{{ result.target_pace }}</dd></div>
+          <div><dt>Фактический темп</dt><dd>{{ result.actual_pace }}</dd></div>
+        </dl>
+        <div class="result-scorecards">
+          <div style="{{ result.finish_rating | rating_color }}"><span>Финиш</span><strong>{{ '%.1f'|format(result.finish_rating)|replace('.', ',') }}<small> / 10</small></strong></div>
+          <div {% if result.splits_rating is not none %}style="{{ result.splits_rating | rating_color }}"{% endif %}><span>Темп на отрезках</span><strong>{% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating)|replace('.', ',') }}<small> / 10</small>{% else %}—{% endif %}</strong></div>
+          <div style="{{ result.rating | rating_color }}"><span>Итог</span><strong>{{ '%.1f'|format(result.rating)|replace('.', ',') }}<small> / 10</small></strong></div>
+        </div>
+        <p class="event-note">{% if not include_splits %}Учёт темпа выключен: итог равен оценке за финиш.{% elif result.splits_rating is none %}Недостаточно данных по отсечкам для оценки темпа: итог равен оценке за финиш.{% else %}Итог: 60% финиш + 40% темп. Оценки темпа взвешены по длине отрезков.{% endif %}</p>
+      </section>
+      <section class="event-editor result-checkpoints" aria-labelledby="checkpoints-title">
+        <h2 id="checkpoints-title">Все контрольные точки <span class="event-note">· {{ result.checkpoints|length }}</span></h2>
+        {% if result.checkpoints %}
+        <p class="event-note">Точка — расстояние от старта. Отрезок — расстояние от предыдущей точки, на котором пейсер держал указанный темп.</p>
+        <div class="result-splits-wrap">
+          <table class="result-splits-table">
+            <thead><tr><th scope="col">Точка, км</th><th scope="col">Отрезок, км</th><th scope="col">Время</th><th scope="col">Темп, мин/км</th></tr></thead>
+            <tbody>{% for checkpoint in result.checkpoints %}
+              <tr><td>{{ checkpoint.distance_km }}</td><td>{{ checkpoint.segment_distance_km }}</td><td>{{ checkpoint.time }}</td><td>{{ checkpoint.pace_per_km }}</td></tr>
+            {% endfor %}</tbody>
+          </table>
+        </div>
+        {% else %}<p>В источнике нет сохранённых контрольных точек.</p>{% endif %}
+      </section>
+      <section class="event-editor result-rating-preview" data-rating-widget aria-labelledby="finish-chart-title">
+        <h2 id="finish-chart-title">Оценка за финиш</h2>
+        <p class="event-note">Действующая шкала этого соревнования · только просмотр. Ваше отклонение: {{ result.time_difference }}, оценка: {{ '%.1f'|format(result.finish_rating)|replace('.', ',') }}.</p>
+        {% include '_rating_chart.html' %}
+        <script type="application/json" data-rating-config>{{ finish_config | tojson }}</script>
+      </section>
+      <section class="event-editor result-rating-preview" data-pace-widget aria-labelledby="pace-chart-title">
+        <h2 id="pace-chart-title">Оценка за темп на отрезках</h2>
+        <p class="event-note">Действующая шкала этого соревнования · только просмотр. Допуск ±{{ '%g'|format(event.pace_formula.tolerance) }} с/км, экспонента после ±{{ '%g'|format(event.pace_formula.bad) }} с/км.</p>
+        {% include '_pace_chart.html' %}
+        <script type="application/json" data-pace-defaults>{{ pace_config | tojson }}</script>
+      </section>
+      <a class="button result-back" href="{{ back_url }}">← Обратно к списку</a>
+    </main>
+  </body>
+</html>

@@ -94,6 +94,51 @@ class Registry:
     min_events: int = 1
 
 
+@dataclass(frozen=True, slots=True)
+class ResultDetails:
+    athlete_name: str
+    source_url: str
+    event: RegistryEvent
+    result: RegistryResult
+
+
+def _build_registry_result(result_id, event, distance, target_time, chip_time,
+                           actual_pace, checkpoints, include_splits=True) -> RegistryResult:
+    """The registry and detail page must use the very same scoring pipeline."""
+    finish_rating = calculate_pacemaker_rating(target_time, chip_time, event.formula)
+    splits_rating = calculate_splits_rating(target_time, distance, checkpoints, event.pace_formula)
+    rating = calculate_combined_rating(finish_rating, splits_rating, include_splits)
+    return RegistryResult(
+        id=result_id, event_id=event.id, event_name=event.name,
+        distance_km=_format_registry_distance(distance), target_time=target_time,
+        target_pace=_calculate_target_pace(target_time, distance), chip_time=chip_time,
+        actual_pace=actual_pace, finish_rating=finish_rating, splits_rating=splits_rating,
+        rating=rating, rating_tone=_rating_tone(rating),
+        time_difference=_format_time_difference(_time_difference_seconds(target_time, chip_time)),
+        checkpoints=tuple(checkpoints),
+    )
+
+
+def get_result_details(result_id: int, include_splits: bool = True) -> ResultDetails | None:
+    with connect_database() as connection:
+        row = connection.execute(
+            """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config,
+                      p.last_name, p.first_name, rr.source_url, rr.id, rr.distance_km,
+                      rr.target_time, rr.chip_time, rr.pace, rr.checkpoints
+               FROM race_results AS rr
+               JOIN events AS e ON e.id = rr.event_id
+               JOIN pacemakers AS p ON p.id = rr.pacemaker_id
+               WHERE rr.id = %s""", (result_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    event = _event_from_row(row[:5])
+    return ResultDetails(
+        athlete_name=f"{row[5]} {row[6]}", source_url=row[7], event=event,
+        result=_build_registry_result(row[8], event, *row[9:], include_splits=include_splits),
+    )
+
+
 def connect_database() -> Connection[Any]:
     database_url = os.getenv("DATABASE_URL")
     if database_url:
@@ -231,41 +276,9 @@ def load_registry(
                 "total_result_count": total_result_count,
             },
         )
-        finish_rating = calculate_pacemaker_rating(
-            target_time,
-            chip_time,
-            events_by_id[event_id].formula,
-        )
-        splits_rating = calculate_splits_rating(
-            target_time,
-            distance,
-            checkpoints,
-            events_by_id[event_id].pace_formula,
-        )
-        rating = calculate_combined_rating(
-            finish_rating,
-            splits_rating,
-            include_splits,
-        )
         pacemaker["results"].append(
-            RegistryResult(
-                id=result_id,
-                event_id=event_id,
-                event_name=event_name,
-                distance_km=_format_registry_distance(distance),
-                target_time=target_time,
-                target_pace=_calculate_target_pace(target_time, distance),
-                chip_time=chip_time,
-                actual_pace=actual_pace,
-                finish_rating=finish_rating,
-                splits_rating=splits_rating,
-                rating=rating,
-                rating_tone=_rating_tone(rating),
-                time_difference=_format_time_difference(
-                    _time_difference_seconds(target_time, chip_time)
-                ),
-                checkpoints=tuple(checkpoints),
-            )
+            _build_registry_result(result_id, events_by_id[event_id], distance,
+                                   target_time, chip_time, actual_pace, checkpoints, include_splits)
         )
 
     pacemakers = []

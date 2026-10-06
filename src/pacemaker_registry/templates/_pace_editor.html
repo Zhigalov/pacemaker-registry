@@ -3,15 +3,7 @@
     <div><h2>Оценка за темп на отрезках</h2><p>Своя шкала для этого соревнования. Отклонение от целевого темпа измеряется в секундах на километр, а не в секундах финиша.</p></div>
     <button class="button button--primary" type="submit">Сохранить темп</button>
   </div>
-  <div class="event-chart-wrap">
-    <svg class="event-chart" viewBox="0 0 800 320" role="img" aria-label="Оценка за темп: абсолютное отклонение в секундах на километр" tabindex="0" data-pace-chart>
-      <g data-zones></g><g class="event-chart-grid" data-grid></g><g data-curves></g><g data-handles></g>
-      <g data-hover hidden><line y1="26" y2="258"></line><circle r="5"></circle></g>
-    </svg>
-    <output class="event-chart-readout" data-readout aria-live="polite">Наведите на график, чтобы увидеть оценку</output>
-    <p class="event-note">Шкала симметрична: ±10 с/км означает на 10 секунд быстрее или медленнее цели. Тяните круглые точки влево и вправо для изменения границ, вверх и вниз — для баллов. Квадрат меняет резкость экспоненты.</p>
-    <noscript><p>График доступен с JavaScript. Настройки можно менять в полях ниже.</p></noscript>
-  </div>
+  {% with pace_editable=true %}{% include '_pace_chart.html' %}{% endwith %}
   <div class="event-zones pace-zones">
     <section class="event-zone event-zone--excellent">
       <h3>Без штрафа · 10 баллов</h3><p>Отклонения внутри допуска не снижают оценку.</p>

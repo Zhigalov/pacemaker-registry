@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -18,6 +19,7 @@ from pacemaker_registry.db import (
     get_event,
     save_event_rating,
     save_event_pace_rating,
+    get_result_details,
     check_database,
     get_event_target_time_type,
     initialize_database,
@@ -177,6 +179,51 @@ async def update_event_pace_rating(request: Request, event_id: int):
     if not updated:
         raise HTTPException(404, "Соревнование не найдено.")
     return RedirectResponse(f"/events/{event_id}?saved=true#pace-rating", status_code=303)
+
+
+def _result_source_links(source_url: str) -> tuple[str | None, str | None]:
+    """Only turn supported public result URLs into clickable external links."""
+    try:
+        url = urlsplit(source_url)
+    except ValueError:
+        return None, None
+    if url.scheme != "https":
+        return None, None
+    base = f"https://{url.netloc}"
+    if url.netloc == "results.russiarunning.com":
+        match = re.fullmatch(r"/participant/([\w-]+)/([\w-]+)/([\w-]+)/?", url.path)
+        if match:
+            return base + url.path, f"{base}/event/{match[1]}/results/{match[2]}"
+    elif url.netloc == "results.runc.run":
+        match = re.fullmatch(r"/event/([\w-]+)/result/(\d+)/?", url.path)
+        if match:
+            return base + url.path, f"{base}/event/{match[1]}/"
+    return None, None
+
+
+@app.get("/results/{result_id}", response_class=HTMLResponse)
+def result_page(
+    request: Request, result_id: int, include_splits: bool = True,
+    event_id: Annotated[int, Query(ge=0)] = 0,
+    min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
+):
+    try:
+        details = get_result_details(result_id, include_splits=include_splits)
+    except (PsycopgError, RuntimeError) as error:
+        raise HTTPException(503, "Не удалось загрузить результат. Попробуйте позже.") from error
+    if details is None:
+        raise HTTPException(404, "Результат не найден.")
+    source_url, source_event_url = _result_source_links(details.source_url)
+    return templates.TemplateResponse(
+        request=request, name="result.html",
+        context={
+            "details": details, "result": details.result, "event": details.event,
+            "source_url": source_url, "source_event_url": source_event_url,
+            "finish_config": asdict(details.event.formula),
+            "pace_config": asdict(details.event.pace_formula), "include_splits": include_splits,
+            "back_url": "/?" + urlencode({"event_id": event_id, "include_splits": str(include_splits).lower(), "min_events": min_events}),
+        },
+    )
 
 
 @app.get("/add", response_class=HTMLResponse)
