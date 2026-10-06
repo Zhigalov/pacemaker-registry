@@ -660,6 +660,10 @@ tbody tr:hover { background: #fbfcfc; }
   text-transform: uppercase;
 }
 
+.registry-filter-field--count input { width: 12rem; padding: .7rem; border: 1px solid #c9d7d0; border-radius: 10px; font: inherit; background: #fff; }
+.registry-filter-field--count small { font-size: .72rem; color: #71807b; }
+.pacemaker-event-count { display: block; font-size: .72rem; color: #71807b; margin-top: .2rem; }
+
 .registry-filter-select {
   position: relative;
   display: block;

@@ -62,7 +62,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "pacemaker_registry.main.load_registry",
-        lambda event_id=None, include_splits=True: registry,
+        lambda event_id=None, include_splits=True, min_events=1: registry,
     )
 
     async with AsyncClient(
@@ -74,7 +74,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=rating-gradient"' in response.text
+    assert 'href="/static/styles.css?v=min-events"' in response.text
     assert response.text.count('--rating-color: hsl(') == 3
     assert 'href="/add"' in response.text
     assert "Жигалов Сергей" in response.text
@@ -112,7 +112,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
 @pytest.mark.anyio
 async def test_home_page_filters_and_checkbox(monkeypatch) -> None:
     requested = []
-    def fake_load_registry(event_id=None, include_splits=True):
+    def fake_load_registry(event_id=None, include_splits=True, min_events=1):
         requested.append((event_id, include_splits))
         return Registry((), 1, 0, events=(RegistryEvent(2, "Марафон"),),
                         selected_event_id=event_id, include_splits=include_splits)
@@ -127,7 +127,7 @@ async def test_home_page_filters_and_checkbox(monkeypatch) -> None:
     assert response.status_code == 200
     assert requested == [(2, False), (1, True), (None, True), (None, True), (None, True)]
     assert 'href="/events/2"' in response.text
-    assert 'href="/?include_splits=false"' in response.text
+    assert 'href="/?include_splits=false&amp;min_events=1"' in response.text
 
 
 @pytest.mark.anyio

@@ -188,6 +188,7 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
             "00:54:53",
             "05:29 /км",
             [],
+            2,
         )
     ]
 

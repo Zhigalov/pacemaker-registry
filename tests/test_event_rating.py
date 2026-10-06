@@ -190,7 +190,7 @@ async def test_events_list_is_readonly_and_links_to_editors(monkeypatch):
 def test_registry_applies_each_events_formula_before_sorting(monkeypatch):
     events = [(1, "Первый", "round", None),
               (2, "Второй", "round", asdict(EventRatingConfig(right_good=10, right_bad=30)))]
-    rows = [(id, "Тестов", name, id, id, event, Decimal("10"), "00:50", "00:50:05", "05:00 /км", [])
+    rows = [(id, "Тестов", name, id, id, event, Decimal("10"), "00:50", "00:50:05", "05:00 /км", [], 1)
             for id, name, event in [(1, "Первый", "Первый"), (2, "Второй", "Второй")]]
     class Connection:
         def __enter__(self): return self

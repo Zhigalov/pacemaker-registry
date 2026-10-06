@@ -72,15 +72,17 @@ def home(
     request: Request,
     event_id: int | None = None,
     include_splits: bool = True,
+    min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
 ) -> HTMLResponse:
     registry_error = None
     try:
         registry = load_registry(
             event_id if event_id and event_id > 0 else None,
             include_splits=include_splits,
+            min_events=min_events,
         )
     except (PsycopgError, RuntimeError):
-        registry = Registry((), 0, 0, include_splits=include_splits)
+        registry = Registry((), 0, 0, include_splits=include_splits, min_events=min_events)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
     return templates.TemplateResponse(
         request=request, name="index.html",
