@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Получение результата пейсмейкера с RussiaRunning">
+    <meta name="description" content="Получение результата пейсмейкера из беговых протоколов">
     <title>Добавить результат — Реестр пейсмейкеров</title>
     <link rel="stylesheet" href="/static/styles.css">
     <script src="/static/add.js" defer></script>
@@ -36,7 +36,7 @@
               autocomplete="off"
               inputmode="url"
               aria-describedby="url-example"
-              placeholder="https://results.russiarunning.com/participant/..."
+              placeholder="Ссылка на результат RussiaRunning или RUNC"
               value="{{ result_url }}"
             >
             <button class="button button--primary loading-button" type="submit">
@@ -48,7 +48,7 @@
             </button>
           </div>
           <p class="field-hint" id="url-example">
-            Например: <span>https://results.russiarunning.com/participant/Kogalymskiypolumarafon2026/21km/827f5fcd-eaaf-41c0-93d2-ed4fd58de206</span>
+            Например: <span>https://results.runc.run/event/moscow_marathon_10_km2026/result/27050/</span>
           </p>
         </form>
 

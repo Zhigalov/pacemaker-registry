@@ -32,8 +32,8 @@ from pacemaker_registry.russiarunning import (
     RaceResult,
     RussiaRunningError,
     guess_target_time,
-    load_race_result,
 )
+from pacemaker_registry.sources import load_race_result
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
