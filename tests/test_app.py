@@ -248,6 +248,53 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
 
 
 @pytest.mark.anyio
+async def test_add_form_parses_result_url_from_query_without_saving(monkeypatch) -> None:
+    result_url = (
+        "https://results.russiarunning.com/participant/"
+        "kazanmarathon2026/21km/edf120ca-d0dd-408e-94d2-52bb06f4f101"
+    )
+    loaded_urls: list[str] = []
+
+    async def fake_load_race_result(value: str) -> RaceResult:
+        loaded_urls.append(value)
+        return RaceResult(
+            athlete_name="Андреев Артем",
+            source_event_id="21ca4584-8f8b-47df-85ee-4fbcef005074",
+            source_participant_id="edf120ca-d0dd-408e-94d2-52bb06f4f101",
+            event_name="СберПрайм Казанский марафон 2026",
+            distance_km="21,1",
+            chip_time="01:19:53",
+            target_time="01:20",
+            pace="03:47 /км",
+            checkpoints=(),
+            source_url=value,
+        )
+
+    def fail_if_saved(*_: object) -> bool:
+        raise AssertionError("GET /add must not save a result")
+
+    monkeypatch.setattr(
+        "pacemaker_registry.main.load_race_result", fake_load_race_result
+    )
+    monkeypatch.setattr(
+        "pacemaker_registry.main.save_race_result", fail_if_saved
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/add", params={"result_url": result_url})
+
+    assert response.status_code == 200
+    assert loaded_urls == [result_url]
+    assert "Андреев Артем" in response.text
+    assert "01:19:53" in response.text
+    assert 'value="01:20"' in response.text
+    assert "Проверьте полученные данные" in response.text
+    assert "Сохранить в реестр" in response.text
+
+
+@pytest.mark.anyio
 async def test_result_can_be_saved_after_review(monkeypatch) -> None:
     result = RaceResult(
         athlete_name="Жигалов Сергей",

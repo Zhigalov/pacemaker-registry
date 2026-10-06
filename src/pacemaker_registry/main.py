@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -134,16 +134,35 @@ def home(
 
 
 @app.get("/add", response_class=HTMLResponse)
-def add_form(request: Request) -> HTMLResponse:
+async def add_form(
+    request: Request,
+    result_url: Annotated[str | None, Query(max_length=500)] = None,
+) -> HTMLResponse:
+    result = None
+    error = None
+    status_code = 200
+    submitted_url = result_url or ""
+
+    if result_url:
+        try:
+            result = await load_race_result(result_url)
+        except InvalidResultUrl as exception:
+            error = str(exception)
+            status_code = 422
+        except RussiaRunningError as exception:
+            error = str(exception)
+            status_code = 502
+
     return templates.TemplateResponse(
         request=request,
         name="add.html",
         context={
-            "result": None,
-            "error": None,
-            "result_url": "",
+            "result": result,
+            "error": error,
+            "result_url": submitted_url,
             "saved_message": None,
         },
+        status_code=status_code,
     )
 
 
