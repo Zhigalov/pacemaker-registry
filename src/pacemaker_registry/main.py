@@ -14,6 +14,7 @@ from psycopg import Error as PsycopgError
 
 from pacemaker_registry.db import (
     Registry,
+    list_events,
     get_event,
     save_event_rating,
     check_database,
@@ -106,6 +107,18 @@ def _event_response(request, event, *, values=None, error=None, saved=False, sta
             "error": error, "saved": saved,
         },
         status_code=status_code,
+    )
+
+
+@app.get("/events", response_class=HTMLResponse)
+def events_page(request: Request):
+    try:
+        events = list_events()
+    except (PsycopgError, RuntimeError) as error:
+        raise HTTPException(503, "Не удалось загрузить соревнования. Попробуйте позже.") from error
+    return templates.TemplateResponse(
+        request=request, name="events.html",
+        context={"events": events, "configs": {event.id: asdict(event.formula) for event in events}},
     )
 
 

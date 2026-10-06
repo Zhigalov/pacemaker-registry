@@ -14,6 +14,8 @@ class EventRatingConfig:
     right_decay: float = 30
     left_curve: float = 1
     right_curve: float = 1
+    left_score: float = 8
+    right_score: float = 8
 
     def __post_init__(self) -> None:
         values = asdict(self)
@@ -27,6 +29,8 @@ class EventRatingConfig:
             raise ValueError("Масштаб экспоненты должен быть от 1 до 300 секунд.")
         if not all(0.5 <= v <= 3 for v in (self.left_curve, self.right_curve)):
             raise ValueError("Кривизна должна быть от 0,5 до 3.")
+        if not all(0.1 <= v <= 10 for v in (self.left_score, self.right_score)):
+            raise ValueError("Оценка на границе должна быть от 0,1 до 10 баллов.")
 
 
 def default_event_rating(target_time_type: str | None) -> EventRatingConfig:
@@ -35,10 +39,12 @@ def default_event_rating(target_time_type: str | None) -> EventRatingConfig:
     return EventRatingConfig()
 
 
-def parse_event_rating(values: dict) -> EventRatingConfig:
+def parse_event_rating(values: dict, *, allow_legacy: bool = False) -> EventRatingConfig:
     keys = set(asdict(EventRatingConfig()))
+    if allow_legacy and isinstance(values, dict) and set(values) == keys - {"left_score", "right_score"}:
+        values = values | {"left_score": 8, "right_score": 8}
     if not isinstance(values, dict) or set(values) != keys:
-        raise ValueError("Передайте все восемь параметров формулы.")
+        raise ValueError("Передайте все десять параметров формулы.")
     try:
         if any(isinstance(v, bool) for v in values.values()):
             raise ValueError
@@ -53,16 +59,16 @@ def calculate_rating_for_difference(difference: float, config: EventRatingConfig
     if difference < config.left_good:
         width = config.left_good - config.left_bad
         if difference >= config.left_bad and width > 0:
-            return 8 + 2 * (difference - config.left_bad) / width
+            return config.left_score + (10 - config.left_score) * (difference - config.left_bad) / width
         distance = (config.left_bad - difference) / config.left_decay
-        edge_score = 8 if width > 0 else 10
+        edge_score = config.left_score if width > 0 else 10
         curve = config.left_curve
     else:
         width = config.right_bad - config.right_good
         if difference <= config.right_bad and width > 0:
-            return 10 - 2 * (difference - config.right_good) / width
+            return 10 - (10 - config.right_score) * (difference - config.right_good) / width
         distance = (difference - config.right_bad) / config.right_decay
-        edge_score = 8 if width > 0 else 10
+        edge_score = config.right_score if width > 0 else 10
         curve = config.right_curve
     # Prevent numerical underflow: even a very distant finish stays above zero.
     return edge_score * exp(-min(700, distance ** curve))

@@ -7,18 +7,12 @@
     <title>Добавить результат — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=event-list">
     <script src="/static/add.js" defer></script>
   </head>
   <body>
     <main class="app-shell">
-      <header class="site-header">
-        <a class="brand" href="/" aria-label="Реестр пейсмейкеров — главная">
-          <span class="brand-mark" aria-hidden="true">P</span>
-          <span>Реестр пейсмейкеров</span>
-        </a>
-        <a class="quiet-link" href="/">← На главную</a>
-      </header>
+      {% include '_navigation.html' %}
 
       <section class="form-card" aria-labelledby="page-title">
         <div class="form-intro">

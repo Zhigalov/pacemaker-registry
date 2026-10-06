@@ -7,21 +7,12 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-rating">
+    <link rel="stylesheet" href="/static/styles.css?v=event-list">
     <script src="/static/registry.js?v=event-rating" defer></script>
   </head>
   <body>
     <main class="app-shell app-shell--registry">
-      <header class="site-header">
-        <a class="brand" href="/" aria-label="Реестр пейсмейкеров — главная">
-          <span class="brand-mark" aria-hidden="true">P</span>
-          <span>Реестр пейсмейкеров</span>
-        </a>
-        <a class="button button--primary" href="/add">
-          <span aria-hidden="true">＋</span>
-          Добавить результат
-        </a>
-      </header>
+      {% include '_navigation.html' %}
 
       <section class="registry-heading" aria-labelledby="page-title">
         <div>
@@ -67,14 +58,6 @@
         </section>
       {% endif %}
 
-      {% if registry.events %}
-        <details class="event-directory">
-          <summary>Соревнования и настройки рейтинга</summary>
-          <nav aria-label="Страницы соревнований">
-            {% for event in registry.events %}<a href="/events/{{ event.id }}">{{ event.name }}</a>{% endfor %}
-          </nav>
-        </details>
-      {% endif %}
 
       {% if registry_error %}
         <div class="error-message registry-load-error" role="alert">{{ registry_error }}</div>
@@ -218,7 +201,7 @@
               </div>
               <p>Отклонение до 5 секунд на километр не штрафуется. Затем оценка плавно снижается: 9 баллов при отклонении 10 секунд, 8 при 20 и 7 при 30. После 30 секунд штраф растёт по экспоненте. Раньше или позже целевого темпа — штраф одинаковый. Длинный отрезок влияет сильнее короткого. Если отсечек недостаточно или они выключены, итог равен оценке за финиш.</p>
             </section>
-            <p>Оценка за финиш считается по настройкам соревнования. В зелёной зоне допуска — 10 баллов, в жёлтых зонах оценка линейно снижается до 8, в красных — убывает по экспоненте.</p>
+            <p>Оценка за финиш считается по настройкам соревнования. В зелёной зоне допуска — 10 баллов, в жёлтых зонах оценка линейно снижается до балла, заданного для границы с красной зоной, в красных — убывает по экспоненте.</p>
             <p>Границы и график доступны на странице каждого соревнования. Рейтинг пейсмейкера — среднее итоговых оценок его выступлений; список отсортирован по убыванию рейтинга.</p>
           </div>
         </details>

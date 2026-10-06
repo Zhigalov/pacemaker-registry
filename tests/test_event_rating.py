@@ -66,6 +66,7 @@ def test_sides_and_curvature_are_independent():
     {"left_decay": 0}, {"right_decay": 301}, {"left_curve": 0.4},
     {"right_curve": 3.1}, {"right_curve": "nan"}, {"left_decay": "inf"},
     {"left_good": True}, {"left_curve": "oops"},
+    {"left_score": 0}, {"right_score": 10.1}, {"left_score": "nan"},
 ])
 def test_invalid_settings_rejected(changes):
     with pytest.raises(ValueError):
@@ -88,7 +89,7 @@ async def test_event_save_reload_and_isolation(monkeypatch):
         events[event_id] = replace(events[event_id], rating_config=config)
         return True
     monkeypatch.setattr("pacemaker_registry.main.save_event_rating", save)
-    values = asdict(default_event_rating("sub_minute")) | {"left_bad": -90}
+    values = asdict(default_event_rating("sub_minute")) | {"left_bad": -90, "left_score": 6, "right_score": 9}
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         page = await client.get("/events/1")
         assert page.status_code == 200
@@ -98,6 +99,8 @@ async def test_event_save_reload_and_isolation(monkeypatch):
         assert saved.status_code == 200
         assert "Формула сохранена" in saved.text
         assert 'value="-90.0"' in saved.text
+        assert events[1].formula.left_score == 6
+        assert events[1].formula.right_score == 9
         assert events[2].formula == default_event_rating("round")
         missing = await client.get("/events/999")
         assert missing.status_code == 404
@@ -141,6 +144,47 @@ def test_database_roundtrip_uses_event_id_and_json(monkeypatch):
     assert save_event_rating(7, config)
     assert get_event(7).formula == config
     assert calls[0][1][1] == 7
+
+
+def test_legacy_configs_keep_eight_points_only_when_loading_database():
+    legacy = asdict(default_event_rating("sub_minute"))
+    del legacy["left_score"], legacy["right_score"]
+    assert parse_event_rating(legacy, allow_legacy=True) == default_event_rating("sub_minute")
+    with pytest.raises(ValueError):
+        parse_event_rating(legacy)
+
+
+def test_editable_scores_are_continuous_and_independent():
+    config = replace(default_event_rating("sub_minute"), left_score=6, right_score=9)
+    assert score(-45, config) == 6
+    assert score(-27.5, config) == 8
+    assert score(27.5, config) == 9.5
+    assert score(45, config) == 9
+    assert score(-75, config) == pytest.approx(6 / exp(1))
+    assert score(75, config) == pytest.approx(9 / exp(1))
+    for boundary in (-45, -10, 10, 45):
+        assert score(boundary - 1e-6, config) == pytest.approx(score(boundary + 1e-6, config), abs=1e-5)
+    collapsed = replace(config, right_bad=10)
+    assert score(10, collapsed) == 10
+    assert score(10 + 1e-6, collapsed) == pytest.approx(10, abs=1e-5)
+
+
+@pytest.mark.anyio
+async def test_events_list_is_readonly_and_links_to_editors(monkeypatch):
+    events = (RegistryEvent(1, "Первое", "round"), RegistryEvent(2, "Второе", "sub_minute", EventRatingConfig(left_score=6)))
+    monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/events")
+        assert response.status_code == 200
+        assert response.text.count('data-rating-widget') == 2
+        assert 'data-event-rating' not in response.text
+        assert '<form' not in response.text
+        assert 'href="/events/1"' in response.text
+        assert 'href="/events/2"' in response.text
+        assert '"left_score": 6' in response.text
+        monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: ())
+        response = await client.get("/events")
+        assert "Пока нет соревнований" in response.text
 
 
 def test_registry_applies_each_events_formula_before_sorting(monkeypatch):

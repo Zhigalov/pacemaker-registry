@@ -6,47 +6,34 @@
     <title>{{ event.name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-rating">
-    <script src="/static/event-rating.js" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=event-list">
+    <script src="/static/event-rating.js?v=event-list" defer></script>
   </head>
   <body>
     <main class="app-shell event-shell">
-      <header class="site-header">
-        <a class="brand" href="/">← Реестр пейсмейкеров</a>
-        <a class="quiet-link" href="/?event_id={{ event.id }}">Результаты соревнования →</a>
-      </header>
+      {% include '_navigation.html' %}
       <section class="event-heading">
-        <p class="eyebrow">Соревнование</p>
+        <p class="eyebrow"><a href="/events">Соревнования</a> / Настройки</p>
         <h1>{{ event.name }}</h1>
         <p>Время на флаге: <strong>{% if event.target_time_type == 'sub_minute' %}саб-минута · 1:29, 1:34, 1:39{% elif event.target_time_type == 'round' %}ровное · 1:30, 1:35, 1:40{% else %}ещё не определено{% endif %}</strong></p>
+        <a class="quiet-link" href="/?event_id={{ event.id }}">Результаты соревнования →</a>
       </section>
       {% if saved %}<p class="event-success" role="status">Формула сохранена. Рейтинг результатов этого соревнования пересчитан при отображении.</p>{% endif %}
       {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
-      <form class="event-editor" action="/events/{{ event.id }}/rating" method="post" data-event-rating>
+      <form class="event-editor" action="/events/{{ event.id }}/rating" method="post" data-event-rating data-rating-widget>
         <div class="event-editor-heading">
           <div><h2>Рейтинг по соревнованию</h2><p>Сдвигайте границы на графике или вводите секунды. Минус — раньше времени на флаге, плюс — позже.</p></div>
           <button class="button button--primary" type="submit">Сохранить формулу</button>
         </div>
-        <div class="event-chart-wrap">
-          <svg class="event-chart" viewBox="0 0 800 320" aria-label="График оценки финиша. Перетаскивайте границы зон; точные значения доступны в полях ниже." role="img" tabindex="0" data-event-chart>
-            <g data-zones></g>
-            <g class="event-chart-grid" data-grid></g>
-            <g data-curves></g>
-            <g data-handles></g>
-            <g data-hover hidden><line y1="26" y2="258"></line><circle r="5"></circle></g>
-          </svg>
-          <output class="event-chart-readout" data-readout aria-live="polite">Наведите на график, чтобы увидеть оценку</output>
-          <p class="event-note">Ось времени — в секундах. Дальние отклонения сжаты по горизонтали, чтобы лучше видеть область рядом с целью.</p>
-          <noscript><p>Для интерактивного графика включите JavaScript. Числовые поля и сохранение работают и без него.</p></noscript>
-        </div>
+        {% include '_rating_chart.html' %}
         <div class="event-zones">
           <section class="event-zone event-zone--bad"><h3>1 · Плохо</h3><p>Ранний финиш. Экспонента ниже левой границы.</p><label>Граница, с<input name="left_bad" type="number" min="-600" max="0" step="1" value="{{ values.get('left_bad', '') }}" required></label></section>
-          <section class="event-zone event-zone--normal"><h3>2 · Нормально</h3><p>От 8 до 10 баллов. Уже зона — круче наклон.</p><output data-left-range></output></section>
+          <section class="event-zone event-zone--normal"><h3>2 · Нормально</h3><p>Прямая от оценки на границе до 10 баллов.</p><output data-left-range></output><label>Баллы на границе<input name="left_score" type="number" min="0.1" max="10" step="0.1" value="{{ values.get('left_score', '') }}" required></label></section>
           <section class="event-zone event-zone--excellent"><h3>3 · Отлично</h3><p>Ворота допуска: всегда 10 баллов, включая границы.</p><div class="event-input-pair"><label>От, с<input name="left_good" type="number" min="-600" max="0" step="1" value="{{ values.get('left_good', '') }}" required></label><label>До, с<input name="right_good" type="number" min="0" max="600" step="1" value="{{ values.get('right_good', '') }}" required></label></div></section>
-          <section class="event-zone event-zone--normal"><h3>4 · Нормально</h3><p>От 10 до 8 баллов. Шире зона — мягче наклон.</p><output data-right-range></output></section>
+          <section class="event-zone event-zone--normal"><h3>4 · Нормально</h3><p>Прямая от 10 до оценки на границе.</p><output data-right-range></output><label>Баллы на границе<input name="right_score" type="number" min="0.1" max="10" step="0.1" value="{{ values.get('right_score', '') }}" required></label></section>
           <section class="event-zone event-zone--bad"><h3>5 · Плохо</h3><p>Поздний финиш. Экспонента выше правой границы.</p><label>Граница, с<input name="right_bad" type="number" min="0" max="600" step="1" value="{{ values.get('right_bad', '') }}" required></label></section>
         </div>
-        <p class="event-note">Если границы жёлтой зоны совпадают, сразу после допуска начинается экспонента от 10 баллов. Иначе экспонента продолжается от 8. Красная зона стремится к нулю, но не достигает его.</p>
+        <p class="event-note">Если границы жёлтой зоны совпадают, сразу после допуска начинается экспонента от 10 баллов. Иначе экспонента продолжается от выбранной оценки на границе. Её можно менять числом или перетаскиванием точки на стыке зон вверх и вниз. Красная зона стремится к нулю, но не достигает его.</p>
         <div class="event-tail-settings">
           {% for side, title in [('left', 'Раньше цели'), ('right', 'Позже цели')] %}
           <fieldset>
@@ -63,6 +50,7 @@
           <button class="button" type="button" data-reset-rating>Вернуть значения по умолчанию</button>
           <span data-save-state role="status">Настройки применяются ко всем результатам этого соревнования после сохранения.</span>
         </div>
+        <script type="application/json" data-rating-config>{{ defaults | tojson }}</script>
       </form>
       <details class="rating-methodology">
         <summary>Как получается итоговая оценка</summary>
@@ -72,7 +60,6 @@
           <p>Оценки за темп взвешиваются по длине отрезков. Без достаточных отсечек или с выключенным учётом темпа итог равен оценке за финиш.</p>
         </div>
       </details>
-      <script type="application/json" id="rating-defaults">{{ defaults | tojson }}</script>
     </main>
   </body>
 </html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Соревнования — Реестр пейсмейкеров</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
+    <link rel="stylesheet" href="/static/styles.css?v=event-list">
+    <script src="/static/event-rating.js?v=event-list" defer></script>
+  </head>
+  <body>
+    <main class="app-shell event-shell">
+      {% include '_navigation.html' %}
+      <section class="event-heading">
+        <h1>Соревнования</h1>
+        <p>Оценка финиша для каждого соревнования. Откройте соревнование, чтобы изменить настройки.</p>
+      </section>
+      <div class="events-list">
+        {% for event in events %}
+          <article class="event-preview" data-rating-widget>
+            <h2><a href="/events/{{ event.id }}">{{ event.name }}</a></h2>
+            <p class="event-note">{% if event.target_time_type == 'sub_minute' %}Саб-минута{% elif event.target_time_type == 'round' %}Ровное время{% else %}Тип времени ещё не определён{% endif %}</p>
+            {% include '_rating_chart.html' %}
+            <a class="quiet-link" href="/events/{{ event.id }}">Настроить рейтинг →</a>
+            <script type="application/json" data-rating-config>{{ configs[event.id] | tojson }}</script>
+          </article>
+        {% else %}
+          <p>Пока нет соревнований. Они появятся после добавления первого результата.</p>
+        {% endfor %}
+      </div>
+    </main>
+  </body>
+</html>

@@ -74,7 +74,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=event-rating"' in response.text
+    assert 'href="/static/styles.css?v=event-list"' in response.text
     assert 'href="/add"' in response.text
     assert "Жигалов Сергей" in response.text
     assert "Международный Когалымский полумарафон" in response.text
@@ -97,7 +97,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Как считается рейтинг" in response.text
     assert "Автопилот" not in response.text
     assert "Конструктор" not in response.text
-    assert 'href="/events/1"' in response.text
+    assert 'href="/events"' in response.text
+    assert 'class="event-directory"' not in response.text
     assert "Детали результата" in response.text
     assert "Здесь появится список выступлений" not in response.text
     assert "Все соревнования" in response.text

@@ -376,7 +376,7 @@ def calculate_pacemaker_rating(
 def _event_from_row(row: tuple) -> RegistryEvent:
     return RegistryEvent(
         id=row[0], name=row[1], target_time_type=row[2],
-        rating_config=parse_event_rating(row[3]) if row[3] is not None else None,
+        rating_config=parse_event_rating(row[3], allow_legacy=True) if row[3] is not None else None,
     )
 
 
@@ -387,6 +387,14 @@ def get_event(event_id: int) -> RegistryEvent | None:
             (event_id,),
         ).fetchone()
     return _event_from_row(row) if row else None
+
+
+def list_events() -> tuple[RegistryEvent, ...]:
+    with connect_database() as connection:
+        rows = connection.execute(
+            "SELECT id, name, target_time_type, rating_config FROM events ORDER BY lower(name), id"
+        ).fetchall()
+    return tuple(_event_from_row(row) for row in rows)
 
 
 def save_event_rating(event_id: int, config: EventRatingConfig) -> bool:

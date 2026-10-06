@@ -1327,10 +1327,18 @@ tbody tr:hover { background: #fbfcfc; }
 .splits-toggle { display: flex; align-items: center; gap: .6rem; font-size: .9rem; cursor: pointer; }
 .splits-toggle input { width: 1.2rem; height: 1.2rem; accent-color: #176f59; }
 .registry-filter { align-items: center; }
-.event-directory { margin: 0 0 1rem; font-size: .9rem; }
-.event-directory summary { cursor: pointer; color: #176f59; }
-.event-directory nav { display: flex; flex-wrap: wrap; gap: .7rem 1.3rem; padding: 1rem 0; }
-.event-directory a { color: #176f59; }
+.site-menu { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.site-menu .button:not(.button--primary) { color: #176f59; background: #e9f5ef; border: 1px solid #cadfd5; }
+.event-heading .eyebrow a { color: #176f59; }
+.site-header { flex-wrap: wrap; gap: 1rem; }
+.events-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.event-preview { min-width: 0; padding: 1.3rem; background: #fff; border: 1px solid #d4e1da; border-radius: 16px; }
+.event-preview h2 { font-size: 1.2rem; margin: 0; }
+.event-preview h2 a { color: #176f59; text-decoration: none; }
+.event-preview .event-chart-wrap { margin: 1rem 0; }
+.event-preview .event-chart-readout { font-size: .85rem; }
+.event-preview .event-chart text { font-size: 20px; }
+.event-zone label { margin-top: .8rem; }
 .event-shell { max-width: 1160px; }
 .event-heading { margin: 2rem 0; }
 .event-heading h1 { font-size: clamp(1.4rem, 4vw, 2.2rem); line-height: 1.25; }
@@ -1371,6 +1379,9 @@ tbody tr:hover { background: #fbfcfc; }
 .event-editor-actions span { font-size: .85rem; color: #64756d; }
 .event-success { color: #176f59; background: #e9f5ef; border-radius: 10px; padding: 1rem; }
 @media (max-width: 760px) {
+  .events-list { grid-template-columns: 1fr; }
+  .site-menu { width: 100%; gap: .5rem; }
+  .site-menu .button { flex: 1; font-size: .8rem; padding: .7rem .6rem; }
   .event-editor { padding: 1rem; }
   .event-editor-heading { flex-direction: column; }
   .event-editor-heading .button { width: 100%; }
@@ -1378,5 +1389,6 @@ tbody tr:hover { background: #fbfcfc; }
   .event-input-pair { grid-template-columns: 1fr 1fr; }
   .event-tail-settings { grid-template-columns: 1fr; }
   .event-chart text { font-size: 16px; }
+  .event-preview .event-chart text { font-size: 24px; }
   .event-shell .site-header { flex-wrap: wrap; gap: 1rem; }
 }
