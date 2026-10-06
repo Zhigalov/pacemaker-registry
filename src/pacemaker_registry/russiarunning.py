@@ -123,7 +123,9 @@ def parse_result_payloads(
         stage_result = stage_results.get(stage.get("id"))
         if not stage_result:
             continue
-        checkpoint_time = stage_result.get("absoluteResult")
+        checkpoint_time = stage_result.get("absoluteResult") or stage_result.get(
+            "individualResult"
+        )
         checkpoint_pace = stage_result.get("pace")
         if not checkpoint_time or not checkpoint_pace:
             continue

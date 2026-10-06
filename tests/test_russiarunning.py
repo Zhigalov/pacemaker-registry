@@ -103,6 +103,65 @@ def test_parse_result_uses_chip_time_and_absolute_checkpoint_time() -> None:
     )
 
 
+def test_parse_result_falls_back_to_individual_checkpoint_time() -> None:
+    link = parse_participant_url(
+        "https://results.russiarunning.com/participant/"
+        "SiriusAutodrom2026/10_km_f/6ee03f42-97ff-48fe-bfa2-cbd79ffcf0fc"
+    )
+    event = {
+        "id": "68fa5e38-6643-4fd3-9ca3-45a07cff746a",
+        "title": "Альфа-Банк Сириус Автодром",
+        "races": [{"id": "race-id", "code": "10_km_f", "distance": 10}],
+    }
+    options = {
+        "stagesInfo": [
+            {"id": "start", "name": "Старт", "distance": 0},
+            {"id": "three", "name": "3,00 км", "distance": 3},
+            {"id": "finish", "name": "Финиш", "distance": 10},
+        ]
+    }
+    profile = {
+        "result": {
+            "results": [
+                {
+                    "fullName": "Чалов Максим",
+                    "individualResult": "54:53",
+                    "pace": "05:29 /км",
+                    "stageResults": [
+                        {
+                            "raceStageId": "three",
+                            "individualResult": "16:42",
+                            "pace": "05:33 /км",
+                        },
+                        {
+                            "raceStageId": "finish",
+                            "individualResult": "54:53",
+                            "pace": "05:07 /км",
+                        },
+                    ],
+                }
+            ]
+        }
+    }
+
+    result = parse_result_payloads(link, event, options, profile)
+
+    assert result.checkpoints == (
+        Checkpoint(
+            distance_km="3,00",
+            segment_distance_km="3,00",
+            time="16:42",
+            pace_per_km="05:33",
+        ),
+        Checkpoint(
+            distance_km="10,00",
+            segment_distance_km="7,00",
+            time="54:53",
+            pace_per_km="05:07",
+        ),
+    )
+
+
 @pytest.mark.parametrize(
     ("chip_time", "expected"),
     [
