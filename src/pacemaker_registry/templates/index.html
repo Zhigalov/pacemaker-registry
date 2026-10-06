@@ -7,7 +7,7 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-list">
+    <link rel="stylesheet" href="/static/styles.css?v=rating-gradient">
     <script src="/static/registry.js?v=event-rating" defer></script>
   </head>
   <body>
@@ -76,6 +76,7 @@
                   <h2>{{ pacemaker.full_name }}</h2>
                   <div
                     class="pacemaker-rating pacemaker-rating--{{ pacemaker.rating_tone }}"
+                    style="{{ pacemaker.rating | rating_color }}"
                     aria-label="Рейтинг {{ '%.1f'|format(pacemaker.rating)|replace('.', ',') }} из 10"
                   >
                     <span class="pacemaker-rating-value">{{ "%.1f"|format(pacemaker.rating)|replace(".", ",") }}</span>
@@ -109,7 +110,7 @@
                       <span class="result-summary-ratings">
                         <span title="Оценка за финиш"><small>Финиш</small><strong>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }}</strong></span>
                         <span title="Оценка за темп на отсечках"><small>Темп</small><strong>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }}{% else %}—{% endif %}</strong></span>
-                        <span class="result-rating result-rating--{{ result.rating_tone }}" title="Итоговая оценка"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
+                        <span class="result-rating result-rating--{{ result.rating_tone }}" style="{{ result.rating | rating_color }}" title="Итоговая оценка"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
                       </span>
                     </span>
                   </button>
@@ -133,7 +134,7 @@
                       <div><dt>Отклонение</dt><dd>{{ result.time_difference }}</dd></div>
                       <div><dt>Оценка за финиш</dt><dd>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }} / 10</dd></div>
                       <div><dt>Оценка за темп</dt><dd>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }} / 10{% else %}Нет данных{% endif %}</dd></div>
-                      <div class="popover-rating popover-rating--{{ result.rating_tone }}">
+                      <div class="popover-rating popover-rating--{{ result.rating_tone }}" style="{{ result.rating | rating_color }}">
                         <dt>Итоговая оценка</dt><dd>{{ "%.1f"|format(result.rating)|replace(".", ",") }} / 10</dd>
                       </div>
                     </dl>

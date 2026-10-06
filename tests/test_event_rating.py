@@ -206,6 +206,6 @@ def test_registry_applies_each_events_formula_before_sorting(monkeypatch):
     assert registry.pacemakers[1].rating == pytest.approx(10 * exp(-5/30))
 
 
-@pytest.mark.parametrize("rating,tone", [(10, "excellent"), (9.9, "good"), (8, "good"), (7.9, "low")])
+@pytest.mark.parametrize("rating,tone", [(10, "excellent"), (9, "excellent"), (8.99, "good"), (7, "good"), (6.99, "low")])
 def test_rating_colors_follow_three_zones(rating, tone):
     assert _rating_tone(rating) == tone

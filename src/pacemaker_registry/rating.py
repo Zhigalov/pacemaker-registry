@@ -4,6 +4,19 @@ from dataclasses import asdict, dataclass
 from math import exp, isfinite
 
 
+def rating_color_style(rating: float) -> str:
+    """Continuous red → amber/yellow → green UI scale, independent of scoring."""
+    value = max(0, min(10, rating)) if isfinite(rating) else 0
+    stops = ((0, 4), (6, 10), (7, 42), (8, 50), (9, 125), (10, 162))
+    hue = stops[-1][1]
+    for (start, low), (end, high) in zip(stops, stops[1:]):
+        if value <= end:
+            hue = low + (high - low) * (value - start) / (end - start)
+            break
+    # Dark text on a lightly tinted background remains legible, including yellow.
+    return f"--rating-color: hsl({hue:.2f} 65% 28%); --rating-bg: hsl({hue:.2f} 70% 94%)"
+
+
 @dataclass(frozen=True, slots=True)
 class EventRatingConfig:
     left_bad: float = -60

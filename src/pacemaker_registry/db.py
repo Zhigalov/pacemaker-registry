@@ -501,9 +501,9 @@ def _format_time_difference(seconds: int) -> str:
 
 
 def _rating_tone(rating: float) -> str:
-    if rating >= 10:
+    if rating >= 9:
         return "excellent"
-    if rating >= 8:
+    if rating >= 7:
         return "good"
     return "low"
 

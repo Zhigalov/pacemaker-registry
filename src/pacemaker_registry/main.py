@@ -23,7 +23,7 @@ from pacemaker_registry.db import (
     load_registry,
     save_race_result,
 )
-from pacemaker_registry.rating import default_event_rating, parse_event_rating
+from pacemaker_registry.rating import default_event_rating, parse_event_rating, rating_color_style
 from pacemaker_registry.russiarunning import (
     InvalidResultUrl,
     RaceResult,
@@ -64,6 +64,7 @@ app = FastAPI(
 )
 app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
+templates.env.filters["rating_color"] = rating_color_style
 
 
 @app.get("/", response_class=HTMLResponse)

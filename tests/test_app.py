@@ -74,7 +74,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=event-list"' in response.text
+    assert 'href="/static/styles.css?v=rating-gradient"' in response.text
+    assert response.text.count('--rating-color: hsl(') == 3
     assert 'href="/add"' in response.text
     assert "Жигалов Сергей" in response.text
     assert "Международный Когалымский полумарафон" in response.text

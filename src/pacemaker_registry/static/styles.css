@@ -792,9 +792,6 @@ tbody tr:hover { background: #fbfcfc; }
   font-variant-numeric: tabular-nums;
 }
 
-.pacemaker-rating--excellent { --rating-color: #14795e; }
-.pacemaker-rating--good { --rating-color: #b98216; }
-.pacemaker-rating--low { --rating-color: #a44638; }
 
 .pacemaker-rating-value {
   font-size: 0.82rem;
@@ -936,22 +933,10 @@ tbody tr:hover { background: #fbfcfc; }
   color: #9a5d22;
 }
 
-.result-rating--excellent,
-.popover-rating--excellent {
-  background: #e8f6f1;
-  color: #126b54;
-}
-
-.result-rating--good,
-.popover-rating--good {
-  background: #fff7e2;
-  color: #94680f;
-}
-
-.result-rating--low,
-.popover-rating--low {
-  background: #fff0ed;
-  color: #963e32;
+.result-rating,
+.popover-rating {
+  background: var(--rating-bg, #fff7e2);
+  color: var(--rating-color, #94680f);
 }
 
 .result-popover {
