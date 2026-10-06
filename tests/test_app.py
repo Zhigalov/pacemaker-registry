@@ -73,8 +73,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert "Реестр пейсмейкеров" in response.text
-    assert 'href="/static/favicon.png"' in response.text
-    assert 'href="/static/apple-touch-icon.png"' in response.text
+    assert 'href="/static/favicon.png?v=pr-flags"' in response.text
+    assert 'href="/static/apple-touch-icon.png?v=pr-flags"' in response.text
     assert 'href="/static/styles.css"' in response.text
     assert 'href="/add"' in response.text
     assert "Жигалов Сергей" in response.text
@@ -232,8 +232,8 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
         )
 
     assert response.status_code == 200
-    assert 'href="/static/favicon.png"' in response.text
-    assert 'href="/static/apple-touch-icon.png"' in response.text
+    assert 'href="/static/favicon.png?v=pr-flags"' in response.text
+    assert 'href="/static/apple-touch-icon.png?v=pr-flags"' in response.text
     assert "Жигалов Сергей" in response.text
     assert "01:53:53" in response.text
     assert 'value="01:54"' in response.text
