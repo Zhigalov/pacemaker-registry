@@ -1,7 +1,6 @@
 import os
 from dataclasses import asdict, dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from math import exp
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +18,7 @@ from pacemaker_registry.russiarunning import (
 
 from pacemaker_registry.rating import (
     EventRatingConfig, calculate_rating_for_difference, default_event_rating, parse_event_rating,
+    PaceRatingConfig, calculate_split_rating, parse_pace_rating,
 )
 
 
@@ -72,10 +72,15 @@ class RegistryEvent:
     name: str
     target_time_type: str | None = None
     rating_config: EventRatingConfig | None = None
+    pace_rating_config: PaceRatingConfig | None = None
 
     @property
     def formula(self) -> EventRatingConfig:
         return self.rating_config or default_event_rating(self.target_time_type)
+
+    @property
+    def pace_formula(self) -> PaceRatingConfig:
+        return self.pace_rating_config or PaceRatingConfig()
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,7 +153,7 @@ def load_registry(
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         event_rows = connection.execute(
             """
-            SELECT e.id, e.name, e.target_time_type, e.rating_config
+            SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config
             FROM events AS e
             WHERE EXISTS (
                 SELECT 1
@@ -235,6 +240,7 @@ def load_registry(
             target_time,
             distance,
             checkpoints,
+            events_by_id[event_id].pace_formula,
         )
         rating = calculate_combined_rating(
             finish_rating,
@@ -398,13 +404,14 @@ def _event_from_row(row: tuple) -> RegistryEvent:
     return RegistryEvent(
         id=row[0], name=row[1], target_time_type=row[2],
         rating_config=parse_event_rating(row[3], allow_legacy=True) if row[3] is not None else None,
+        pace_rating_config=parse_pace_rating(row[4]) if row[4] is not None else None,
     )
 
 
 def get_event(event_id: int) -> RegistryEvent | None:
     with connect_database() as connection:
         row = connection.execute(
-            "SELECT id, name, target_time_type, rating_config FROM events WHERE id = %s",
+            "SELECT id, name, target_time_type, rating_config, pace_rating_config FROM events WHERE id = %s",
             (event_id,),
         ).fetchone()
     return _event_from_row(row) if row else None
@@ -413,7 +420,7 @@ def get_event(event_id: int) -> RegistryEvent | None:
 def list_events() -> tuple[RegistryEvent, ...]:
     with connect_database() as connection:
         rows = connection.execute(
-            "SELECT id, name, target_time_type, rating_config FROM events ORDER BY lower(name), id"
+            "SELECT id, name, target_time_type, rating_config, pace_rating_config FROM events ORDER BY lower(name), id"
         ).fetchall()
     return tuple(_event_from_row(row) for row in rows)
 
@@ -427,22 +434,20 @@ def save_event_rating(event_id: int, config: EventRatingConfig) -> bool:
     return row is not None
 
 
-def calculate_split_rating(deviation_seconds_per_km: float) -> float:
-    """Rate an absolute pace deviation in seconds per kilometre."""
-    deviation = abs(deviation_seconds_per_km)
-    if deviation <= 5:
-        return 10
-    if deviation <= 10:
-        return 10 - (deviation - 5) / 5
-    if deviation <= 30:
-        return 9 - (deviation - 10) / 10
-    return 7 * exp(-(deviation - 30) / 15)
+def save_event_pace_rating(event_id: int, config: PaceRatingConfig) -> bool:
+    with connect_database() as connection:
+        row = connection.execute(
+            "UPDATE events SET pace_rating_config = %s WHERE id = %s RETURNING id",
+            (Jsonb(asdict(config)), event_id),
+        ).fetchone()
+    return row is not None
 
 
 def calculate_splits_rating(
     target_time: str,
     distance_km: Decimal,
     checkpoints: list[dict[str, str]] | tuple[dict[str, str], ...],
+    config: PaceRatingConfig = PaceRatingConfig(),
 ) -> float | None:
     """Return a distance-weighted rating for checkpoint segment paces."""
     if distance_km <= 0:
@@ -462,7 +467,7 @@ def calculate_splits_rating(
         if segment_distance <= 0:
             continue
         weighted_rating += calculate_split_rating(
-            pace_seconds - target_pace_seconds
+            pace_seconds - target_pace_seconds, config
         ) * float(segment_distance)
         covered_distance += segment_distance
 

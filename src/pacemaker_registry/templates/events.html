@@ -13,7 +13,7 @@
       {% include '_navigation.html' %}
       <section class="event-heading">
         <h1>Соревнования</h1>
-        <p>Оценка финиша для каждого соревнования. Откройте соревнование, чтобы изменить настройки.</p>
+        <p>Графики оценки финиша. Откройте соревнование, чтобы отдельно настроить финиш и темп на отрезках.</p>
       </section>
       <div class="events-list">
         {% for event in events %}
@@ -21,6 +21,7 @@
             <h2><a href="/events/{{ event.id }}">{{ event.name }}</a></h2>
             <p class="event-note">{% if event.target_time_type == 'sub_minute' %}Саб-минута{% elif event.target_time_type == 'round' %}Ровное время{% else %}Тип времени ещё не определён{% endif %}</p>
             {% include '_rating_chart.html' %}
+            <p class="event-note">Темп: допуск ±{{ '%g'|format(event.pace_formula.tolerance) }} с/км · экспонента после ±{{ '%g'|format(event.pace_formula.bad) }} с/км. <a href="/events/{{ event.id }}#pace-rating">Настроить темп →</a></p>
             <a class="quiet-link" href="/events/{{ event.id }}">Настроить рейтинг →</a>
             <script type="application/json" data-rating-config>{{ configs[event.id] | tojson }}</script>
           </article>

@@ -17,13 +17,17 @@ from pacemaker_registry.db import (
     list_events,
     get_event,
     save_event_rating,
+    save_event_pace_rating,
     check_database,
     get_event_target_time_type,
     initialize_database,
     load_registry,
     save_race_result,
 )
-from pacemaker_registry.rating import default_event_rating, parse_event_rating, rating_color_style
+from pacemaker_registry.rating import (
+    default_event_rating, parse_event_rating, rating_color_style,
+    PaceRatingConfig, parse_pace_rating,
+)
 from pacemaker_registry.russiarunning import (
     InvalidResultUrl,
     RaceResult,
@@ -100,13 +104,15 @@ def _load_event_or_404(event_id: int):
     return event
 
 
-def _event_response(request, event, *, values=None, error=None, saved=False, status_code=200):
+def _event_response(request, event, *, values=None, pace_values=None, error=None, saved=False, status_code=200):
     return templates.TemplateResponse(
         request=request, name="event.html",
         context={
             "event": event,
             "values": values if values is not None else asdict(event.formula),
             "defaults": asdict(default_event_rating(event.target_time_type)),
+            "pace_values": pace_values if pace_values is not None else asdict(event.pace_formula),
+            "pace_defaults": asdict(PaceRatingConfig()),
             "error": error, "saved": saved,
         },
         status_code=status_code,
@@ -150,6 +156,27 @@ async def update_event_rating(request: Request, event_id: int):
     if not updated:
         raise HTTPException(404, "Соревнование не найдено.")
     return RedirectResponse(f"/events/{event_id}?saved=true", status_code=303)
+
+
+@app.post("/events/{event_id}/pace-rating", response_class=HTMLResponse)
+async def update_event_pace_rating(request: Request, event_id: int):
+    event = await run_in_threadpool(_load_event_or_404, event_id)
+    values = dict(await request.form())
+    try:
+        config = parse_pace_rating(values)
+    except ValueError as error:
+        return _event_response(request, event, pace_values=values, error=str(error), status_code=422)
+    try:
+        updated = await run_in_threadpool(save_event_pace_rating, event_id, config)
+    except (PsycopgError, RuntimeError):
+        return _event_response(
+            request, event, pace_values=values,
+            error="Не удалось сохранить оценку темпа. Настройки остались в форме — попробуйте ещё раз.",
+            status_code=503,
+        )
+    if not updated:
+        raise HTTPException(404, "Соревнование не найдено.")
+    return RedirectResponse(f"/events/{event_id}?saved=true#pace-rating", status_code=303)
 
 
 @app.get("/add", response_class=HTMLResponse)

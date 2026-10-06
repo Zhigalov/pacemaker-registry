@@ -174,7 +174,7 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
     monkeypatch,
 ) -> None:
     calls: list[tuple[str, tuple[int, ...]]] = []
-    event_rows = [(1, "Когалымский полумарафон", "sub_minute", None), (2, "Московский марафон", "round", None)]
+    event_rows = [(1, "Когалымский полумарафон", "sub_minute", None, None), (2, "Московский марафон", "round", None, None)]
     result_rows = [
         (
             7,

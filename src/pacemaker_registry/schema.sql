@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS race_results (
 ALTER TABLE events ADD COLUMN IF NOT EXISTS rating_config JSONB
     CHECK (rating_config IS NULL OR jsonb_typeof(rating_config) = 'object');
 
+ALTER TABLE events ADD COLUMN IF NOT EXISTS pace_rating_config JSONB
+    CHECK (pace_rating_config IS NULL OR jsonb_typeof(pace_rating_config) = 'object');
+
 CREATE INDEX IF NOT EXISTS race_results_pacemaker_id_idx
     ON race_results (pacemaker_id);
 

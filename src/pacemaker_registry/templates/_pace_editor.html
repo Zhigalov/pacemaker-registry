@@ -1,0 +1,47 @@
+<form class="event-editor pace-editor" id="pace-rating" action="/events/{{ event.id }}/pace-rating" method="post" data-pace-rating>
+  <div class="event-editor-heading">
+    <div><h2>Оценка за темп на отрезках</h2><p>Своя шкала для этого соревнования. Отклонение от целевого темпа измеряется в секундах на километр, а не в секундах финиша.</p></div>
+    <button class="button button--primary" type="submit">Сохранить темп</button>
+  </div>
+  <div class="event-chart-wrap">
+    <svg class="event-chart" viewBox="0 0 800 320" role="img" aria-label="Оценка за темп: абсолютное отклонение в секундах на километр" tabindex="0" data-pace-chart>
+      <g data-zones></g><g class="event-chart-grid" data-grid></g><g data-curves></g><g data-handles></g>
+      <g data-hover hidden><line y1="26" y2="258"></line><circle r="5"></circle></g>
+    </svg>
+    <output class="event-chart-readout" data-readout aria-live="polite">Наведите на график, чтобы увидеть оценку</output>
+    <p class="event-note">Шкала симметрична: ±10 с/км означает на 10 секунд быстрее или медленнее цели. Тяните круглые точки влево и вправо для изменения границ, вверх и вниз — для баллов. Квадрат меняет резкость экспоненты.</p>
+    <noscript><p>График доступен с JavaScript. Настройки можно менять в полях ниже.</p></noscript>
+  </div>
+  <div class="event-zones pace-zones">
+    <section class="event-zone event-zone--excellent">
+      <h3>Без штрафа · 10 баллов</h3><p>Отклонения внутри допуска не снижают оценку.</p>
+      <label>Допуск ±, с/км<input name="tolerance" type="number" min="0" max="598" step="1" value="{{ pace_values.get('tolerance', '') }}" required></label>
+    </section>
+    <section class="event-zone event-zone--normal">
+      <h3>Опорная точка</h3><p>Между допуском, этой точкой и началом экспоненты — линейное снижение.</p>
+      <label>Отклонение ±, с/км<input name="checkpoint" type="number" min="1" max="599" step="1" value="{{ pace_values.get('checkpoint', '') }}" required></label>
+      <label>Баллы<input name="checkpoint_score" type="number" min="0.1" max="10" step="0.1" value="{{ pace_values.get('checkpoint_score', '') }}" required></label>
+    </section>
+    <section class="event-zone event-zone--bad">
+      <h3>Начало экспоненты</h3><p>После этой границы оценка убывает по кривой и остаётся выше нуля.</p>
+      <label>Отклонение ±, с/км<input name="bad" type="number" min="2" max="600" step="1" value="{{ pace_values.get('bad', '') }}" required></label>
+      <label>Баллы на границе<input name="bad_score" type="number" min="0.1" max="10" step="0.1" value="{{ pace_values.get('bad_score', '') }}" required></label>
+    </section>
+  </div>
+  <div class="event-tail-settings">
+    <fieldset><legend>Резкость падения</legend>
+      <label>Масштаб, с/км<input name="decay" type="number" min="1" max="300" step="1" value="{{ pace_values.get('decay', '') }}" required></label>
+      <p>Меньше значение — быстрее падает оценка. Квадратная точка на графике управляет этим параметром.</p>
+    </fieldset>
+    <fieldset><legend>Форма кривой</legend>
+      <label>Кривизна<input name="curve" type="number" min="0.5" max="3" step="0.1" value="{{ pace_values.get('curve', '') }}" required></label>
+      <input type="range" min="0.5" max="3" step="0.1" value="{{ pace_values.get('curve', 1) }}" data-pace-curve aria-label="Кривизна оценки темпа">
+      <p>1 — обычная экспонента. Больше 1 — мягче в начале, резче вдали от границы.</p>
+    </fieldset>
+  </div>
+  <div class="event-editor-actions">
+    <button class="button" type="button" data-reset-pace>Вернуть значения по умолчанию</button>
+    <span data-save-state role="status">Изменения применятся только к этому соревнованию после сохранения. Формула финиша не изменится.</span>
+  </div>
+  <script type="application/json" data-pace-defaults>{{ pace_defaults | tojson }}</script>
+</form>

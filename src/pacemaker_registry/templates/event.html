@@ -6,8 +6,9 @@
     <title>{{ event.name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-list">
+    <link rel="stylesheet" href="/static/styles.css?v=event-pace">
     <script src="/static/event-rating.js?v=event-list" defer></script>
+    <script src="/static/pace-rating.js?v=event-pace" defer></script>
   </head>
   <body>
     <main class="app-shell event-shell">
@@ -22,7 +23,7 @@
       {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
       <form class="event-editor" action="/events/{{ event.id }}/rating" method="post" data-event-rating data-rating-widget>
         <div class="event-editor-heading">
-          <div><h2>Рейтинг по соревнованию</h2><p>Сдвигайте границы на графике или вводите секунды. Минус — раньше времени на флаге, плюс — позже.</p></div>
+          <div><h2>Оценка за финиш</h2><p>Сдвигайте границы на графике или вводите секунды. Минус — раньше времени на флаге, плюс — позже.</p></div>
           <button class="button button--primary" type="submit">Сохранить формулу</button>
         </div>
         {% include '_rating_chart.html' %}
@@ -52,10 +53,11 @@
         </div>
         <script type="application/json" data-rating-config>{{ defaults | tojson }}</script>
       </form>
+      {% include '_pace_editor.html' %}
       <details class="rating-methodology">
         <summary>Как получается итоговая оценка</summary>
         <div class="rating-methodology-content">
-          <p>На этой странице задаётся оценка за финиш. Когда включён учёт темпа, итог состоит из 60% оценки за финиш и 40% оценки за темп на отрезках.</p>
+          <p>На этой странице независимо настраиваются оценки за финиш и за темп только этого соревнования. Сохраняйте каждый блок отдельно. Когда включён учёт темпа, итог состоит из 60% оценки за финиш и 40% оценки за темп на отрезках.</p>
           <div class="rating-composition-bar"><span class="rating-composition-finish"><strong>60%</strong> финиш</span><span class="rating-composition-splits"><strong>40%</strong> темп</span></div>
           <p>Оценки за темп взвешиваются по длине отрезков. Без достаточных отсечек или с выключенным учётом темпа итог равен оценке за финиш.</p>
         </div>

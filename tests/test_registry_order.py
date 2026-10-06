@@ -32,7 +32,7 @@ def test_sort_uses_displayed_rating_then_performances_then_absolute_mean_then_na
 
 
 def test_min_events_uses_history_and_keeps_event_options(monkeypatch):
-    events = [(1, "Первое", "round", None), (2, "Второе", "round", None)]
+    events = [(1, "Первое", "round", None, None), (2, "Второе", "round", None, None)]
     rows = [(i, "Тестов", str(i), i, 1, "Первое", Decimal(10), "01:00", "00:59:59", "06:00", [], count)
             for i, count in [(1, 1), (2, 3)]]
     class Connection:

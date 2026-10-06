@@ -1,7 +1,54 @@
-"""The single finish-rating model, configured independently for each event."""
+"""Finish and segment-pace models, configured independently for each event."""
 
 from dataclasses import asdict, dataclass
 from math import exp, isfinite
+
+
+@dataclass(frozen=True, slots=True)
+class PaceRatingConfig:
+    tolerance: float = 5
+    checkpoint: float = 10
+    bad: float = 30
+    checkpoint_score: float = 9
+    bad_score: float = 7
+    decay: float = 15
+    curve: float = 1
+
+    def __post_init__(self) -> None:
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not isfinite(v)
+               for v in asdict(self).values()):
+            raise ValueError("Все параметры темпа должны быть конечными числами.")
+        if not 0 <= self.tolerance < self.checkpoint < self.bad <= 600:
+            raise ValueError("Границы темпа: 0 ≤ допуск < опорная точка < начало экспоненты ≤ 600 с/км.")
+        if not 0.1 <= self.bad_score <= self.checkpoint_score <= 10:
+            raise ValueError("Баллы должны убывать: 10 ≥ опорная точка ≥ начало экспоненты ≥ 0,1.")
+        if not 1 <= self.decay <= 300:
+            raise ValueError("Масштаб падения темпа должен быть от 1 до 300 с/км.")
+        if not 0.5 <= self.curve <= 3:
+            raise ValueError("Кривизна должна быть от 0,5 до 3.")
+
+
+def parse_pace_rating(values: dict) -> PaceRatingConfig:
+    if not isinstance(values, dict) or set(values) != set(asdict(PaceRatingConfig())):
+        raise ValueError("Передайте все семь параметров оценки темпа.")
+    try:
+        if any(isinstance(v, bool) for v in values.values()):
+            raise ValueError("Параметры темпа должны быть числами.")
+        return PaceRatingConfig(**{key: float(value) for key, value in values.items()})
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError(str(error) or "Некорректные параметры темпа.") from error
+
+
+def calculate_split_rating(deviation_seconds_per_km: float, config: PaceRatingConfig = PaceRatingConfig()) -> float:
+    """Symmetric pace score; default anchors preserve the original rating exactly."""
+    deviation = abs(deviation_seconds_per_km)
+    if deviation <= config.tolerance:
+        return 10.0
+    if deviation <= config.checkpoint:
+        return 10 - (10 - config.checkpoint_score) * (deviation - config.tolerance) / (config.checkpoint - config.tolerance)
+    if deviation <= config.bad:
+        return config.checkpoint_score - (config.checkpoint_score - config.bad_score) * (deviation - config.checkpoint) / (config.bad - config.checkpoint)
+    return config.bad_score * exp(-min(700, ((deviation - config.bad) / config.decay) ** config.curve))
 
 
 def rating_color_style(rating: float) -> str:

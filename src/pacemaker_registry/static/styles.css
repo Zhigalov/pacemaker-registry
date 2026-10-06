@@ -1379,6 +1379,8 @@ tbody tr:hover { background: #fbfcfc; }
 .event-editor-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: 1.5rem; }
 .event-editor-actions span { font-size: .85rem; color: #64756d; }
 .event-success { color: #176f59; background: #e9f5ef; border-radius: 10px; padding: 1rem; }
+.pace-editor { margin-top: 1.5rem; scroll-margin-top: 1rem; }
+.pace-zones { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) {
   .events-list { grid-template-columns: 1fr; }
   .site-menu { width: 100%; gap: .5rem; }
@@ -1390,6 +1392,7 @@ tbody tr:hover { background: #fbfcfc; }
   .event-input-pair { grid-template-columns: 1fr 1fr; }
   .event-tail-settings { grid-template-columns: 1fr; }
   .event-chart text { font-size: 16px; }
+  .pace-editor .event-chart text { font-size: 28px; }
   .event-preview .event-chart text { font-size: 24px; }
   .event-shell .site-header { flex-wrap: wrap; gap: 1rem; }
 }

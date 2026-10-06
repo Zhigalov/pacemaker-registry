@@ -136,7 +136,7 @@ def test_database_roundtrip_uses_event_id_and_json(monkeypatch):
                 stored = parameters[0].obj
                 self.result = (7,)
             else:
-                self.result = (7, "Марафон", "round", stored)
+                self.result = (7, "Марафон", "round", stored, None)
             return self
         def fetchone(self): return self.result
     monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)
@@ -188,8 +188,8 @@ async def test_events_list_is_readonly_and_links_to_editors(monkeypatch):
 
 
 def test_registry_applies_each_events_formula_before_sorting(monkeypatch):
-    events = [(1, "Первый", "round", None),
-              (2, "Второй", "round", asdict(EventRatingConfig(right_good=10, right_bad=30)))]
+    events = [(1, "Первый", "round", None, None),
+              (2, "Второй", "round", asdict(EventRatingConfig(right_good=10, right_bad=30)), None)]
     rows = [(id, "Тестов", name, id, id, event, Decimal("10"), "00:50", "00:50:05", "05:00 /км", [], 1)
             for id, name, event in [(1, "Первый", "Первый"), (2, "Второй", "Второй")]]
     class Connection:
