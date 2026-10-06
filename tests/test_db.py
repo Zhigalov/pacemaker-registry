@@ -244,7 +244,16 @@ def test_exponential_rating_never_reaches_zero_for_realistic_result() -> None:
 
 @pytest.mark.parametrize(
     ("deviation", "expected"),
-    [(0, 10), (3, 9), (6, 8), (10, 7), (-6, 8)],
+    [
+        (0, 10),
+        (5, 10),
+        (-5, 10),
+        (7.5, 9.5),
+        (10, 9),
+        (-10, 9),
+        (20, 8),
+        (30, 7),
+    ],
 )
 def test_split_rating_uses_symmetric_pace_corridor(
     deviation: float, expected: float
@@ -252,8 +261,8 @@ def test_split_rating_uses_symmetric_pace_corridor(
     assert calculate_split_rating(deviation) == pytest.approx(expected)
 
 
-def test_split_rating_falls_exponentially_after_ten_seconds() -> None:
-    assert calculate_split_rating(25) == pytest.approx(7 / 2.718281828, abs=0.01)
+def test_split_rating_falls_exponentially_after_thirty_seconds() -> None:
+    assert calculate_split_rating(45) == pytest.approx(7 / 2.718281828, abs=0.01)
     assert calculate_split_rating(1000) > 0
 
 
@@ -267,7 +276,7 @@ def test_splits_rating_is_weighted_by_segment_distance() -> None:
         ],
     )
 
-    assert rating == pytest.approx(8.4)
+    assert rating == pytest.approx(9.84)
 
 
 def test_splits_rating_requires_eighty_percent_distance_coverage() -> None:

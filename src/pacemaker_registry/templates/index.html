@@ -227,13 +227,13 @@
                 <span><strong>3</strong> Получаем среднюю по дистанции</span>
               </div>
               <div class="splits-score-scale" aria-label="Шкала оценки отклонения темпа">
-                <span><strong>0</strong><small>сек/км</small><b>10</b></span>
-                <span><strong>3</strong><small>сек/км</small><b>9</b></span>
-                <span><strong>6</strong><small>сек/км</small><b>8</b></span>
-                <span><strong>10</strong><small>сек/км</small><b>7</b></span>
-                <span class="splits-score-scale-fade"><strong>&gt;10</strong><small>сек/км</small><b>штраф растёт</b></span>
+                <span><strong>0–5</strong><small>сек/км</small><b>10</b></span>
+                <span><strong>10</strong><small>сек/км</small><b>9</b></span>
+                <span><strong>20</strong><small>сек/км</small><b>8</b></span>
+                <span><strong>30</strong><small>сек/км</small><b>7</b></span>
+                <span class="splits-score-scale-fade"><strong>&gt;30</strong><small>сек/км</small><b>экспонента</b></span>
               </div>
-              <p>Раньше или позже целевого темпа — штраф одинаковый. Длинный отрезок влияет сильнее короткого. Если отсечек недостаточно или они выключены, итог равен оценке за финиш.</p>
+              <p>Отклонение до 5 секунд на километр не штрафуется. Затем оценка плавно снижается: 9 баллов при отклонении 10 секунд, 8 при 20 и 7 при 30. После 30 секунд штраф растёт по экспоненте. Раньше или позже целевого темпа — штраф одинаковый. Длинный отрезок влияет сильнее короткого. Если отсечек недостаточно или они выключены, итог равен оценке за финиш.</p>
             </section>
             <div class="rating-models">
               <article class="rating-model {% if registry.rating_mode == 'automatic' %}rating-model--selected{% endif %}">

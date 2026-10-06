@@ -474,13 +474,13 @@ def calculate_pacemaker_rating(
 def calculate_split_rating(deviation_seconds_per_km: float) -> float:
     """Rate an absolute pace deviation in seconds per kilometre."""
     deviation = abs(deviation_seconds_per_km)
-    if deviation <= 3:
-        return 10 - deviation / 3
-    if deviation <= 6:
-        return 9 - (deviation - 3) / 3
+    if deviation <= 5:
+        return 10
     if deviation <= 10:
-        return 8 - (deviation - 6) / 4
-    return 7 * exp(-(deviation - 10) / 15)
+        return 10 - (deviation - 5) / 5
+    if deviation <= 30:
+        return 9 - (deviation - 10) / 10
+    return 7 * exp(-(deviation - 30) / 15)
 
 
 def calculate_splits_rating(

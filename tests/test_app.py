@@ -87,6 +87,8 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert ">Темп<" in response.text
     assert ">Итог<" in response.text
     assert "60% финиш + 40% темп" in response.text
+    assert "Отклонение до 5 секунд на километр не штрафуется" in response.text
+    assert "После 30 секунд штраф растёт по экспоненте" in response.text
     assert "Международный Когалымский полумарафон</strong>" in response.text
     assert 'name="include_splits"' in response.text
     assert '<option value="true" selected>' in response.text
