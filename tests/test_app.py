@@ -74,7 +74,10 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=min-events"' in response.text
+    assert 'href="/static/styles.css?v=compact-toolbar"' in response.text
+    assert 'Результаты забегов' not in response.text
+    assert 'class="visually-hidden">Пейсмейкеры</h1>' in response.text
+    assert 'class="filter-hint" role="tooltip">За всю историю пейсера</span>' in response.text
     assert response.text.count('--rating-color: hsl(') == 3
     assert 'href="/add"' in response.text
     assert "Жигалов Сергей" in response.text

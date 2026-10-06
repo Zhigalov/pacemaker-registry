@@ -7,7 +7,7 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=min-events">
+    <link rel="stylesheet" href="/static/styles.css?v=compact-toolbar">
     <script src="/static/registry.js?v=event-rating" defer></script>
   </head>
   <body>
@@ -15,10 +15,7 @@
       {% include '_navigation.html' %}
 
       <section class="registry-heading" aria-labelledby="page-title">
-        <div>
-          <p class="eyebrow">Результаты забегов</p>
-          <h1 id="page-title">Пейсмейкеры</h1>
-        </div>
+        <h1 id="page-title" class="visually-hidden">Пейсмейкеры</h1>
         {% if registry.pacemakers %}
           <dl class="registry-stats" aria-label="Статистика реестра">
             <div><dt>Пэйсмейкеров</dt><dd>{{ registry.pacemakers | length }}</dd></div>
@@ -45,9 +42,11 @@
               </span>
             </div>
             <div class="registry-filter-field registry-filter-field--count">
-              <label for="min-events-filter">Минимум выступлений</label>
+              <div class="filter-label-hint">
+                <label for="min-events-filter" tabindex="0" aria-describedby="min-events-hint">Минимум выступлений</label>
+                <span id="min-events-hint" class="filter-hint" role="tooltip">За всю историю пейсера</span>
+              </div>
               <input id="min-events-filter" name="min_events" type="number" min="1" max="10000" step="1" value="{{ registry.min_events }}" data-registry-filter aria-describedby="min-events-hint">
-              <small id="min-events-hint">За всю историю пейсера</small>
             </div>
             <input type="hidden" name="include_splits" value="false">
             <label class="splits-toggle">
