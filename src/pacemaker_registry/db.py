@@ -54,11 +54,11 @@ class RegistryPacemaker:
     rating: float
     rating_tone: str
     results: tuple[RegistryResult, ...]
-    total_event_count: int = 0
+    total_result_count: int = 0
 
     @property
-    def competition_count(self) -> int:
-        return self.total_event_count or len({result.event_id for result in self.results})
+    def performance_count(self) -> int:
+        return self.total_result_count or len(self.results)
 
     @property
     def mean_finish_deviation(self) -> float:
@@ -177,9 +177,9 @@ def load_registry(
                 rr.chip_time,
                 rr.pace,
                 rr.checkpoints,
-                (SELECT count(DISTINCT history.event_id)
+                (SELECT count(*)
                  FROM race_results AS history
-                 WHERE history.pacemaker_id = p.id) AS total_event_count
+                 WHERE history.pacemaker_id = p.id) AS total_result_count
             FROM pacemakers AS p
             JOIN race_results AS rr ON rr.pacemaker_id = p.id
             JOIN events AS e ON e.id = rr.event_id
@@ -212,9 +212,9 @@ def load_registry(
             chip_time,
             actual_pace,
             checkpoints,
-            total_event_count,
+            total_result_count,
         ) = row
-        if total_event_count < min_events:
+        if total_result_count < min_events:
             continue
         event_ids.add(event_id)
         pacemaker = grouped.setdefault(
@@ -223,7 +223,7 @@ def load_registry(
                 "full_name": f"{last_name} {first_name}",
                 "initials": f"{last_name[0]}{first_name[0]}",
                 "results": [],
-                "total_event_count": total_event_count,
+                "total_result_count": total_result_count,
             },
         )
         finish_rating = calculate_pacemaker_rating(
@@ -274,7 +274,7 @@ def load_registry(
                 rating=rating,
                 rating_tone=_rating_tone(rating),
                 results=results,
-                total_event_count=data["total_event_count"],
+                total_result_count=data["total_result_count"],
             )
         )
     return Registry(
@@ -536,8 +536,8 @@ def _sort_pacemakers(
         sorted(
             pacemakers,
             key=lambda pacemaker: (
-                -pacemaker.rating,
-                -pacemaker.competition_count,
+                -float(format(pacemaker.rating, ".1f")),
+                -pacemaker.performance_count,
                 pacemaker.mean_finish_deviation,
                 pacemaker.full_name.casefold(),
                 pacemaker.id,

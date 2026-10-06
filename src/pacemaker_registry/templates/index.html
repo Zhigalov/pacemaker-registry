@@ -45,7 +45,7 @@
               </span>
             </div>
             <div class="registry-filter-field registry-filter-field--count">
-              <label for="min-events-filter">Минимум соревнований</label>
+              <label for="min-events-filter">Минимум выступлений</label>
               <input id="min-events-filter" name="min_events" type="number" min="1" max="10000" step="1" value="{{ registry.min_events }}" data-registry-filter aria-describedby="min-events-hint">
               <small id="min-events-hint">За всю историю пейсера</small>
             </div>
@@ -79,7 +79,7 @@
                 <span class="pacemaker-avatar" aria-hidden="true">{{ pacemaker.initials }}</span>
                 <div>
                   <h2>{{ pacemaker.full_name }}</h2>
-                  <span class="pacemaker-event-count" title="Количество разных соревнований за всю историю">Соревнований: {{ pacemaker.competition_count }}</span>
+                  <span class="pacemaker-event-count" title="Количество выступлений за всю историю, включая разные дистанции одного соревнования">Выступлений: {{ pacemaker.performance_count }}</span>
                   <div
                     class="pacemaker-rating pacemaker-rating--{{ pacemaker.rating_tone }}"
                     style="{{ pacemaker.rating | rating_color }}"
@@ -210,13 +210,13 @@
             </section>
             <p>Оценка за финиш считается по настройкам соревнования. В зелёной зоне допуска — 10 баллов, в жёлтых зонах оценка линейно снижается до балла, заданного для границы с красной зоной, в красных — убывает по экспоненте.</p>
             <p>Границы и график доступны на странице каждого соревнования. Рейтинг пейсмейкера — среднее итоговых оценок его выступлений; список отсортирован по убыванию рейтинга.</p>
-            <p>При равном рейтинге (до округления) выше пейсер с большим числом разных соревнований за всю историю. Если и оно совпало — с меньшим средним абсолютным отклонением финиша от цели в секундах по показанным выступлениям. Ранний и поздний финиш не компенсируют друг друга.</p>
+            <p>Сравниваем рейтинг, округлённый до десятых, как на карточках. При равенстве выше пейсер с большим числом выступлений за всю историю, включая разные дистанции одного соревнования. Если и оно совпало — с меньшим средним абсолютным отклонением финиша от цели в секундах по показанным выступлениям. Ранний и поздний финиш не компенсируют друг друга.</p>
           </div>
         </details>
       {% elif registry.events %}
         <section class="empty-state">
           <h2>Нет пейсеров по выбранным условиям</h2>
-          <p>Уменьшите минимальное число соревнований или выберите другое соревнование.</p>
+          <p>Уменьшите минимальное число выступлений или выберите другое соревнование.</p>
           <a class="button" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}">Сбросить фильтры</a>
         </section>
       {% else %}
