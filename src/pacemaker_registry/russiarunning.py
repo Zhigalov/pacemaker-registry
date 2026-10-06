@@ -11,6 +11,8 @@ import httpx
 
 RUSSIA_RUNNING_ORIGIN = "https://results.russiarunning.com"
 SLUG_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+TARGET_TIME_TYPE_ROUND = "round"
+TARGET_TIME_TYPE_SUB_MINUTE = "sub_minute"
 
 
 class InvalidResultUrl(ValueError):
@@ -241,7 +243,7 @@ def _pace_value(value: str) -> str:
     return value.split()[0]
 
 
-def guess_target_time(chip_time: str) -> str:
+def guess_target_time(chip_time: str, target_time_type: str | None = None) -> str:
     """Guess the flag time from the nearest common pacemaker target."""
     parts = chip_time.strip().split(":")
     if len(parts) not in (2, 3) or not all(part.isdigit() for part in parts):
@@ -259,8 +261,14 @@ def guess_target_time(chip_time: str) -> str:
     chip_seconds = hours * 3600 + minutes * 60 + seconds
     center_minute = chip_seconds // 60
     candidate_minutes = range(max(0, center_minute - 5), center_minute + 7)
+    allowed_remainders = {
+        TARGET_TIME_TYPE_ROUND: (0,),
+        TARGET_TIME_TYPE_SUB_MINUTE: (4,),
+    }.get(target_time_type, (0, 4))
     candidates = [
-        minute * 60 for minute in candidate_minutes if minute % 5 in (0, 4)
+        minute * 60
+        for minute in candidate_minutes
+        if minute % 5 in allowed_remainders
     ]
     target_seconds = min(
         candidates,

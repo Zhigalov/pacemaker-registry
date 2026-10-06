@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS events (
     id BIGSERIAL PRIMARY KEY,
     source_event_id TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL CHECK (btrim(name) <> ''),
+    target_time_type TEXT CHECK (
+        target_time_type IN ('round', 'sub_minute')
+    ),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -34,3 +37,27 @@ CREATE INDEX IF NOT EXISTS race_results_pacemaker_id_idx
 
 CREATE INDEX IF NOT EXISTS race_results_event_id_idx
     ON race_results (event_id);
+
+ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS target_time_type TEXT CHECK (
+        target_time_type IN ('round', 'sub_minute')
+    );
+
+UPDATE events AS event
+SET target_time_type = (
+    SELECT CASE
+        WHEN split_part(result.target_time, ':', 2)::INTEGER % 5 = 4
+            THEN 'sub_minute'
+        ELSE 'round'
+    END
+    FROM race_results AS result
+    WHERE result.event_id = event.id
+    ORDER BY result.created_at, result.id
+    LIMIT 1
+)
+WHERE event.target_time_type IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM race_results AS result
+      WHERE result.event_id = event.id
+  );

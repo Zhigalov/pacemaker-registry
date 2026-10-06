@@ -176,3 +176,8 @@ def test_guess_target_time_uses_nearest_common_flag_time(
     chip_time: str, expected: str
 ) -> None:
     assert guess_target_time(chip_time) == expected
+
+
+def test_guess_target_time_respects_event_target_time_type() -> None:
+    assert guess_target_time("01:04:20", "round") == "01:05"
+    assert guess_target_time("01:04:40", "sub_minute") == "01:04"

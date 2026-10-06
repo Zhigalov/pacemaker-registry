@@ -20,6 +20,7 @@ from pacemaker_registry.db import (
     Registry,
     calculate_rating_for_difference,
     check_database,
+    get_event_target_time_type,
     initialize_database,
     load_registry,
     parse_custom_rating_config,
@@ -28,7 +29,9 @@ from pacemaker_registry.db import (
 )
 from pacemaker_registry.russiarunning import (
     InvalidResultUrl,
+    RaceResult,
     RussiaRunningError,
+    guess_target_time,
     load_race_result,
 )
 
@@ -58,6 +61,19 @@ RATING_CHARTS = {
     RATING_MODE_STRICT: _rating_chart_points(RATING_MODE_STRICT),
     RATING_MODE_SYMMETRIC: _rating_chart_points(RATING_MODE_SYMMETRIC),
 }
+
+
+def _apply_event_target_time_type(result: RaceResult) -> RaceResult:
+    try:
+        target_time_type = get_event_target_time_type(result.source_event_id)
+    except (PsycopgError, RuntimeError):
+        return result
+    if not target_time_type:
+        return result
+    return replace(
+        result,
+        target_time=guess_target_time(result.chip_time, target_time_type),
+    )
 
 
 @asynccontextmanager
@@ -146,6 +162,7 @@ async def add_form(
     if result_url:
         try:
             result = await load_race_result(result_url)
+            result = _apply_event_target_time_type(result)
         except InvalidResultUrl as exception:
             error = str(exception)
             status_code = 422
@@ -176,6 +193,7 @@ async def add_result(
     status_code = 200
     try:
         result = await load_race_result(result_url)
+        result = _apply_event_target_time_type(result)
     except InvalidResultUrl as exception:
         error = str(exception)
         status_code = 422

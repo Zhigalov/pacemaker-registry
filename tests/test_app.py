@@ -279,6 +279,9 @@ async def test_add_form_parses_result_url_from_query_without_saving(monkeypatch)
     monkeypatch.setattr(
         "pacemaker_registry.main.save_race_result", fail_if_saved
     )
+    monkeypatch.setattr(
+        "pacemaker_registry.main.get_event_target_time_type", lambda _: None
+    )
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -292,6 +295,47 @@ async def test_add_form_parses_result_url_from_query_without_saving(monkeypatch)
     assert 'value="01:20"' in response.text
     assert "Проверьте полученные данные" in response.text
     assert "Сохранить в реестр" in response.text
+
+
+@pytest.mark.anyio
+async def test_add_form_uses_saved_event_target_time_type(monkeypatch) -> None:
+    async def fake_load_race_result(value: str) -> RaceResult:
+        return RaceResult(
+            athlete_name="Пейсер Второй",
+            source_event_id="event-id",
+            source_participant_id="827f5fcd-eaaf-41c0-93d2-ed4fd58de206",
+            event_name="Забег с ровными флагами",
+            distance_km="21,1",
+            chip_time="01:04:20",
+            target_time="01:04",
+            pace="03:03 /км",
+            checkpoints=(),
+            source_url=value,
+        )
+
+    monkeypatch.setattr(
+        "pacemaker_registry.main.load_race_result", fake_load_race_result
+    )
+    monkeypatch.setattr(
+        "pacemaker_registry.main.get_event_target_time_type", lambda _: "round"
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get(
+            "/add",
+            params={
+                "result_url": (
+                    "https://results.russiarunning.com/participant/"
+                    "event/race/827f5fcd-eaaf-41c0-93d2-ed4fd58de206"
+                )
+            },
+        )
+
+    assert response.status_code == 200
+    assert 'value="01:05"' in response.text
+    assert 'value="01:04"' not in response.text
 
 
 @pytest.mark.anyio

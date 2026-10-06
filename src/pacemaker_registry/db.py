@@ -9,7 +9,12 @@ import psycopg
 from psycopg import Connection
 from psycopg.types.json import Jsonb
 
-from pacemaker_registry.russiarunning import RaceResult, RussiaRunningError
+from pacemaker_registry.russiarunning import (
+    TARGET_TIME_TYPE_ROUND,
+    TARGET_TIME_TYPE_SUB_MINUTE,
+    RaceResult,
+    RussiaRunningError,
+)
 
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
@@ -119,6 +124,19 @@ def initialize_database() -> None:
 def check_database() -> None:
     with connect_database() as connection:
         connection.execute("SELECT 1").fetchone()
+
+
+def get_event_target_time_type(source_event_id: str) -> str | None:
+    with connect_database() as connection:
+        row = connection.execute(
+            """
+            SELECT target_time_type
+            FROM events
+            WHERE source_event_id = %s
+            """,
+            (source_event_id,),
+        ).fetchone()
+    return row[0] if row else None
 
 
 def load_registry(
@@ -268,6 +286,7 @@ def save_race_result(result: RaceResult, target_time: str) -> bool:
     last_name, first_name = _split_athlete_name(result.athlete_name)
     checkpoints = [asdict(checkpoint) for checkpoint in result.checkpoints]
     distance = Decimal(result.distance_km.replace(",", "."))
+    target_time_type = _target_time_type_from_target_time(target_time)
 
     with connect_database() as connection:
         with connection.cursor() as cursor:
@@ -287,13 +306,18 @@ def save_race_result(result: RaceResult, target_time: str) -> bool:
 
             cursor.execute(
                 """
-                INSERT INTO events (source_event_id, name)
-                VALUES (%s, %s)
+                INSERT INTO events (source_event_id, name, target_time_type)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (source_event_id)
-                DO UPDATE SET name = EXCLUDED.name
+                DO UPDATE SET
+                    name = EXCLUDED.name,
+                    target_time_type = COALESCE(
+                        events.target_time_type,
+                        EXCLUDED.target_time_type
+                    )
                 RETURNING id
                 """,
-                (result.source_event_id, result.event_name),
+                (result.source_event_id, result.event_name, target_time_type),
             )
             event_id = cursor.fetchone()[0]
 
@@ -327,6 +351,13 @@ def save_race_result(result: RaceResult, target_time: str) -> bool:
                 ),
             )
             return cursor.fetchone() is not None
+
+
+def _target_time_type_from_target_time(target_time: str) -> str:
+    _, minutes = map(int, target_time.split(":"))
+    if minutes % 5 == 4:
+        return TARGET_TIME_TYPE_SUB_MINUTE
+    return TARGET_TIME_TYPE_ROUND
 
 
 def _split_athlete_name(full_name: str) -> tuple[str, str]:

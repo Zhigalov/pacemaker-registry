@@ -9,6 +9,7 @@ from pacemaker_registry.db import (
     RATING_MODE_SYMMETRIC,
     CustomRatingConfig,
     RegistryPacemaker,
+    _target_time_type_from_target_time,
     _calculate_target_pace,
     _format_time_difference,
     _sort_pacemakers,
@@ -21,7 +22,68 @@ from pacemaker_registry.db import (
     normalize_rating_mode,
     parse_custom_rating_config,
     resolve_rating_mode,
+    save_race_result,
 )
+from pacemaker_registry.russiarunning import RaceResult
+
+
+def test_target_time_type_is_derived_from_first_confirmed_flag_time() -> None:
+    assert _target_time_type_from_target_time("01:40") == "round"
+    assert _target_time_type_from_target_time("01:39") == "sub_minute"
+
+
+def test_save_result_records_event_type_from_confirmed_target(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, tuple]] = []
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def execute(self, query: str, parameters: tuple):
+            calls.append((query, parameters))
+
+        def fetchone(self):
+            return (1,)
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return None
+
+        def cursor(self):
+            return FakeCursor()
+
+    monkeypatch.setattr(
+        "pacemaker_registry.db.connect_database", lambda: FakeConnection()
+    )
+    result = RaceResult(
+        athlete_name="Пейсер Первый",
+        source_event_id="event-id",
+        source_participant_id="827f5fcd-eaaf-41c0-93d2-ed4fd58de206",
+        event_name="Забег",
+        distance_km="21,1",
+        chip_time="01:38:53",
+        target_time="01:39",
+        pace="04:41 /км",
+        checkpoints=(),
+        source_url=(
+            "https://results.russiarunning.com/participant/"
+            "event/race/827f5fcd-eaaf-41c0-93d2-ed4fd58de206"
+        ),
+    )
+
+    assert save_race_result(result, "01:39") is True
+
+    event_query, event_parameters = calls[1]
+    assert "target_time_type = COALESCE" in event_query
+    assert event_parameters == ("event-id", "Забег", "sub_minute")
 
 
 def test_calculate_target_pace_from_flag_time_and_distance() -> None:
