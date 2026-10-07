@@ -851,7 +851,7 @@ tbody tr:hover { background: #fbfcfc; }
 }
 
 .result-summary {
-  --result-columns: 5.75rem minmax(0, 1fr) minmax(0, 1fr);
+  --result-columns: 5.5rem minmax(0, 1fr) minmax(0, 1fr);
   --result-cell-padding: .375rem;
   position: relative;
   text-decoration: none;
