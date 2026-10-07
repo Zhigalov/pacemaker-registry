@@ -1,3 +1,4 @@
+import os
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -69,7 +70,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
-templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
+def analytics_context(request: Request) -> dict:
+    counter_id = os.getenv("YANDEX_METRICA_ID", "")
+    return {"metrica_id": counter_id if re.fullmatch(r"[1-9][0-9]{0,14}", counter_id) else None}
+
+
+templates = Jinja2Templates(
+    directory=PACKAGE_DIR / "templates", context_processors=[analytics_context],
+)
 templates.env.filters["rating_color"] = rating_color_style
 
 
@@ -300,6 +308,7 @@ async def save_result(
     result = None
     error = None
     saved_message = None
+    result_created = False
     status_code = 200
 
     if not TARGET_TIME_PATTERN.fullmatch(target_time):
@@ -310,6 +319,7 @@ async def save_result(
             result = await load_race_result(result_url)
             result = replace(result, target_time=target_time)
             created = save_race_result(result, target_time)
+            result_created = created
             saved_message = (
                 "Результат сохранён в реестр."
                 if created
@@ -335,6 +345,7 @@ async def save_result(
             "error": error,
             "result_url": result_url,
             "saved_message": saved_message,
+            "result_created": result_created,
         },
         status_code=status_code,
     )

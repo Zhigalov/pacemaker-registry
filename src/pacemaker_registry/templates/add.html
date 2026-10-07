@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
   <head>
+    {% include '_analytics.html' %}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Получение результата пейсмейкера из беговых протоколов">
@@ -11,6 +12,8 @@
     <script src="/static/add.js" defer></script>
   </head>
   <body>
+    {% if result_created %}<span hidden data-analytics-goal="result_saved"></span>
+    {% elif result and not error %}<span hidden data-analytics-goal="result_preview"></span>{% endif %}
     <main class="app-shell">
       {% include '_navigation.html' %}
 

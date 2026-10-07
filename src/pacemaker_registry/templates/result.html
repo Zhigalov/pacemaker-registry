@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ru">
   <head>
+    {% include '_analytics.html' %}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ details.athlete_name }} · {{ event.name }} — Реестр пейсмейкеров</title>
@@ -11,6 +12,7 @@
     <script src="/static/pace-rating.js?v=result-markers" defer></script>
   </head>
   <body>
+    <span hidden data-analytics-goal="result_open"></span>
     <main class="app-shell event-shell result-detail">
       {% include '_navigation.html' %}
       <section class="event-heading">
