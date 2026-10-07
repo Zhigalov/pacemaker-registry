@@ -74,7 +74,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=compact-cards"' in response.text
+    assert 'href="/static/styles.css?v=card-grid"' in response.text
     assert 'Результаты забегов' not in response.text
     assert 'class="visually-hidden">Пейсмейкеры</h1>' in response.text
     assert 'class="filter-hint" role="tooltip">За всю историю пейсера</span>' in response.text
@@ -96,6 +96,9 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     card = response.text.split('class="result-summary-times"', 1)[1].split('</a>', 1)[0]
     assert '→' not in card
     assert card.count('class="result-icon"') == 4
+    assert '<sup class="result-deviation"' in card
+    assert '(−7 с)</sup></span></span>' in card
+    assert 'class="result-time result-time--actual"' in card
     assert ">Итог<" in response.text
     assert "60% финиш + 40% темп" in response.text
     assert "По умолчанию отклонение до 5 секунд на километр не штрафуется" in response.text

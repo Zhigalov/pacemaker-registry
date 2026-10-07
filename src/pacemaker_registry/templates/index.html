@@ -8,7 +8,7 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=compact-cards">
+    <link rel="stylesheet" href="/static/styles.css?v=card-grid">
     <script src="/static/registry.js?v=result-detail" defer></script>
   </head>
   <body>
@@ -110,8 +110,7 @@
                       </span>
                       <span class="result-summary-times">
                         <span class="result-time result-time--target" title="Цель — время на флаге">{{ icon('target') }}<span class="visually-hidden">Цель </span><strong>{{ result.target_time_display }}</strong></span>
-                        <span class="result-time" title="Факт — чип-тайм">{{ icon('clock') }}<span class="visually-hidden">Факт </span><strong>{{ result.chip_time_display }}</strong></span>
-                        <span class="result-deviation" title="Отклонение от цели: минус — раньше, плюс — позже">({{ result.finish_difference_display }})</span>
+                        <span class="result-time result-time--actual" title="Факт — чип-тайм">{{ icon('clock') }}<span class="visually-hidden">Факт </span><span class="result-chip-time"><strong>{{ result.chip_time_display }}</strong><sup class="result-deviation" title="Отклонение от цели: минус — раньше, плюс — позже">({{ result.finish_difference_display }})</sup></span></span>
                       </span>
                       <span class="result-summary-ratings">
                         <span class="result-score" style="{{ result.finish_rating | rating_color }}" title="Оценка за финиш">{{ icon('finish') }}<span class="visually-hidden">Финиш </span><strong>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }}</strong></span>

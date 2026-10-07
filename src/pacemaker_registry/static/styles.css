@@ -840,7 +840,7 @@ tbody tr:hover { background: #fbfcfc; }
 .results-strip {
   display: grid;
   min-width: 0;
-  grid-auto-columns: 20rem;
+  grid-auto-columns: 18rem;
   grid-auto-flow: column;
   justify-content: start;
   gap: 0.75rem;
@@ -851,6 +851,8 @@ tbody tr:hover { background: #fbfcfc; }
 }
 
 .result-summary {
+  --result-columns: 5.75rem minmax(0, 1fr) minmax(0, 1fr);
+  --result-cell-padding: .375rem;
   position: relative;
   text-decoration: none;
   display: block;
@@ -908,28 +910,27 @@ tbody tr:hover { background: #fbfcfc; }
   color: #4d615a;
 }
 
-.result-summary-times {
-  gap: 0.5rem;
-  white-space: nowrap;
-}
-
-.result-time { display: inline-flex; align-items: center; gap: .25rem; }
-.result-time--target { color: #52655d; }
-.result-icon { width: 1rem; height: 1rem; flex: 0 0 1rem; }
-.result-deviation { margin-left: auto; color: #64756d; font-size: .66rem; font-variant-numeric: tabular-nums; }
-
+.result-summary-times,
 .result-summary-ratings {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.15fr;
+  grid-template-columns: var(--result-columns);
   gap: 0.35rem;
 }
+
+.result-summary-times { white-space: nowrap; }
+.result-time { display: flex; align-items: center; gap: .25rem; padding-inline: var(--result-cell-padding); }
+.result-time--target { color: #52655d; justify-content: space-between; }
+.result-time--actual { grid-column: 2 / -1; padding-inline-end: 0; }
+.result-icon { width: .875rem; height: .875rem; flex: 0 0 .875rem; }
+.result-chip-time { white-space: nowrap; }
+.result-deviation { position: relative; top: -.45em; margin-left: .15rem; vertical-align: baseline; line-height: 0; color: #64756d; font-size: .58rem; font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .result-summary-ratings > span {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.25rem;
-  padding: 0.3rem 0.5rem;
+  padding: 0.3rem var(--result-cell-padding);
   border-radius: 0.48rem;
   background: var(--rating-bg, #f1f4f3);
   color: var(--rating-color, #687970);
@@ -1262,7 +1263,7 @@ tbody tr:hover { background: #fbfcfc; }
   }
 
   .results-strip {
-    grid-auto-columns: min(20rem, calc(100vw - 3.5rem));
+    grid-auto-columns: min(18rem, calc(100vw - 3.5rem));
     margin-right: -1rem;
     padding-right: 1rem;
   }
