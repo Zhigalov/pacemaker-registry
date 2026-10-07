@@ -5,6 +5,7 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
   const fields = editable ? Object.fromEntries(keys.map(key => [key, form.elements.namedItem(key)])) : {};
   const svg = form.querySelector("[data-event-chart]");
   const readout = form.querySelector("[data-readout]");
+  const observations = window.resultChartMarkers?.read(form) || [];
   const state = form.querySelector("[data-save-state]");
   const boundaries = ["left_bad", "left_good", "right_good", "right_bad"];
   const colors = ["#bc4c43", "#b98216", "#176f59", "#b98216", "#bc4c43"];
@@ -63,7 +64,8 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
     if (!readConfig()) return;
     if (rescale) {
       extent = Math.max(90, -config.left_bad + config.left_decay * 2,
-        config.right_bad + config.right_decay * 2);
+        config.right_bad + config.right_decay * 2,
+        ...observations.map(point => Math.abs(point.deviation) * 1.1));
     }
     const zones = svg.querySelector("[data-zones]");
     const grid = svg.querySelector("[data-grid]");
@@ -98,6 +100,7 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
       lastX = px;
       grid.append(element("text", {x: px, y: 309, "text-anchor": "middle"}, Math.round(t)));
     });
+    if (observations.length) window.resultChartMarkers.render(svg, observations, x, y, readout);
     if (!editable) return;
     boundaries.forEach((key, i) => {
       const px = x(config[key]);
@@ -164,6 +167,7 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
     svg.setPointerCapture(event.pointerId);
   });
   svg.addEventListener("pointermove", event => {
+    if (event.target.closest('[data-result-marker]')) return;
     const p = position(event);
     if (drag) {
       const key = drag.key;

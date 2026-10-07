@@ -4,6 +4,7 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
   const fields = editable ? Object.fromEntries(Object.keys(defaults).map(key => [key, form.elements.namedItem(key)])) : {};
   const chart = form.querySelector('[data-pace-chart]');
   const readout = form.querySelector('[data-readout]');
+  const observations = window.resultChartMarkers?.read(form) || [];
   const state = form.querySelector('[data-save-state]');
   const slider = form.querySelector('[data-pace-curve]');
   const submit = form.querySelector('[type=submit]');
@@ -69,7 +70,8 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
   }
 
   function render(rescale = true) {
-    if (rescale) extent = Math.max(60, config.bad + 2 * config.decay);
+    if (rescale) extent = Math.max(60, config.bad + 2 * config.decay,
+      ...observations.map(point => Math.abs(point.deviation) * 1.1));
     const zones = chart.querySelector('[data-zones]'), grid = chart.querySelector('[data-grid]');
     const curves = chart.querySelector('[data-curves]'), handles = chart.querySelector('[data-handles]');
     [zones, grid, curves, handles].forEach(group => group.replaceChildren());
@@ -97,6 +99,7 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
     points.push([extent, score(extent)]);
     line(points, '#bc4c43');
     if (!chart.querySelector('[data-hover]').hasAttribute('hidden')) inspect(inspected);
+    if (observations.length) window.resultChartMarkers.render(chart, observations, x, y, readout, true);
     if (!editable) return;
     [['tolerance', 10, '#176f59'], ['checkpoint', config.checkpoint_score, '#b98216'], ['bad', config.bad_score, '#bc4c43']].forEach(([key, value, fill]) => {
       const handle = element('circle', {cx: x(config[key]), cy: y(value), r: 8, fill, class: 'event-handle', 'data-pace-handle': key}, handles);
@@ -119,6 +122,7 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
     event.preventDefault();
   });
   chart.addEventListener('pointermove', event => {
+    if (event.target.closest('[data-result-marker]')) return;
     const point = position(event), t = round(secondsAt(point.x));
     if (drag) {
       const value = round(scoreAt(point.y), 1);

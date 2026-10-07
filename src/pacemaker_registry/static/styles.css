@@ -1361,6 +1361,15 @@ tbody tr:hover { background: #fbfcfc; }
 .event-chart [data-hover][hidden] { display: none; }
 .event-chart [data-hover] line { stroke: #3e4e46; stroke-dasharray: 3 3; }
 .event-chart [data-hover] circle { fill: #176f59; stroke: white; stroke-width: 2; }
+.result-chart-marker { cursor: pointer; outline: none; }
+.result-marker-leader { fill: none; stroke: #315b87; stroke-width: 1; opacity: .25; pointer-events: none; }
+.result-marker-dot { fill: #315b87; stroke: #fff; stroke-width: 2; }
+.result-marker-label { fill: #eef4fa; stroke: #c5d4e4; stroke-width: 1; }
+.event-chart .result-chart-marker text { fill: #264d75; font-weight: 600; }
+.result-marker-leader.is-selected { opacity: 1; stroke-width: 2; }
+.result-chart-marker.is-selected .result-marker-label,
+.result-chart-marker:focus-visible .result-marker-label { stroke: #264d75; stroke-width: 2; fill: #dceaf7; }
+.result-chart-marker.is-selected .result-marker-dot { fill: #123e70; stroke-width: 3; }
 .event-zones { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .65rem; }
 .event-zone { padding: .85rem; border-radius: 12px; border-top: 4px solid; }
 .event-zone h3 { margin: 0 0 .6rem; font-size: .9rem; }

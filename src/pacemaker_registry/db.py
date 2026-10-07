@@ -1,6 +1,7 @@
 import os
 from dataclasses import asdict, dataclass
 from decimal import ROUND_HALF_UP, Decimal
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,8 @@ class RegistryResult:
     rating_tone: str
     time_difference: str
     checkpoints: tuple[dict[str, str], ...]
+    finish_deviation: int = 0
+    pace_markers: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +119,11 @@ def _build_registry_result(result_id, event, distance, target_time, chip_time,
         rating=rating, rating_tone=_rating_tone(rating),
         time_difference=_format_time_difference(_time_difference_seconds(target_time, chip_time)),
         checkpoints=tuple(checkpoints),
+        finish_deviation=_time_difference_seconds(target_time, chip_time),
+        pace_markers=tuple({"label": str(point.get("distance_km", "?")) + " км",
+                            "deviation": deviation, "score": score}
+                           for point, _, deviation, score in
+                           _rated_segments(target_time, distance, checkpoints, event.pace_formula)),
     )
 
 
@@ -466,9 +474,22 @@ def calculate_splits_rating(
     if distance_km <= 0:
         return None
 
-    target_pace_seconds = _target_time_seconds(target_time) / float(distance_km)
     weighted_rating = 0.0
     covered_distance = Decimal("0")
+    for _, segment_distance, _, score in _rated_segments(target_time, distance_km, checkpoints, config):
+        weighted_rating += score * float(segment_distance)
+        covered_distance += segment_distance
+
+    if covered_distance < distance_km * MIN_SPLITS_COVERAGE:
+        return None
+    return weighted_rating / float(covered_distance)
+
+
+def _rated_segments(target_time, distance_km, checkpoints, config):
+    """One source for the weighted rating and exact per-segment chart markers."""
+    if not distance_km.is_finite() or distance_km <= 0:
+        return
+    target_pace_seconds = _target_time_seconds(target_time) / float(distance_km)
     for checkpoint in checkpoints:
         try:
             segment_distance = Decimal(
@@ -477,16 +498,11 @@ def calculate_splits_rating(
             pace_seconds = _pace_seconds(str(checkpoint["pace_per_km"]))
         except (KeyError, ValueError, ArithmeticError):
             continue
-        if segment_distance <= 0:
+        if not segment_distance.is_finite() or segment_distance <= 0 or pace_seconds <= 0:
             continue
-        weighted_rating += calculate_split_rating(
-            pace_seconds - target_pace_seconds, config
-        ) * float(segment_distance)
-        covered_distance += segment_distance
-
-    if covered_distance < distance_km * MIN_SPLITS_COVERAGE:
-        return None
-    return weighted_rating / float(covered_distance)
+        deviation = pace_seconds - target_pace_seconds
+        if isfinite(deviation):
+            yield checkpoint, segment_distance, deviation, calculate_split_rating(deviation, config)
 
 
 def calculate_combined_rating(

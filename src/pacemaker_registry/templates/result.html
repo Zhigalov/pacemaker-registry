@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ details.athlete_name }} · {{ event.name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=result-detail">
-    <script src="/static/event-rating.js?v=event-list" defer></script>
-    <script src="/static/pace-rating.js?v=result-detail" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=result-markers">
+    <script src="/static/result-markers.js?v=1" defer></script>
+    <script src="/static/event-rating.js?v=result-markers" defer></script>
+    <script src="/static/pace-rating.js?v=result-markers" defer></script>
   </head>
   <body>
     <main class="app-shell event-shell result-detail">
@@ -58,12 +59,16 @@
         <p class="event-note">Действующая шкала этого соревнования · только просмотр. Ваше отклонение: {{ result.time_difference }}, оценка: {{ '%.1f'|format(result.finish_rating)|replace('.', ',') }}.</p>
         {% include '_rating_chart.html' %}
         <script type="application/json" data-rating-config>{{ finish_config | tojson }}</script>
+        <script type="application/json" data-result-markers>{{ [{'label': 'Финиш', 'deviation': result.finish_deviation, 'score': result.finish_rating}] | tojson }}</script>
       </section>
       <section class="event-editor result-rating-preview" data-pace-widget aria-labelledby="pace-chart-title">
         <h2 id="pace-chart-title">Оценка за темп на отрезках</h2>
         <p class="event-note">Действующая шкала этого соревнования · только просмотр. Допуск ±{{ '%g'|format(event.pace_formula.tolerance) }} с/км, экспонента после ±{{ '%g'|format(event.pace_formula.bad) }} с/км.</p>
         {% include '_pace_chart.html' %}
         <script type="application/json" data-pace-defaults>{{ pace_config | tojson }}</script>
+        <script type="application/json" data-result-markers>{{ result.pace_markers | tojson }}</script>
+        {% if result.pace_markers %}<p class="event-note">Метки подписаны километром окончания отрезка. Наведите, нажмите или выберите подпись клавишей Tab, чтобы увидеть отклонение и балл. Минус — быстрее целевого темпа, плюс — медленнее.</p>{% endif %}
+        {% if result.pace_markers|length < result.checkpoints|length %}<p class="event-note">Отсечки без корректного темпа или длины отрезка не нанесены на график.</p>{% endif %}
       </section>
       <a class="button result-back" href="{{ back_url }}">← Обратно к списку</a>
     </main>
