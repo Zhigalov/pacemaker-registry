@@ -1,4 +1,5 @@
 <!doctype html>
+{% from '_icons.html' import icon %}
 <html lang="ru">
   <head>
     <meta charset="utf-8">
@@ -7,7 +8,7 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=result-detail">
+    <link rel="stylesheet" href="/static/styles.css?v=compact-cards">
     <script src="/static/registry.js?v=result-detail" defer></script>
   </head>
   <body>
@@ -100,7 +101,7 @@
                     href="/results/{{ result.id }}?event_id={{ registry.selected_event_id or 0 }}&amp;include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}"
                     data-tooltip-id="result-details-{{ result.id }}"
                     aria-describedby="result-details-{{ result.id }}"
-                    aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time }}, факт {{ result.chip_time }}, финиш {{ '%.1f'|format(result.finish_rating) }}, темп {% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating) }}{% else %}нет данных{% endif %}, итог {{ '%.1f'|format(result.rating) }} из 10"
+                    aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time_display }}, факт {{ result.chip_time_display }}, отклонение {{ result.finish_difference_display }}, финиш {{ '%.1f'|format(result.finish_rating) }}, темп {% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating) }}{% else %}нет данных{% endif %}, итог {{ '%.1f'|format(result.rating) }} из 10"
                   >
                     <span class="result-summary-data">
                       <span class="result-summary-head">
@@ -108,14 +109,14 @@
                         <strong class="result-distance">{{ result.distance_km }} км</strong>
                       </span>
                       <span class="result-summary-times">
-                        <small>Цель</small><strong>{{ result.target_time }}</strong>
-                        <span aria-hidden="true">→</span>
-                        <small>Факт</small><strong>{{ result.chip_time }}</strong>
+                        <span class="result-time result-time--target" title="Цель — время на флаге">{{ icon('target') }}<span class="visually-hidden">Цель </span><strong>{{ result.target_time_display }}</strong></span>
+                        <span class="result-time" title="Факт — чип-тайм">{{ icon('clock') }}<span class="visually-hidden">Факт </span><strong>{{ result.chip_time_display }}</strong></span>
+                        <span class="result-deviation" title="Отклонение от цели: минус — раньше, плюс — позже">({{ result.finish_difference_display }})</span>
                       </span>
                       <span class="result-summary-ratings">
-                        <span title="Оценка за финиш"><small>Финиш</small><strong>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }}</strong></span>
-                        <span title="Оценка за темп на отсечках"><small>Темп</small><strong>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }}{% else %}—{% endif %}</strong></span>
-                        <span class="result-rating result-rating--{{ result.rating_tone }}" style="{{ result.rating | rating_color }}" title="Итоговая оценка"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
+                        <span class="result-score" style="{{ result.finish_rating | rating_color }}" title="Оценка за финиш">{{ icon('finish') }}<span class="visually-hidden">Финиш </span><strong>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }}</strong></span>
+                        <span class="result-score{% if result.splits_rating is none %} result-score--missing{% endif %}" {% if result.splits_rating is not none %}style="{{ result.splits_rating | rating_color }}"{% endif %} title="{% if result.splits_rating is none %}Недостаточно данных по отсечкам — это не нулевая оценка{% else %}Оценка за темп на отсечках{% if not registry.include_splits %} · не учитывается в итоге{% endif %}{% endif %}">{{ icon('pace') }}<span class="visually-hidden">Темп {% if result.splits_rating is none %}— нет данных{% endif %}</span><strong>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }}{% else %}—{% endif %}</strong></span>
+                        <span class="result-score result-score--total" style="{{ result.rating | rating_color }}" title="Итоговая оценка{% if not registry.include_splits %} · только финиш: учёт темпа выключен{% elif result.splits_rating is none %} · только финиш: недостаточно отсечек{% endif %}"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
                       </span>
                     </span>
                   </a>

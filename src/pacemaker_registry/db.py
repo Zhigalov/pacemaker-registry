@@ -48,6 +48,27 @@ class RegistryResult:
     finish_deviation: int = 0
     pace_markers: tuple[dict[str, Any], ...] = ()
 
+    @property
+    def target_time_display(self) -> str:
+        hours, minutes = map(int, self.target_time.split(":"))
+        return f"{hours:02d}:{minutes:02d}:00"
+
+    @property
+    def chip_time_display(self) -> str:
+        parts = list(map(int, self.chip_time.split(":")))
+        if len(parts) == 2:
+            parts.insert(0, 0)
+        hours, minutes, seconds = parts
+        # Sources may return elapsed minutes greater than 59 (e.g. 65:07).
+        hours += minutes // 60
+        return f"{hours:02d}:{minutes % 60:02d}:{seconds:02d}"
+
+    @property
+    def finish_difference_display(self) -> str:
+        difference = _time_difference_seconds(self.target_time, self.chip_time)
+        sign = "+" if difference > 0 else "−" if difference < 0 else ""
+        return f"{sign}{abs(difference)} с"
+
 
 @dataclass(frozen=True, slots=True)
 class RegistryPacemaker:

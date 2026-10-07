@@ -74,11 +74,11 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=result-detail"' in response.text
+    assert 'href="/static/styles.css?v=compact-cards"' in response.text
     assert 'Результаты забегов' not in response.text
     assert 'class="visually-hidden">Пейсмейкеры</h1>' in response.text
     assert 'class="filter-hint" role="tooltip">За всю историю пейсера</span>' in response.text
-    assert response.text.count('--rating-color: hsl(') == 3
+    assert response.text.count('--rating-color: hsl(') == 5
     assert 'href="/add"' in response.text
     assert 'href="/results/1?event_id=0&amp;include_splits=true&amp;min_events=1"' in response.text
     assert "Жигалов Сергей" in response.text
@@ -87,10 +87,15 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "05:23 /км" in response.text
     assert 'class="result-event"' not in response.text
     assert "Рейтинг 9,5 из 10" in response.text
-    assert ">Цель<" in response.text
-    assert ">Факт<" in response.text
-    assert ">Финиш<" in response.text
-    assert ">Темп<" in response.text
+    assert '>Цель </span>' in response.text
+    assert '>Факт </span>' in response.text
+    assert '>Финиш </span>' in response.text
+    assert '>Темп </span>' in response.text
+    assert '<strong>01:54:00</strong>' in response.text
+    assert '(−7 с)' in response.text
+    card = response.text.split('class="result-summary-times"', 1)[1].split('</a>', 1)[0]
+    assert '→' not in card
+    assert card.count('class="result-icon"') == 4
     assert ">Итог<" in response.text
     assert "60% финиш + 40% темп" in response.text
     assert "По умолчанию отклонение до 5 секунд на километр не штрафуется" in response.text
@@ -112,6 +117,38 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert '<option value="0" selected>' in response.text
     assert 'name="rating_mode"' not in response.text
     assert '<noscript><button class="button registry-filter-submit"' in response.text
+
+
+@pytest.mark.parametrize('target,chip,expected_target,expected_chip,delta', [
+    ('00:54', '54:53', '00:54:00', '00:54:53', '+53 с'),
+    ('00:44', '00:44:00', '00:44:00', '00:44:00', '0 с'),
+    ('1:05', '65:07', '01:05:00', '01:05:07', '+7 с'),
+    ('03:59', '03:58:48', '03:59:00', '03:58:48', '−12 с'),
+    ('03:59', '04:01:01', '03:59:00', '04:01:01', '+121 с'),
+])
+def test_card_time_formatting(target, chip, expected_target, expected_chip, delta):
+    result = RegistryResult(1, 1, 'Старт', '10', target, '', chip, '', 10, None, 10, '', '', ())
+    assert result.target_time_display == expected_target
+    assert result.chip_time_display == expected_chip
+    assert result.finish_difference_display == delta
+    assert result.target_time == target and result.chip_time == chip
+
+
+@pytest.mark.anyio
+async def test_card_distinguishes_missing_pace_from_zero(monkeypatch):
+    from dataclasses import replace
+    missing = RegistryResult(1, 1, 'Старт', '10', '00:54', '', '54:53', '', 10, None, 10, '', '', ())
+    zero = replace(missing, id=2, splits_rating=0.0)
+    registry = Registry((RegistryPacemaker(1, 'Тестовый пейсер', 'ТП', 10, '', (missing, zero)),), 1, 2)
+    monkeypatch.setattr('pacemaker_registry.main.load_registry', lambda *args, **kwargs: registry)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get('/')
+    assert response.status_code == 200
+    assert response.text.count('result-score--missing') == 1
+    assert 'Недостаточно данных по отсечкам — это не нулевая оценка' in response.text
+    assert '<strong>—</strong>' in response.text
+    assert '<strong>0,0</strong>' in response.text
+    assert '--rating-color: hsl(4.00 65% 28%)' in response.text
 
 
 @pytest.mark.anyio

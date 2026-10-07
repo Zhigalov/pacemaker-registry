@@ -1,0 +1,9 @@
+{% macro icon(name) -%}
+<svg class="result-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  {% if name == 'target' %}<path d="M5 21V3l14 4-14 4"/>
+  {% elif name == 'clock' %}<circle cx="12" cy="14" r="8"/><path d="M9 2h6M12 2v4m6 1 2-2M12 10v4l3 2"/>
+  {% elif name == 'finish' %}<path d="M5 21V3m0 1h14v10H5"/><path d="M5 4h5v5H5zm10 0h4v5h-4zM10 9h5v5h-5z" fill="currentColor" stroke="none"/>
+  {% elif name == 'pace' %}<path d="M2 13h4l3-7 5 13 3-7h5"/>
+  {% endif %}
+</svg>
+{%- endmacro %}
