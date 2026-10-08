@@ -1,10 +1,11 @@
 <header class="site-header">
   <a class="brand" href="/" aria-label="Реестр пейсмейкеров — главная">
-    <span class="brand-mark" aria-hidden="true">P</span>
-    <span>Реестр пейсмейкеров</span>
+    <img class="brand-mark" src="/static/apple-touch-icon.png?v=equal-flags" width="36" height="36" alt="">
+    <span class="brand-name">Реестр пейсмейкеров</span>
   </a>
   <nav class="site-menu" aria-label="Главное меню">
-    <a class="button" href="/events">Соревнования</a>
-    <a class="button button--primary" href="/add">＋ Добавить результат</a>
+    <a class="site-menu-link" href="/"{% if request.url.path == '/' or request.url.path.startswith('/results/') %} aria-current="page"{% endif %}>Пейсмейкеры</a>
+    <a class="site-menu-link" href="/events"{% if request.url.path.startswith('/events') %} aria-current="page"{% endif %}>Соревнования</a>
   </nav>
+  <a class="button button--primary site-add" href="/add" aria-label="Добавить результат"{% if request.url.path in ['/add', '/results'] %} aria-current="page"{% endif %}><span aria-hidden="true">＋</span> Добавить<span class="site-add-long"> результат</span></a>
 </header>

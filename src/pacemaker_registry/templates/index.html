@@ -9,23 +9,14 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=card-grid">
+    <link rel="stylesheet" href="/static/styles.css?v=compact-header">
     <script src="/static/registry.js?v=result-detail" defer></script>
   </head>
   <body>
     <main class="app-shell app-shell--registry">
       {% include '_navigation.html' %}
 
-      <section class="registry-heading" aria-labelledby="page-title">
-        <h1 id="page-title" class="visually-hidden">Пейсмейкеры</h1>
-        {% if registry.pacemakers %}
-          <dl class="registry-stats" aria-label="Статистика реестра">
-            <div><dt>Пэйсмейкеров</dt><dd>{{ registry.pacemakers | length }}</dd></div>
-            <div><dt>Соревнований</dt><dd>{{ registry.event_count }}</dd></div>
-            <div><dt>Результатов</dt><dd>{{ registry.result_count }}</dd></div>
-          </dl>
-        {% endif %}
-      </section>
+      <h1 id="page-title" class="visually-hidden">Пейсмейкеры</h1>
 
       {% if registry.events %}
         <section class="registry-toolbar" aria-label="Фильтр реестра">
@@ -53,17 +44,31 @@
             <input type="hidden" name="include_splits" value="false">
             <label class="splits-toggle">
               <input type="checkbox" name="include_splits" value="true" data-registry-filter {% if registry.include_splits %}checked{% endif %}>
-              Учитывать темп на дистанции
+              Учитывать темп в рейтинге
             </label>
             <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
           </form>
-          {% if registry.selected_event_id is not none %}
-            <a class="quiet-link" href="/events/{{ registry.selected_event_id }}">Настройки соревнования →</a>
-            <a class="quiet-link registry-filter-reset" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}">Все соревнования</a>
-          {% endif %}
         </section>
       {% endif %}
 
+      {% if not registry_error and (registry.events or registry.pacemakers) %}
+        <div class="registry-summary">
+          <div class="registry-summary-counts">
+            <span>Показано</span>
+            <dl class="registry-stats" aria-label="Статистика отфильтрованного списка">
+              <div><dt>Пейсеров</dt><dd>{{ registry.pacemakers | length }}</dd></div>
+              <div><dt>Соревнований</dt><dd>{{ registry.event_count }}</dd></div>
+              <div><dt>Результатов</dt><dd>{{ registry.result_count }}</dd></div>
+            </dl>
+          </div>
+          {% if registry.selected_event_id is not none %}
+            <div class="registry-summary-links">
+              <a class="quiet-link" href="/events/{{ registry.selected_event_id }}">Настройки соревнования →</a>
+              <a class="quiet-link registry-filter-reset" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}">Все соревнования</a>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
 
       {% if registry_error %}
         <div class="error-message registry-load-error" role="alert">{{ registry_error }}</div>
