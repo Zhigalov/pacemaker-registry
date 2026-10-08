@@ -168,6 +168,16 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
     )
 
 
+def update_result_target_time(result_id: int, target_time: str, previous_target_time: str) -> bool:
+    """Change only the flag; refuse to overwrite a concurrently edited result."""
+    with connect_database() as connection:
+        return connection.execute(
+            """UPDATE race_results SET target_time = %s
+               WHERE id = %s AND target_time = %s RETURNING id""",
+            (target_time, result_id, previous_target_time),
+        ).fetchone() is not None
+
+
 def connect_database() -> Connection[Any]:
     database_url = os.getenv("DATABASE_URL")
     if database_url:

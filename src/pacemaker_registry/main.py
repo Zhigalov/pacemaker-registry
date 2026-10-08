@@ -21,6 +21,7 @@ from pacemaker_registry.db import (
     save_event_rating,
     save_event_pace_rating,
     get_result_details,
+    update_result_target_time,
     check_database,
     get_event_target_time_type,
     initialize_database,
@@ -209,19 +210,20 @@ def _result_source_links(source_url: str) -> tuple[str | None, str | None]:
     return None, None
 
 
-@app.get("/results/{result_id}", response_class=HTMLResponse)
-def result_page(
-    request: Request, result_id: int, include_splits: bool = True,
-    event_id: Annotated[int, Query(ge=0)] = 0,
-    min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
-):
+def _load_result_or_404(result_id: int, include_splits: bool):
     try:
         details = get_result_details(result_id, include_splits=include_splits)
     except (PsycopgError, RuntimeError) as error:
         raise HTTPException(503, "Не удалось загрузить результат. Попробуйте позже.") from error
     if details is None:
         raise HTTPException(404, "Результат не найден.")
+    return details
+
+
+def _result_response(request, details, include_splits, event_id, min_events, *,
+                     target_time=None, error=None, saved=False, status_code=200):
     source_url, source_event_url = _result_source_links(details.source_url)
+    query = urlencode({"event_id": event_id, "include_splits": str(include_splits).lower(), "min_events": min_events})
     return templates.TemplateResponse(
         request=request, name="result.html",
         context={
@@ -229,9 +231,61 @@ def result_page(
             "source_url": source_url, "source_event_url": source_event_url,
             "finish_config": asdict(details.event.formula),
             "pace_config": asdict(details.event.pace_formula), "include_splits": include_splits,
-            "back_url": "/?" + urlencode({"event_id": event_id, "include_splits": str(include_splits).lower(), "min_events": min_events}),
+            "back_url": "/?" + query,
+            "edit_url": f"/results/{details.result.id}/target-time?" + query,
+            "target_time_value": details.result.target_time if target_time is None else target_time,
+            "error": error, "saved": saved,
         },
+        status_code=status_code,
     )
+
+
+@app.get("/results/{result_id}", response_class=HTMLResponse)
+def result_page(
+    request: Request, result_id: int, include_splits: bool = True,
+    event_id: Annotated[int, Query(ge=0)] = 0,
+    min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
+    saved: bool = False,
+):
+    return _result_response(request, _load_result_or_404(result_id, include_splits),
+                            include_splits, event_id, min_events, saved=saved)
+
+
+@app.post("/results/{result_id}/target-time", response_class=HTMLResponse)
+def edit_result_target_time(
+    request: Request, result_id: int,
+    target_time: Annotated[str, Form(max_length=20)],
+    previous_target_time: Annotated[str, Form(max_length=20)],
+    include_splits: bool = True,
+    event_id: Annotated[int, Query(ge=0)] = 0,
+    min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
+):
+    details = _load_result_or_404(result_id, include_splits)
+    target_time = target_time.strip()
+    if not TARGET_TIME_PATTERN.fullmatch(target_time) or int(target_time.replace(":", "")) == 0:
+        return _result_response(
+            request, details, include_splits, event_id, min_events, target_time=target_time,
+            error="Укажите время на флаге в формате ЧЧ:ММ, больше нуля. Например, 01:54.", status_code=422,
+        )
+    hours, minutes = map(int, target_time.split(":"))
+    target_time = f"{hours:02d}:{minutes:02d}"
+    try:
+        updated = update_result_target_time(result_id, target_time, previous_target_time)
+    except (PsycopgError, RuntimeError):
+        return _result_response(
+            request, details, include_splits, event_id, min_events, target_time=target_time,
+            error="Не удалось сохранить время. Проверьте текущее значение и попробуйте ещё раз.", status_code=503,
+        )
+    if not updated:
+        details = _load_result_or_404(result_id, include_splits)
+        return _result_response(
+            request, details, include_splits, event_id, min_events, target_time=target_time,
+            error="Время уже изменено в другой вкладке. Сравните с текущей целью и подтвердите сохранение ещё раз.",
+            status_code=409,
+        )
+    query = urlencode({"event_id": event_id, "include_splits": str(include_splits).lower(),
+                       "min_events": min_events, "saved": "true"})
+    return RedirectResponse(f"/results/{result_id}?{query}", status_code=303)
 
 
 @app.get("/add", response_class=HTMLResponse)

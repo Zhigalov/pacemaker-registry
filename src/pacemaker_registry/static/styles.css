@@ -1392,6 +1392,13 @@ tbody tr:hover { background: #fbfcfc; }
 .pace-editor { margin-top: 1.5rem; scroll-margin-top: 1rem; }
 .pace-zones { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .result-detail > .event-editor { margin-bottom: 1.25rem; }
+.flag-editor { margin-bottom: 1.5rem; }
+.flag-editor summary { cursor: pointer; color: #176f59; font-weight: 650; padding: .5rem 0; }
+.flag-editor summary:focus-visible { outline: 2px solid #176f59; outline-offset: 3px; }
+.flag-editor-controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; margin: .75rem 0; }
+.flag-editor-controls label { display: block; margin-bottom: .4rem; font-size: .85rem; }
+.flag-editor-controls input { width: 10rem; max-width: 100%; font-variant-numeric: tabular-nums; }
+.flag-editor-controls > div { max-width: 100%; }
 .result-detail h2 { font-size: 1.15rem; line-height: 1.4; }
 .result-detail a:not(.button) { color: #176f59; }
 .result-back { margin: .5rem 0; background: #e9f5ef; color: #176f59; }

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ details.athlete_name }} · {{ event.name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=result-markers">
+    <link rel="stylesheet" href="/static/styles.css?v=flag-edit">
     <script src="/static/result-markers.js?v=1" defer></script>
     <script src="/static/event-rating.js?v=result-markers" defer></script>
     <script src="/static/pace-rating.js?v=result-markers" defer></script>
@@ -28,6 +28,25 @@
         </nav>
       </section>
       <section class="event-editor" aria-label="Показатели выступления">
+        {% if saved %}<p class="success-message success-message--compact" role="status">Время на флаге сохранено. Темп, оценки и графики пересчитаны.</p>{% endif %}
+        <details class="flag-editor"{% if error %} open{% endif %}>
+          <summary>Изменить время на флаге</summary>
+          <form method="post" action="{{ edit_url }}">
+            <input type="hidden" name="previous_target_time" value="{{ result.target_time }}">
+            <div class="flag-editor-controls">
+              <div>
+                <label for="flag-time">Время на флаге · ЧЧ:ММ</label>
+                <input id="flag-time" name="target_time" type="text" value="{{ target_time_value }}"
+                       required minlength="4" maxlength="5" pattern="[0-9]{1,2}:[0-5][0-9]"
+                       placeholder="01:54" autocomplete="off" aria-describedby="flag-hint{% if error %} flag-error{% endif %}"
+                       {% if error %}aria-invalid="true"{% endif %}>
+              </div>
+              <button type="submit" class="button button--primary">Сохранить</button>
+            </div>
+            <p class="event-note" id="flag-hint">Только для этого выступления. Чип-тайм и отсечки не изменятся; настройки соревнования сохранятся.</p>
+            {% if error %}<p class="error-message" id="flag-error" role="alert">{{ error }}</p>{% endif %}
+          </form>
+        </details>
         <dl class="result-facts">
           <div><dt>Цель · время на флаге</dt><dd>{{ result.target_time }}</dd></div>
           <div><dt>Факт · чип-тайм</dt><dd>{{ result.chip_time }}</dd></div>

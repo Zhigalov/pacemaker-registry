@@ -36,7 +36,9 @@ async def test_detail_renders_every_split_readonly_graphs_and_context(monkeypatc
     assert '<td>42</td>' in response.text
     assert 'Тестов &lt;Первый&gt;' in response.text
     assert 'data-rating-widget' in response.text and 'data-pace-widget' in response.text
-    assert '<form' not in response.text and '<input' not in response.text
+    assert 'Изменить время на флаге' in response.text
+    assert 'name="previous_target_time" value="03:30"' in response.text
+    assert 'action="/results/12/target-time?event_id=1&amp;include_splits=true&amp;min_events=3"' in response.text
     assert 'data-event-rating' not in response.text and 'data-pace-rating' not in response.text
     assert '"left_score": 6' in response.text and '"tolerance": 8' in response.text
     marker_sets = [json.loads(value) for value in re.findall(
@@ -147,3 +149,92 @@ def test_finish_marker_keeps_outlier_and_zero_deviations():
         result = db._build_registry_result(1, event, Decimal('10'), '01:00', chip, '06:00', ())
         assert result.finish_deviation == deviation
         assert result.pace_markers == ()
+
+
+@pytest.mark.anyio
+async def test_edit_flag_redirects_preserves_filters_and_recalculates(monkeypatch):
+    sample = details()
+    sample = details(checkpoints=tuple(dict(point, pace_per_km='05:15') for point in sample.result.checkpoints))
+    target = sample.result.target_time
+    calls = []
+    def get(result_id, include_splits):
+        result = db._build_registry_result(result_id, sample.event, Decimal('42.2'), target,
+                                          sample.result.chip_time, sample.result.actual_pace,
+                                          sample.result.checkpoints, include_splits)
+        return db.ResultDetails(sample.athlete_name, sample.source_url, sample.event, result)
+    def save(result_id, value, previous):
+        nonlocal target
+        calls.append((result_id, value, previous))
+        target = value
+        return True
+    monkeypatch.setattr(main, 'get_result_details', get)
+    monkeypatch.setattr(main, 'update_result_target_time', save)
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+        response = await client.post('/results/12/target-time?event_id=1&include_splits=false&min_events=3',
+                                     data={'target_time': '3:29', 'previous_target_time': '03:30'})
+        assert response.status_code == 303
+        assert calls == [(12, '03:29', '03:30')]
+        assert response.headers['location'] == '/results/12?event_id=1&include_splits=false&min_events=3&saved=true'
+        page = await client.get(response.headers['location'])
+    assert page.status_code == 200
+    assert 'Время на флаге сохранено' in page.text
+    assert 'Учёт темпа выключен' in page.text
+    assert 'name="previous_target_time" value="03:29"' in page.text
+    markers = [json.loads(value) for value in re.findall(
+        r'<script type="application/json" data-result-markers>(.*?)</script>', page.text)]
+    assert markers[0][0]['deviation'] == 55
+    assert markers[0][0]['score'] != sample.result.finish_rating
+    assert markers[1][0]['deviation'] == pytest.approx(315 - 12540 / 42.2)
+    assert get(12, False).result.target_pace != sample.result.target_pace
+    assert get(12, False).result.rating == get(12, False).result.finish_rating
+    assert get(12, True).result.splits_rating != sample.result.splits_rating
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('value', ['00:00', '0:00', '-1:20', '01:60', '100:00', '01:20:00', 'oops', '<script>'])
+async def test_edit_flag_rejects_invalid_values_without_saving(monkeypatch, value):
+    monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: details())
+    def never_save(*args): pytest.fail('Invalid input must not reach UPDATE')
+    monkeypatch.setattr(main, 'update_result_target_time', never_save)
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+        response = await client.post('/results/12/target-time',
+                                     data={'target_time': value, 'previous_target_time': '03:30'})
+    assert response.status_code == 422
+    assert 'Укажите время на флаге' in response.text
+    assert '<details class="flag-editor" open>' in response.text
+    assert 'value="<script>"' not in response.text
+
+
+@pytest.mark.anyio
+async def test_edit_flag_handles_missing_conflict_and_database_error(monkeypatch):
+    def fail(*args): raise RuntimeError('secret database error')
+    monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: details())
+    payload = {'target_time': '03:29', 'previous_target_time': '03:30'}
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+        monkeypatch.setattr(main, 'update_result_target_time', fail)
+        response = await client.post('/results/12/target-time', data=payload)
+        assert response.status_code == 503
+        assert 'value="03:29"' in response.text
+        assert 'secret database error' not in response.text
+        monkeypatch.setattr(main, 'update_result_target_time', lambda *args: False)
+        response = await client.post('/results/12/target-time', data=payload)
+        assert response.status_code == 409
+        assert 'Время уже изменено' in response.text
+        monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: None)
+        assert (await client.post('/results/999/target-time', data=payload)).status_code == 404
+
+
+@pytest.mark.parametrize('row,expected', [((12,), True), (None, False)])
+def test_flag_update_only_changes_one_result_and_checks_previous_value(monkeypatch, row, expected):
+    calls = []
+    class Connection:
+        def __enter__(self): return self
+        def __exit__(self, *_): pass
+        def execute(self, query, parameters):
+            calls.append((' '.join(query.split()), parameters))
+            return self
+        def fetchone(self): return row
+    monkeypatch.setattr(db, 'connect_database', Connection)
+    assert db.update_result_target_time(12, '03:29', '03:30') is expected
+    assert calls == [('UPDATE race_results SET target_time = %s WHERE id = %s AND target_time = %s RETURNING id',
+                      ('03:29', 12, '03:30'))]
