@@ -1,0 +1,25 @@
+{
+  "purpose": "temporary-recovery",
+  "created_on": "2026-10-13",
+  "folder_id": "b1genq2j3vqm14gio5vl",
+  "zone": "ru-central1-d",
+  "instance_id": "fv435m0kn12bvqiqcgnu",
+  "disk_id": "fv4cnluu88osv4mnmlk8",
+  "address_id": "fl8ock45ephquvuh1ppp",
+  "public_ip": "84.252.135.179",
+  "private_ip": "10.42.2.9",
+  "security_group_id": "enpsa4fepsqt7ar80pbe",
+  "db_security_group_id": "enpa04sa392m7do7a7gc",
+  "temporary_db_rule_id": "enpsocpd1vd7bi1uurtk",
+  "dns_zone_id": "dnsbcf00009ms5hrrigm",
+  "certificate_id": "fpqupotov0gtue2d0uhv",
+  "certificate_expires_at": "2027-01-04T12:48:28Z",
+  "serverless_container_id": "bbapk9h0bc3hh8o1audt",
+  "serverless_revision_id": "bba1hgjnjta5ivi16jic",
+  "application_commit": "033511e",
+  "gateway_id": "d5dob39pmttc4v5vgvjr",
+  "original_dns": [
+    {"name": "pacersreg.ru.", "type": "ANAME", "ttl": "300", "data": ["d5dob39pmttc4v5vgvjr.l5v6loqa.apigw.yandexcloud.net."]},
+    {"name": "www.pacersreg.ru.", "type": "CNAME", "ttl": "300", "data": ["d5dob39pmttc4v5vgvjr.l5v6loqa.apigw.yandexcloud.net."]}
+  ]
+}

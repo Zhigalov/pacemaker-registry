@@ -1,0 +1,20 @@
+#cloud-config
+# Render __SSH_PUBLIC_KEY__ with the operator's existing public key.
+users:
+  - name: yc-user
+    groups: [sudo]
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__
+ssh_pwauth: false
+disable_root: true
+package_update: true
+packages:
+  - docker.io
+  - nginx
+  - python3
+runcmd:
+  - [systemctl, enable, --now, docker]
+  - [systemctl, stop, nginx]
