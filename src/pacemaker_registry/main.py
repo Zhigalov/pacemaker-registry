@@ -61,12 +61,7 @@ def _apply_event_target_time_type(result: RaceResult) -> RaceResult:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     initialize_database()
-    try:
-        yield
-    finally:
-        if os.getenv("DATABASE_BACKEND", "postgresql") == "ydb":
-            from pacemaker_registry.ydb_storage import close_database
-            close_database()
+    yield
 
 app = FastAPI(
     title="Pacemaker Registry",
