@@ -4,6 +4,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from math import isfinite
 from pathlib import Path
 from typing import Any
+from functools import wraps
 
 import psycopg
 from psycopg import Connection
@@ -27,6 +28,20 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 FINISH_RATING_WEIGHT = 0.6
 SPLITS_RATING_WEIGHT = 0.4
 MIN_SPLITS_COVERAGE = Decimal("0.8")
+
+
+def _storage_route(function):
+    """Keep PostgreSQL available during the staged YDB migration and rollback."""
+    @wraps(function)
+    def call(*args, **kwargs):
+        backend = os.getenv("DATABASE_BACKEND", "postgresql")
+        if backend == "ydb":
+            from pacemaker_registry import ydb_storage
+            return getattr(ydb_storage, function.__name__)(*args, **kwargs)
+        if backend != "postgresql":
+            raise RuntimeError("Unknown database backend")
+        return function(*args, **kwargs)
+    return call
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +163,7 @@ def _build_registry_result(result_id, event, distance, target_time, chip_time,
     )
 
 
+@_storage_route
 def get_result_details(result_id: int, include_splits: bool = True) -> ResultDetails | None:
     with connect_database() as connection:
         row = connection.execute(
@@ -159,6 +175,10 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
                JOIN pacemakers AS p ON p.id = rr.pacemaker_id
                WHERE rr.id = %s""", (result_id,),
         ).fetchone()
+    return _details_from_row(row, include_splits)
+
+
+def _details_from_row(row, include_splits=True):
     if row is None:
         return None
     event = _event_from_row(row[:5])
@@ -168,6 +188,7 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
     )
 
 
+@_storage_route
 def update_result_target_time(result_id: int, target_time: str, previous_target_time: str) -> bool:
     """Change only the flag; refuse to overwrite a concurrently edited result."""
     with connect_database() as connection:
@@ -203,17 +224,20 @@ def connect_database() -> Connection[Any]:
     return psycopg.connect(**settings)
 
 
+@_storage_route
 def initialize_database() -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     with connect_database() as connection:
         connection.execute(schema)
 
 
+@_storage_route
 def check_database() -> None:
     with connect_database() as connection:
         connection.execute("SELECT 1").fetchone()
 
 
+@_storage_route
 def get_event_target_time_type(source_event_id: str) -> str | None:
     with connect_database() as connection:
         row = connection.execute(
@@ -227,6 +251,7 @@ def get_event_target_time_type(source_event_id: str) -> str | None:
     return row[0] if row else None
 
 
+@_storage_route
 def load_registry(
     event_id: int | None = None,
     include_splits: bool = True,
@@ -248,7 +273,6 @@ def load_registry(
             """
         ).fetchall()
         events = tuple(_event_from_row(row) for row in event_rows)
-        events_by_id = {event.id: event for event in events}
         selected_event_id = (
             event_id if event_id in {event.id for event in events} else None
         )
@@ -286,6 +310,11 @@ def load_registry(
         """
         rows = connection.execute(query, parameters).fetchall()
 
+    return _build_registry(events, rows, selected_event_id, include_splits, min_events)
+
+
+def _build_registry(events, rows, selected_event_id, include_splits, min_events):
+    events_by_id = {event.id: event for event in events}
     grouped: dict[int, dict[str, Any]] = {}
     event_ids: set[int] = set()
     for row in rows:
@@ -346,6 +375,7 @@ def load_registry(
     )
 
 
+@_storage_route
 def save_race_result(result: RaceResult, target_time: str) -> bool:
     last_name, first_name = _split_athlete_name(result.athlete_name)
     checkpoints = [asdict(checkpoint) for checkpoint in result.checkpoints]
@@ -460,6 +490,7 @@ def _event_from_row(row: tuple) -> RegistryEvent:
     )
 
 
+@_storage_route
 def get_event(event_id: int) -> RegistryEvent | None:
     with connect_database() as connection:
         row = connection.execute(
@@ -469,6 +500,7 @@ def get_event(event_id: int) -> RegistryEvent | None:
     return _event_from_row(row) if row else None
 
 
+@_storage_route
 def list_events() -> tuple[RegistryEvent, ...]:
     with connect_database() as connection:
         rows = connection.execute(
@@ -477,6 +509,7 @@ def list_events() -> tuple[RegistryEvent, ...]:
     return tuple(_event_from_row(row) for row in rows)
 
 
+@_storage_route
 def save_event_rating(event_id: int, config: EventRatingConfig) -> bool:
     with connect_database() as connection:
         row = connection.execute(
@@ -486,6 +519,7 @@ def save_event_rating(event_id: int, config: EventRatingConfig) -> bool:
     return row is not None
 
 
+@_storage_route
 def save_event_pace_rating(event_id: int, config: PaceRatingConfig) -> bool:
     with connect_database() as connection:
         row = connection.execute(

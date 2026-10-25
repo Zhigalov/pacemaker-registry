@@ -15,6 +15,7 @@ dependencies = [
     "psycopg[binary]>=3.2,<4",
     "python-multipart>=0.0.20,<1",
     "uvicorn[standard]>=0.35,<1",
+    "ydb[yc]>=3.33,<4",
 ]
 
 [project.optional-dependencies]
