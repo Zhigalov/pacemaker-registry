@@ -2,7 +2,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
 import os
-from pathlib import Path
 from uuid import uuid4
 
 import psycopg
