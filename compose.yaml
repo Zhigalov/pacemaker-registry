@@ -13,15 +13,26 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  migrate:
+    build: .
+    command: ["python", "-m", "pacemaker_registry.migrate"]
+    environment:
+      DATABASE_URL: postgresql://registry:registry-dev-password@postgres:5432/pacemaker_registry
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
     build: .
     environment:
       DATABASE_URL: postgresql://registry:registry-dev-password@postgres:5432/pacemaker_registry
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     ports:
       - "8080:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres-data:

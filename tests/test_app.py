@@ -25,7 +25,6 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
                 full_name="Жигалов Сергей",
                 initials="ЖС",
                 rating=9.533,
-                rating_tone="excellent",
                 results=(
                     RegistryResult(
                         id=1,
@@ -39,7 +38,6 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
                         finish_rating=9.533,
                         splits_rating=8.7,
                         rating=9.2,
-                        rating_tone="excellent",
                         time_difference="−7 с",
                         checkpoints=(
                             {
@@ -134,7 +132,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     ('03:59', '04:01:01', '03:59:00', '04:01:01', '+121 с'),
 ])
 def test_card_time_formatting(target, chip, expected_target, expected_chip, delta):
-    result = RegistryResult(1, 1, 'Старт', '10', target, '', chip, '', 10, None, 10, '', '', ())
+    result = RegistryResult(1, 1, 'Старт', '10', target, '', chip, '', 10, None, 10, '', ())
     assert result.target_time_display == expected_target
     assert result.chip_time_display == expected_chip
     assert result.finish_difference_display == delta
@@ -144,9 +142,9 @@ def test_card_time_formatting(target, chip, expected_target, expected_chip, delt
 @pytest.mark.anyio
 async def test_card_distinguishes_missing_pace_from_zero(monkeypatch):
     from dataclasses import replace
-    missing = RegistryResult(1, 1, 'Старт', '10', '00:54', '', '54:53', '', 10, None, 10, '', '', ())
+    missing = RegistryResult(1, 1, 'Старт', '10', '00:54', '', '54:53', '', 10, None, 10, '', ())
     zero = replace(missing, id=2, splits_rating=0.0)
-    registry = Registry((RegistryPacemaker(1, 'Тестовый пейсер', 'ТП', 10, '', (missing, zero)),), 1, 2)
+    registry = Registry((RegistryPacemaker(1, 'Тестовый пейсер', 'ТП', 10, (missing, zero)),), 1, 2)
     monkeypatch.setattr('pacemaker_registry.main.load_registry', lambda *args, **kwargs: registry)
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
         response = await client.get('/')

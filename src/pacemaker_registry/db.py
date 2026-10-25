@@ -1,8 +1,6 @@
 import os
-from dataclasses import asdict, dataclass
-from decimal import ROUND_HALF_UP, Decimal
-from math import isfinite
-from pathlib import Path
+from dataclasses import asdict
+from decimal import Decimal
 from typing import Any
 
 import psycopg
@@ -17,135 +15,10 @@ from pacemaker_registry.russiarunning import (
 )
 
 
-from pacemaker_registry.rating import (
-    EventRatingConfig, calculate_rating_for_difference, default_event_rating, parse_event_rating,
-    PaceRatingConfig, calculate_split_rating, parse_pace_rating,
-)
-
-
-SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-FINISH_RATING_WEIGHT = 0.6
-SPLITS_RATING_WEIGHT = 0.4
-MIN_SPLITS_COVERAGE = Decimal("0.8")
-
-
-@dataclass(frozen=True, slots=True)
-class RegistryResult:
-    id: int
-    event_id: int
-    event_name: str
-    distance_km: str
-    target_time: str
-    target_pace: str
-    chip_time: str
-    actual_pace: str
-    finish_rating: float
-    splits_rating: float | None
-    rating: float
-    rating_tone: str
-    time_difference: str
-    checkpoints: tuple[dict[str, str], ...]
-    finish_deviation: int = 0
-    pace_markers: tuple[dict[str, Any], ...] = ()
-
-    @property
-    def target_time_display(self) -> str:
-        hours, minutes = map(int, self.target_time.split(":"))
-        return f"{hours:02d}:{minutes:02d}:00"
-
-    @property
-    def chip_time_display(self) -> str:
-        parts = list(map(int, self.chip_time.split(":")))
-        if len(parts) == 2:
-            parts.insert(0, 0)
-        hours, minutes, seconds = parts
-        # Sources may return elapsed minutes greater than 59 (e.g. 65:07).
-        hours += minutes // 60
-        return f"{hours:02d}:{minutes % 60:02d}:{seconds:02d}"
-
-    @property
-    def finish_difference_display(self) -> str:
-        difference = _time_difference_seconds(self.target_time, self.chip_time)
-        sign = "+" if difference > 0 else "−" if difference < 0 else ""
-        return f"{sign}{abs(difference)} с"
-
-
-@dataclass(frozen=True, slots=True)
-class RegistryPacemaker:
-    id: int
-    full_name: str
-    initials: str
-    rating: float
-    rating_tone: str
-    results: tuple[RegistryResult, ...]
-    total_result_count: int = 0
-
-    @property
-    def performance_count(self) -> int:
-        return self.total_result_count or len(self.results)
-
-    @property
-    def mean_finish_deviation(self) -> float:
-        return (sum(abs(_time_difference_seconds(result.target_time, result.chip_time))
-                    for result in self.results) / len(self.results)) if self.results else float("inf")
-
-
-@dataclass(frozen=True, slots=True)
-class RegistryEvent:
-    id: int
-    name: str
-    target_time_type: str | None = None
-    rating_config: EventRatingConfig | None = None
-    pace_rating_config: PaceRatingConfig | None = None
-
-    @property
-    def formula(self) -> EventRatingConfig:
-        return self.rating_config or default_event_rating(self.target_time_type)
-
-    @property
-    def pace_formula(self) -> PaceRatingConfig:
-        return self.pace_rating_config or PaceRatingConfig()
-
-
-@dataclass(frozen=True, slots=True)
-class Registry:
-    pacemakers: tuple[RegistryPacemaker, ...]
-    event_count: int
-    result_count: int
-    events: tuple[RegistryEvent, ...] = ()
-    selected_event_id: int | None = None
-    include_splits: bool = True
-    min_events: int = 1
-
-
-@dataclass(frozen=True, slots=True)
-class ResultDetails:
-    athlete_name: str
-    source_url: str
-    event: RegistryEvent
-    result: RegistryResult
-
-
-def _build_registry_result(result_id, event, distance, target_time, chip_time,
-                           actual_pace, checkpoints, include_splits=True) -> RegistryResult:
-    """The registry and detail page must use the very same scoring pipeline."""
-    finish_rating = calculate_pacemaker_rating(target_time, chip_time, event.formula)
-    splits_rating = calculate_splits_rating(target_time, distance, checkpoints, event.pace_formula)
-    rating = calculate_combined_rating(finish_rating, splits_rating, include_splits)
-    return RegistryResult(
-        id=result_id, event_id=event.id, event_name=event.name,
-        distance_km=_format_registry_distance(distance), target_time=target_time,
-        target_pace=_calculate_target_pace(target_time, distance), chip_time=chip_time,
-        actual_pace=actual_pace, finish_rating=finish_rating, splits_rating=splits_rating,
-        rating=rating, rating_tone=_rating_tone(rating),
-        time_difference=_format_time_difference(_time_difference_seconds(target_time, chip_time)),
-        checkpoints=tuple(checkpoints),
-        finish_deviation=_time_difference_seconds(target_time, chip_time),
-        pace_markers=tuple({"label": str(point.get("distance_km", "?")) + " км",
-                            "deviation": deviation, "score": score}
-                           for point, _, deviation, score in
-                           _rated_segments(target_time, distance, checkpoints, event.pace_formula)),
-    )
+from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig
+from pacemaker_registry.models import Registry, RegistryEvent, RegistryResult, RegistryPacemaker, ResultDetails
+from pacemaker_registry.registry import _build_registry_result, _sort_pacemakers
+from pacemaker_registry.times import normalize_target_time
 
 
 def get_result_details(result_id: int, include_splits: bool = True) -> ResultDetails | None:
@@ -170,6 +43,7 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
 
 def update_result_target_time(result_id: int, target_time: str, previous_target_time: str) -> bool:
     """Change only the flag; refuse to overwrite a concurrently edited result."""
+    target_time = normalize_target_time(target_time)
     with connect_database() as connection:
         return connection.execute(
             """UPDATE race_results SET target_time = %s
@@ -201,12 +75,6 @@ def connect_database() -> Connection[Any]:
             "Database connection is not configured: " + ", ".join(missing)
         )
     return psycopg.connect(**settings)
-
-
-def initialize_database() -> None:
-    schema = SCHEMA_PATH.read_text(encoding="utf-8")
-    with connect_database() as connection:
-        connection.execute(schema)
 
 
 def check_database() -> None:
@@ -330,7 +198,6 @@ def load_registry(
                 full_name=data["full_name"],
                 initials=data["initials"],
                 rating=rating,
-                rating_tone=_rating_tone(rating),
                 results=results,
                 total_result_count=data["total_result_count"],
             )
@@ -347,6 +214,7 @@ def load_registry(
 
 
 def save_race_result(result: RaceResult, target_time: str) -> bool:
+    target_time = normalize_target_time(target_time)
     last_name, first_name = _split_athlete_name(result.athlete_name)
     checkpoints = [asdict(checkpoint) for checkpoint in result.checkpoints]
     distance = Decimal(result.distance_km.replace(",", "."))
@@ -431,27 +299,6 @@ def _split_athlete_name(full_name: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def _calculate_target_pace(target_time: str, distance_km: Decimal) -> str:
-    hours, minutes = map(int, target_time.split(":"))
-    total_seconds = hours * 3600 + minutes * 60
-    seconds_per_km = int(
-        (Decimal(total_seconds) / distance_km).quantize(
-            Decimal("1"), rounding=ROUND_HALF_UP
-        )
-    )
-    return f"{seconds_per_km // 60:02d}:{seconds_per_km % 60:02d} /км"
-
-
-def calculate_pacemaker_rating(
-    target_time: str,
-    chip_time: str,
-    config: EventRatingConfig,
-) -> float:
-    return calculate_rating_for_difference(
-        _time_difference_seconds(target_time, chip_time), config
-    )
-
-
 def _event_from_row(row: tuple) -> RegistryEvent:
     return RegistryEvent(
         id=row[0], name=row[1], target_time_type=row[2],
@@ -493,123 +340,3 @@ def save_event_pace_rating(event_id: int, config: PaceRatingConfig) -> bool:
             (Jsonb(asdict(config)), event_id),
         ).fetchone()
     return row is not None
-
-
-def calculate_splits_rating(
-    target_time: str,
-    distance_km: Decimal,
-    checkpoints: list[dict[str, str]] | tuple[dict[str, str], ...],
-    config: PaceRatingConfig = PaceRatingConfig(),
-) -> float | None:
-    """Return a distance-weighted rating for checkpoint segment paces."""
-    if distance_km <= 0:
-        return None
-
-    weighted_rating = 0.0
-    covered_distance = Decimal("0")
-    for _, segment_distance, _, score in _rated_segments(target_time, distance_km, checkpoints, config):
-        weighted_rating += score * float(segment_distance)
-        covered_distance += segment_distance
-
-    if covered_distance < distance_km * MIN_SPLITS_COVERAGE:
-        return None
-    return weighted_rating / float(covered_distance)
-
-
-def _rated_segments(target_time, distance_km, checkpoints, config):
-    """One source for the weighted rating and exact per-segment chart markers."""
-    if not distance_km.is_finite() or distance_km <= 0:
-        return
-    target_pace_seconds = _target_time_seconds(target_time) / float(distance_km)
-    for checkpoint in checkpoints:
-        try:
-            segment_distance = Decimal(
-                str(checkpoint["segment_distance_km"]).replace(",", ".")
-            )
-            pace_seconds = _pace_seconds(str(checkpoint["pace_per_km"]))
-        except (KeyError, ValueError, ArithmeticError):
-            continue
-        if not segment_distance.is_finite() or segment_distance <= 0 or pace_seconds <= 0:
-            continue
-        deviation = pace_seconds - target_pace_seconds
-        if isfinite(deviation):
-            yield checkpoint, segment_distance, deviation, calculate_split_rating(deviation, config)
-
-
-def calculate_combined_rating(
-    finish_rating: float,
-    splits_rating: float | None,
-    include_splits: bool = True,
-) -> float:
-    if not include_splits or splits_rating is None:
-        return finish_rating
-    return (
-        finish_rating * FINISH_RATING_WEIGHT
-        + splits_rating * SPLITS_RATING_WEIGHT
-    )
-
-
-def _time_difference_seconds(target_time: str, chip_time: str) -> int:
-    target_hours, target_minutes = map(int, target_time.split(":"))
-    chip_parts = [int(part) for part in chip_time.split(":")]
-    if len(chip_parts) == 2:
-        chip_hours = 0
-        chip_minutes, chip_seconds = chip_parts
-    elif len(chip_parts) == 3:
-        chip_hours, chip_minutes, chip_seconds = chip_parts
-    else:
-        raise ValueError(f"Unsupported chip time format: {chip_time!r}")
-    target_seconds = target_hours * 3600 + target_minutes * 60
-    actual_seconds = chip_hours * 3600 + chip_minutes * 60 + chip_seconds
-    return actual_seconds - target_seconds
-
-
-def _target_time_seconds(target_time: str) -> int:
-    hours, minutes = map(int, target_time.split(":"))
-    return hours * 3600 + minutes * 60
-
-
-def _pace_seconds(pace: str) -> int:
-    normalized = pace.replace("/км", "").strip()
-    minutes, seconds = map(int, normalized.split(":"))
-    return minutes * 60 + seconds
-
-
-def _format_time_difference(seconds: int) -> str:
-    if seconds == 0:
-        return "ровно"
-    sign = "+" if seconds > 0 else "−"
-    absolute = abs(seconds)
-    if absolute < 60:
-        return f"{sign}{absolute} с"
-    minutes, remaining_seconds = divmod(absolute, 60)
-    return f"{sign}{minutes}:{remaining_seconds:02d}"
-
-
-def _rating_tone(rating: float) -> str:
-    if rating >= 9:
-        return "excellent"
-    if rating >= 7:
-        return "good"
-    return "low"
-
-
-def _sort_pacemakers(
-    pacemakers: list[RegistryPacemaker],
-) -> tuple[RegistryPacemaker, ...]:
-    return tuple(
-        sorted(
-            pacemakers,
-            key=lambda pacemaker: (
-                -float(format(pacemaker.rating, ".1f")),
-                -pacemaker.performance_count,
-                pacemaker.mean_finish_deviation,
-                pacemaker.full_name.casefold(),
-                pacemaker.id,
-            ),
-        )
-    )
-
-
-def _format_registry_distance(distance: Decimal) -> str:
-    return format(distance.normalize(), "f").replace(".", ",")

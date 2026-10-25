@@ -1,13 +1,11 @@
 import os
 import re
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 
-from fastapi import FastAPI, Form, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -24,7 +22,6 @@ from pacemaker_registry.db import (
     update_result_target_time,
     check_database,
     get_event_target_time_type,
-    initialize_database,
     load_registry,
     save_race_result,
 )
@@ -38,11 +35,12 @@ from pacemaker_registry.russiarunning import (
     RussiaRunningError,
     guess_target_time,
 )
-from pacemaker_registry.sources import load_race_result
+from pacemaker_registry.sources import load_race_result, result_source_links as _result_source_links
+from pacemaker_registry.times import normalize_target_time
+from pacemaker_registry.auth import require_editor
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-TARGET_TIME_PATTERN = re.compile(r"^[0-9]{1,2}:[0-5][0-9]$")
 
 
 def _apply_event_target_time_type(result: RaceResult) -> RaceResult:
@@ -58,17 +56,11 @@ def _apply_event_target_time_type(result: RaceResult) -> RaceResult:
     )
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    initialize_database()
-    yield
-
 app = FastAPI(
     title="Pacemaker Registry",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
-    lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
 def analytics_context(request: Request) -> dict:
@@ -147,7 +139,7 @@ def event_page(request: Request, event_id: int, saved: bool = False):
     return _event_response(request, _load_event_or_404(event_id), saved=saved)
 
 
-@app.post("/events/{event_id}/rating", response_class=HTMLResponse)
+@app.post("/events/{event_id}/rating", response_class=HTMLResponse, dependencies=[Depends(require_editor)])
 async def update_event_rating(request: Request, event_id: int):
     event = await run_in_threadpool(_load_event_or_404, event_id)
     form = await request.form()
@@ -169,7 +161,7 @@ async def update_event_rating(request: Request, event_id: int):
     return RedirectResponse(f"/events/{event_id}?saved=true", status_code=303)
 
 
-@app.post("/events/{event_id}/pace-rating", response_class=HTMLResponse)
+@app.post("/events/{event_id}/pace-rating", response_class=HTMLResponse, dependencies=[Depends(require_editor)])
 async def update_event_pace_rating(request: Request, event_id: int):
     event = await run_in_threadpool(_load_event_or_404, event_id)
     values = dict(await request.form())
@@ -188,26 +180,6 @@ async def update_event_pace_rating(request: Request, event_id: int):
     if not updated:
         raise HTTPException(404, "Соревнование не найдено.")
     return RedirectResponse(f"/events/{event_id}?saved=true#pace-rating", status_code=303)
-
-
-def _result_source_links(source_url: str) -> tuple[str | None, str | None]:
-    """Only turn supported public result URLs into clickable external links."""
-    try:
-        url = urlsplit(source_url)
-    except ValueError:
-        return None, None
-    if url.scheme != "https":
-        return None, None
-    base = f"https://{url.netloc}"
-    if url.netloc == "results.russiarunning.com":
-        match = re.fullmatch(r"/participant/([\w-]+)/([\w-]+)/([\w-]+)/?", url.path)
-        if match:
-            return base + url.path, f"{base}/event/{match[1]}/results/{match[2]}"
-    elif url.netloc == "results.runc.run":
-        match = re.fullmatch(r"/event/([\w-]+)/result/(\d+)/?", url.path)
-        if match:
-            return base + url.path, f"{base}/event/{match[1]}/"
-    return None, None
 
 
 def _load_result_or_404(result_id: int, include_splits: bool):
@@ -251,7 +223,7 @@ def result_page(
                             include_splits, event_id, min_events, saved=saved)
 
 
-@app.post("/results/{result_id}/target-time", response_class=HTMLResponse)
+@app.post("/results/{result_id}/target-time", response_class=HTMLResponse, dependencies=[Depends(require_editor)])
 def edit_result_target_time(
     request: Request, result_id: int,
     target_time: Annotated[str, Form(max_length=20)],
@@ -262,13 +234,13 @@ def edit_result_target_time(
 ):
     details = _load_result_or_404(result_id, include_splits)
     target_time = target_time.strip()
-    if not TARGET_TIME_PATTERN.fullmatch(target_time) or int(target_time.replace(":", "")) == 0:
+    try:
+        target_time = normalize_target_time(target_time)
+    except ValueError as error:
         return _result_response(
             request, details, include_splits, event_id, min_events, target_time=target_time,
-            error="Укажите время на флаге в формате ЧЧ:ММ, больше нуля. Например, 01:54.", status_code=422,
+            error=str(error), status_code=422,
         )
-    hours, minutes = map(int, target_time.split(":"))
-    target_time = f"{hours:02d}:{minutes:02d}"
     try:
         updated = update_result_target_time(result_id, target_time, previous_target_time)
     except (PsycopgError, RuntimeError):
@@ -293,6 +265,10 @@ async def add_form(
     request: Request,
     result_url: Annotated[str | None, Query(max_length=500)] = None,
 ) -> HTMLResponse:
+    return await _preview_result(request, result_url or "")
+
+
+async def _preview_result(request: Request, result_url: str) -> HTMLResponse:
     result = None
     error = None
     status_code = 200
@@ -301,7 +277,7 @@ async def add_form(
     if result_url:
         try:
             result = await load_race_result(result_url)
-            result = _apply_event_target_time_type(result)
+            result = await run_in_threadpool(_apply_event_target_time_type, result)
         except InvalidResultUrl as exception:
             error = str(exception)
             status_code = 422
@@ -327,30 +303,7 @@ async def add_result(
     request: Request,
     result_url: Annotated[str, Form(min_length=1, max_length=500)],
 ) -> HTMLResponse:
-    result = None
-    error = None
-    status_code = 200
-    try:
-        result = await load_race_result(result_url)
-        result = _apply_event_target_time_type(result)
-    except InvalidResultUrl as exception:
-        error = str(exception)
-        status_code = 422
-    except RussiaRunningError as exception:
-        error = str(exception)
-        status_code = 502
-
-    return templates.TemplateResponse(
-        request=request,
-        name="add.html",
-        context={
-            "result": result,
-            "error": error,
-            "result_url": result_url,
-            "saved_message": None,
-        },
-        status_code=status_code,
-    )
+    return await _preview_result(request, result_url)
 
 
 @app.post("/results", response_class=HTMLResponse)
@@ -365,14 +318,16 @@ async def save_result(
     result_created = False
     status_code = 200
 
-    if not TARGET_TIME_PATTERN.fullmatch(target_time):
-        error = "Время на флаге должно быть в формате ЧЧ:ММ."
+    try:
+        target_time = normalize_target_time(target_time)
+    except ValueError as exception:
+        error = str(exception)
         status_code = 422
     else:
         try:
             result = await load_race_result(result_url)
             result = replace(result, target_time=target_time)
-            created = save_race_result(result, target_time)
+            created = await run_in_threadpool(save_race_result, result, target_time)
             result_created = created
             saved_message = (
                 "Результат сохранён в реестр."

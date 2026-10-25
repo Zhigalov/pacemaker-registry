@@ -14,11 +14,11 @@ def anyio_backend():
 
 
 def result(event_id, chip):
-    return RegistryResult(1, event_id, "Забег", "10", "01:00", "06:00", chip, "06:00", 10, None, 10, "excellent", "", ())
+    return RegistryResult(1, event_id, "Забег", "10", "01:00", "06:00", chip, "06:00", 10, None, 10, "", ())
 
 
 def test_sort_uses_displayed_rating_then_performances_then_absolute_mean_then_name():
-    a = RegistryPacemaker(1, "А Первый", "АП", 10, "excellent", (result(1, "01:00:01"),))
+    a = RegistryPacemaker(1, "А Первый", "АП", 10, (result(1, "01:00:01"),))
     b = replace(a, id=2, full_name="Б Второй", results=(result(1, "00:59:50"), result(2, "01:00:10")))
     c = replace(b, id=3, full_name="В Третий", results=(result(1, "00:59:58"), result(2, "01:00:04")))
     lower = replace(c, id=4, rating=9.94, total_result_count=10)
@@ -56,8 +56,8 @@ def test_min_events_uses_history_and_keeps_event_options(monkeypatch):
 
 
 def test_two_distances_outrank_one_when_displayed_rating_is_equal():
-    dyskin = RegistryPacemaker(1, "Дыскин Артём", "ДА", 10, "excellent", (result(1, "01:00:00"),))
-    andreev = RegistryPacemaker(2, "Андреев Артем", "АА", 9.996847330473258, "excellent",
+    dyskin = RegistryPacemaker(1, "Дыскин Артём", "ДА", 10, (result(1, "01:00:00"),))
+    andreev = RegistryPacemaker(2, "Андреев Артем", "АА", 9.996847330473258,
                                (result(2, "00:59:53"), result(2, "00:59:58")))
     assert format(andreev.rating, '.1f') == format(dyskin.rating, '.1f') == '10.0'
     assert andreev.performance_count == 2

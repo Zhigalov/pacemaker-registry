@@ -8,28 +8,18 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
   const state = form.querySelector('[data-save-state]');
   const slider = form.querySelector('[data-pace-curve]');
   const submit = form.querySelector('[type=submit]');
-  const ns = 'http://www.w3.org/2000/svg';
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const clamp = window.ratingChart.clamp;
   const round = (v, digits = 0) => Number(v.toFixed(digits));
   const format = v => v.toLocaleString('ru-RU', {maximumFractionDigits: 1});
   let config = {...defaults}, extent = 60, drag = null, inspected = 0;
   const x = seconds => 52 + seconds / extent * 700;
-  const y = score => 26 + (10 - score) * 23.2;
+  const y = window.ratingChart.y;
   const secondsAt = position => clamp((position - 52) / 700 * extent, 0, extent);
   const scoreAt = position => clamp(10 - (position - 26) / 23.2, 0, 10);
 
-  function score(seconds) {
-    const d = Math.abs(seconds), c = config;
-    if (d <= c.tolerance) return 10;
-    if (d <= c.checkpoint) return 10 - (10 - c.checkpoint_score) * (d - c.tolerance) / (c.checkpoint - c.tolerance);
-    if (d <= c.bad) return c.checkpoint_score - (c.checkpoint_score - c.bad_score) * (d - c.checkpoint) / (c.bad - c.checkpoint);
-    return c.bad_score * Math.exp(-Math.min(700, ((d - c.bad) / c.decay) ** c.curve));
-  }
-
+  const score = seconds => window.ratingModels.pace(seconds, config);
   function element(tag, attrs, parent, text) {
-    const node = document.createElementNS(ns, tag);
-    Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
-    if (text !== undefined) node.textContent = text;
+    const node = window.ratingChart.element(tag, attrs, text);
     parent.append(node);
     return node;
   }
@@ -110,9 +100,7 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
     if (!chart.querySelector('[data-hover]').hasAttribute('hidden')) inspect(inspected);
   }
 
-  function position(event) {
-    return new DOMPoint(event.clientX, event.clientY).matrixTransform(chart.getScreenCTM().inverse());
-  }
+  const position = event => window.ratingChart.position(chart, event);
   chart.addEventListener('pointerdown', event => {
     if (!editable) return;
     const key = event.target.dataset.paceHandle;
@@ -152,7 +140,7 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
     inspect(event.key === 'Home' ? 0 : event.key === 'End' ? extent : inspected + (event.key === 'ArrowLeft' ? -1 : 1));
   });
   readFields(); render();
-  if (window.ResizeObserver) new ResizeObserver(() => { if (!drag) render(); }).observe(chart);
+  window.ratingChart.observe(chart, () => { if (!drag) render(); });
   if (!editable) return;
   Object.values(fields).forEach(input => input.addEventListener('input', () => {
     if (readFields()) { state.textContent = 'Есть несохранённые изменения оценки темпа.'; render(); }

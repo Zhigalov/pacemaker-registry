@@ -87,7 +87,7 @@
                   <h2>{{ pacemaker.full_name }}</h2>
                   <span class="pacemaker-event-count" title="Количество выступлений за всю историю, включая разные дистанции одного соревнования">Выступлений: {{ pacemaker.performance_count }}</span>
                   <div
-                    class="pacemaker-rating pacemaker-rating--{{ pacemaker.rating_tone }}"
+                    class="pacemaker-rating"
                     style="{{ pacemaker.rating | rating_color }}"
                     aria-label="Рейтинг {{ '%.1f'|format(pacemaker.rating)|replace('.', ',') }} из 10"
                   >
@@ -145,32 +145,11 @@
                       <div><dt>Отклонение</dt><dd>{{ result.time_difference }}</dd></div>
                       <div><dt>Оценка за финиш</dt><dd>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }} / 10</dd></div>
                       <div><dt>Оценка за темп</dt><dd>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }} / 10{% else %}Нет данных{% endif %}</dd></div>
-                      <div class="popover-rating popover-rating--{{ result.rating_tone }}" style="{{ result.rating | rating_color }}">
+                      <div class="popover-rating" style="{{ result.rating | rating_color }}">
                         <dt>Итоговая оценка</dt><dd>{{ "%.1f"|format(result.rating)|replace(".", ",") }} / 10</dd>
                       </div>
                     </dl>
-                    {% if result.checkpoints %}
-                      <div class="popover-splits">
-                        <h4>Контрольные точки</h4>
-                        <div class="popover-table-wrap">
-                          <table>
-                            <thead>
-                              <tr><th>Точка</th><th>Отрезок</th><th>Время</th><th>Темп</th></tr>
-                            </thead>
-                            <tbody>
-                              {% for checkpoint in result.checkpoints %}
-                                <tr>
-                                  <td>{{ checkpoint.distance_km }} км</td>
-                                  <td>{{ checkpoint.segment_distance_km }} км</td>
-                                  <td>{{ checkpoint.time }}</td>
-                                  <td>{{ checkpoint.pace_per_km }} /км</td>
-                                </tr>
-                              {% endfor %}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    {% endif %}
+                    <p class="quiet-link">Все отсечки — на странице выступления.</p>
                   </div>
                 {% endfor %}
               </div>

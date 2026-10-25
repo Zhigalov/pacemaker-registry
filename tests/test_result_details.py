@@ -29,7 +29,7 @@ def details(checkpoints=None, include_splits=True):
 async def test_detail_renders_every_split_readonly_graphs_and_context(monkeypatch):
     sample = details()
     monkeypatch.setattr(main, 'get_result_details', lambda result_id, include_splits: sample)
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test', auth=('test-admin', 'test-only-password')) as client:
         response = await client.get('/results/12?event_id=1&include_splits=true&min_events=3')
     assert response.status_code == 200
     assert response.text.count('<tr><td>') == 42
@@ -58,7 +58,7 @@ async def test_detail_finish_only_and_missing_splits(monkeypatch):
     def get(result_id, include_splits):
         return details(checkpoints=(), include_splits=include_splits)
     monkeypatch.setattr(main, 'get_result_details', get)
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test', auth=('test-admin', 'test-only-password')) as client:
         response = await client.get('/results/12?include_splits=false')
         assert 'Учёт темпа выключен' in response.text
         assert 'В источнике нет сохранённых контрольных точек' in response.text
@@ -70,7 +70,7 @@ async def test_detail_finish_only_and_missing_splits(monkeypatch):
 @pytest.mark.anyio
 async def test_detail_missing_db_unavailable_and_invalid_filters(monkeypatch):
     monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: None)
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test', auth=('test-admin', 'test-only-password')) as client:
         assert (await client.get('/results/999')).status_code == 404
         assert (await client.get('/results/12?min_events=0')).status_code == 422
         assert (await client.get('/results/12?event_id=-1')).status_code == 422
@@ -80,9 +80,12 @@ async def test_detail_missing_db_unavailable_and_invalid_filters(monkeypatch):
 
 
 @pytest.mark.parametrize('source,expected', [
-    ('https://results.russiarunning.com/participant/race2026/42km/abc-def',
+    ('https://results.russiarunning.com/participant/race2026/42km/edf120ca-d0dd-408e-94d2-52bb06f4f101',
      'https://results.russiarunning.com/event/race2026/results/42km'),
     ('https://results.runc.run/event/marathon/result/123/', 'https://results.runc.run/event/marathon/'),
+    ('https://results.runc.run/event/moscow_marathon_42,2km_2026/result/123/',
+     'https://results.runc.run/event/moscow_marathon_42,2km_2026/'),
+    ('https://results.runc.run/event/marathon/result/123/?redirect=evil', None),
     ('javascript:alert(1)', None), ('https://evil.example/event/a/result/1/', None),
     ('https://results.runc.run@evil.example/event/a/result/1/', None),
     ('https://results.runc.run/event/a/../../evil', None), ('https://[bad', None),
@@ -169,7 +172,7 @@ async def test_edit_flag_redirects_preserves_filters_and_recalculates(monkeypatc
         return True
     monkeypatch.setattr(main, 'get_result_details', get)
     monkeypatch.setattr(main, 'update_result_target_time', save)
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test', auth=('test-admin', 'test-only-password')) as client:
         response = await client.post('/results/12/target-time?event_id=1&include_splits=false&min_events=3',
                                      data={'target_time': '3:29', 'previous_target_time': '03:30'})
         assert response.status_code == 303
@@ -196,7 +199,7 @@ async def test_edit_flag_rejects_invalid_values_without_saving(monkeypatch, valu
     monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: details())
     def never_save(*args): pytest.fail('Invalid input must not reach UPDATE')
     monkeypatch.setattr(main, 'update_result_target_time', never_save)
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test', auth=('test-admin', 'test-only-password')) as client:
         response = await client.post('/results/12/target-time',
                                      data={'target_time': value, 'previous_target_time': '03:30'})
     assert response.status_code == 422
@@ -210,7 +213,7 @@ async def test_edit_flag_handles_missing_conflict_and_database_error(monkeypatch
     def fail(*args): raise RuntimeError('secret database error')
     monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: details())
     payload = {'target_time': '03:29', 'previous_target_time': '03:30'}
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test', auth=('test-admin', 'test-only-password')) as client:
         monkeypatch.setattr(main, 'update_result_target_time', fail)
         response = await client.post('/results/12/target-time', data=payload)
         assert response.status_code == 503

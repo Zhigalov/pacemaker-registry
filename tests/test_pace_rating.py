@@ -5,7 +5,7 @@ from math import exp
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pacemaker_registry import db, main
+from pacemaker_registry import db, main, registry
 from pacemaker_registry.rating import PaceRatingConfig, EventRatingConfig, calculate_split_rating, parse_pace_rating
 
 
@@ -58,10 +58,10 @@ def test_weighting_coverage_and_finish_only_unchanged():
     config = PaceRatingConfig(tolerance=0, checkpoint=10, bad=30)
     checkpoints = [{"segment_distance_km": "2", "pace_per_km": "05:00 /км"},
                    {"segment_distance_km": "8", "pace_per_km": "05:10 /км"}]
-    assert db.calculate_splits_rating("00:50", Decimal("10"), checkpoints, config) == pytest.approx(9.2)
-    assert db.calculate_splits_rating("00:50", Decimal("10"), checkpoints[:1], config) is None
-    assert db.calculate_combined_rating(8, 4, False) == 8
-    assert db.calculate_combined_rating(8, 4) == pytest.approx(6.4)
+    assert registry.calculate_splits_rating("00:50", Decimal("10"), checkpoints, config) == pytest.approx(9.2)
+    assert registry.calculate_splits_rating("00:50", Decimal("10"), checkpoints[:1], config) is None
+    assert registry.calculate_combined_rating(8, 4, False) == 8
+    assert registry.calculate_combined_rating(8, 4) == pytest.approx(6.4)
 
 
 @pytest.mark.anyio
@@ -74,7 +74,7 @@ async def test_save_reload_event_and_finish_isolation(monkeypatch):
         return True
     monkeypatch.setattr(main, "save_event_pace_rating", save)
     values = asdict(PaceRatingConfig(tolerance=8, checkpoint=15, bad=45))
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test", auth=("test-admin", "test-only-password")) as client:
         page = await client.get("/events/1")
         assert 'action="/events/1/pace-rating"' in page.text
         assert 'data-pace-rating' in page.text
@@ -98,7 +98,7 @@ async def test_db_error_keeps_pace_edits_and_deleted_event_404(monkeypatch):
     def unavailable(*_):
         raise RuntimeError("DB unavailable")
     monkeypatch.setattr(main, "save_event_pace_rating", unavailable)
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test", auth=("test-admin", "test-only-password")) as client:
         values = asdict(PaceRatingConfig(bad=55))
         page = await client.post("/events/1/pace-rating", data=values)
         assert page.status_code == 503

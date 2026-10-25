@@ -13,9 +13,9 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
   let drag = null;
   let selectedSecond = 0;
   let extent = 180;
-  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const clamp = window.ratingChart.clamp;
   const format = n => n === 0 ? "0 с" : (n > 0 ? "+" : "−") + Math.abs(n) + " с";
-  const y = score => 26 + (10 - score) * 23.2;
+  const y = window.ratingChart.y;
   // One affine mapping everywhere, including during drags: no artificial kinks.
   function x(t) {
     return 52 + (t + extent) / (2 * extent) * 700;
@@ -23,26 +23,8 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
   function seconds(px) {
     return -extent + (px - 52) / 700 * 2 * extent;
   }
-  function rating(t) {
-    if (t >= config.left_good && t <= config.right_good) return 10;
-    const left = t < config.left_good;
-    const good = left ? config.left_good : config.right_good;
-    const bad = left ? config.left_bad : config.right_bad;
-    const width = Math.abs(good - bad);
-    const side = left ? "left" : "right";
-    const edgeScore = config[side + "_score"];
-    if (width > 0 && (left ? t >= bad : t <= bad)) {
-      return 10 - (10 - edgeScore) * Math.abs(t - good) / width;
-    }
-    return (width > 0 ? edgeScore : 10) * Math.exp(-Math.min(700,
-      (Math.abs(t - bad) / config[side + "_decay"]) ** config[side + "_curve"]));
-  }
-  function element(tag, attrs, text) {
-    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
-    Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
+  const rating = t => window.ratingModels.finish(t, config);
+  const element = window.ratingChart.element;
   function valid() {
     if (!editable) return true;
     return keys.every(key => fields[key].value !== "" && fields[key].validity.valid)
@@ -141,11 +123,7 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
     changed();
   });
   }
-  function position(event) {
-    const point = svg.createSVGPoint();
-    point.x = event.clientX; point.y = event.clientY;
-    return point.matrixTransform(svg.getScreenCTM().inverse());
-  }
+  const position = event => window.ratingChart.position(svg, event);
   function show(t) {
     if (!valid()) return;
     selectedSecond = Math.round(clamp(t, -extent, extent));
@@ -217,5 +195,5 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
   });
   }
   render();
-  new ResizeObserver(() => { if (!drag) render(); }).observe(svg);
+  window.ratingChart.observe(svg, () => { if (!drag) render(); });
 });

@@ -118,12 +118,7 @@ a, button, input { -webkit-tap-highlight-color: transparent; }
 
 .quiet-link:hover, .source-link:hover { text-decoration: underline; }
 
-.registry-intro {
-  padding: clamp(2.5rem, 7vw, 5.5rem) 0 clamp(2rem, 5vw, 3.5rem);
-  border-bottom: 1px solid #dfe7e4;
-}
 
-.registry-intro > div { max-width: 45rem; }
 
 .eyebrow {
   margin: 0 0 0.7rem;
@@ -143,18 +138,7 @@ h1 {
   line-height: 1.05;
 }
 
-.lead {
-  max-width: 40rem;
-  margin: 1.25rem 0 0;
-  color: #5a6b65;
-  font-size: clamp(1rem, 2vw, 1.12rem);
-  line-height: 1.65;
-}
 
-.lead--compact {
-  margin-top: 0.8rem;
-  font-size: 1rem;
-}
 
 .empty-state {
   display: flex;
@@ -496,19 +480,7 @@ th {
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: #fbfcfc; }
 
-.save-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
 
-.save-actions p {
-  margin: 0;
-  color: #71807b;
-  font-size: 0.78rem;
-}
 
 @media (max-width: 42rem) {
   .app-shell {
@@ -517,7 +489,6 @@ tbody tr:hover { background: #fbfcfc; }
   }
 
   .quiet-link { font-size: 0.82rem; }
-  .registry-intro { padding-top: 2.5rem; }
   .empty-state { margin-top: 3rem; }
   .form-card, .result-card { border-radius: 1rem; }
   .form-card { margin-top: 1rem; }
@@ -542,12 +513,7 @@ tbody tr:hover { background: #fbfcfc; }
 
   .result-heading-actions .button { width: 100%; }
 
-  .save-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
 
-  .save-actions .button { width: 100%; }
 
   .result-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1040,27 +1006,6 @@ tbody tr:hover { background: #fbfcfc; }
   font-size: 0.82rem;
   font-weight: 740;
   font-variant-numeric: tabular-nums;
-}
-
-.popover-splits {
-  margin-top: 1rem;
-}
-
-.popover-splits h4 {
-  margin: 0 0 0.5rem;
-  font-size: 0.78rem;
-}
-
-.popover-table-wrap {
-  overflow-x: auto;
-  border: 1px solid #e1e9e6;
-  border-radius: 0.7rem;
-}
-
-.result-popover th,
-.result-popover td {
-  padding: 0.55rem 0.6rem;
-  font-size: 0.67rem;
 }
 
 .registry-load-error {

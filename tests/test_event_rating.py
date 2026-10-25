@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pacemaker_registry.db import RegistryEvent, get_event, save_event_rating, load_registry, _rating_tone
+from pacemaker_registry.db import RegistryEvent, get_event, save_event_rating, load_registry
 from pacemaker_registry.main import app
 from pacemaker_registry.rating import (
     EventRatingConfig, calculate_rating_for_difference as score,
@@ -90,7 +90,7 @@ async def test_event_save_reload_and_isolation(monkeypatch):
         return True
     monkeypatch.setattr("pacemaker_registry.main.save_event_rating", save)
     values = asdict(default_event_rating("sub_minute")) | {"left_bad": -90, "left_score": 6, "right_score": 9}
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", auth=("test-admin", "test-only-password")) as client:
         page = await client.get("/events/1")
         assert page.status_code == 200
         assert "саб-минута" in page.text
@@ -116,7 +116,7 @@ async def test_save_failure_keeps_edits(monkeypatch):
     def unavailable(*_):
         raise RuntimeError("DB unavailable")
     monkeypatch.setattr("pacemaker_registry.main.save_event_rating", unavailable)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", auth=("test-admin", "test-only-password")) as client:
         response = await client.post("/events/1/rating", data=asdict(EventRatingConfig(left_bad=-80)))
     assert response.status_code == 503
     assert 'value="-80"' in response.text
@@ -173,7 +173,7 @@ def test_editable_scores_are_continuous_and_independent():
 async def test_events_list_is_readonly_and_links_to_editors(monkeypatch):
     events = (RegistryEvent(1, "Первое", "round"), RegistryEvent(2, "Второе", "sub_minute", EventRatingConfig(left_score=6)))
     monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", auth=("test-admin", "test-only-password")) as client:
         response = await client.get("/events")
         assert response.status_code == 200
         assert response.text.count('data-rating-widget') == 2
@@ -204,8 +204,3 @@ def test_registry_applies_each_events_formula_before_sorting(monkeypatch):
     assert [p.id for p in registry.pacemakers] == [2, 1]
     assert registry.pacemakers[0].rating == 10
     assert registry.pacemakers[1].rating == pytest.approx(10 * exp(-5/30))
-
-
-@pytest.mark.parametrize("rating,tone", [(10, "excellent"), (9, "excellent"), (8.99, "good"), (7, "good"), (6.99, "low")])
-def test_rating_colors_follow_three_zones(rating, tone):
-    assert _rating_tone(rating) == tone

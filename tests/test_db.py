@@ -1,3 +1,4 @@
+from pacemaker_registry.registry import (_calculate_target_pace, _format_time_difference, _sort_pacemakers, calculate_combined_rating, calculate_rating_for_difference, calculate_pacemaker_rating, calculate_split_rating, calculate_splits_rating)
 from decimal import Decimal
 
 import pytest
@@ -5,14 +6,6 @@ import pytest
 from pacemaker_registry.db import (
     RegistryPacemaker,
     _target_time_type_from_target_time,
-    _calculate_target_pace,
-    _format_time_difference,
-    _sort_pacemakers,
-    calculate_combined_rating,
-    calculate_rating_for_difference,
-    calculate_pacemaker_rating,
-    calculate_split_rating,
-    calculate_splits_rating,
     load_registry,
     save_race_result,
 )
@@ -156,9 +149,9 @@ def test_format_time_difference(seconds: int, expected: str) -> None:
 
 def test_pacemakers_are_sorted_by_rating_then_name() -> None:
     pacemakers = [
-        RegistryPacemaker(1, "Петров Пётр", "ПП", 3.0, "low", ()),
-        RegistryPacemaker(2, "Сидоров Семён", "СС", 9.5, "excellent", ()),
-        RegistryPacemaker(3, "Алексеев Алексей", "АА", 9.5, "excellent", ()),
+        RegistryPacemaker(1, "Петров Пётр", "ПП", 3.0, ()),
+        RegistryPacemaker(2, "Сидоров Семён", "СС", 9.5, ()),
+        RegistryPacemaker(3, "Алексеев Алексей", "АА", 9.5, ()),
     ]
 
     sorted_pacemakers = _sort_pacemakers(pacemakers)
