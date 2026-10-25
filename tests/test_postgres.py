@@ -59,6 +59,15 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
     assert db.load_registry().result_count == 1
 
 
+def test_readiness_rejects_unmigrated_database_without_changing_it(database):
+    with pytest.raises(psycopg.errors.UndefinedTable):
+        db.check_database()
+    with database() as connection:
+        assert connection.execute("SELECT to_regclass('schema_migrations')").fetchone() == (None,)
+    migrate.migrate()
+    db.check_database()
+
+
 def test_duplicates_names_event_type_and_json_round_trip(database):
     migrate.migrate()
     first = sample()

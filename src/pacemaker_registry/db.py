@@ -78,8 +78,13 @@ def connect_database() -> Connection[Any]:
 
 
 def check_database() -> None:
+    """A reachable server without the application's schema is not ready."""
     with connect_database() as connection:
-        connection.execute("SELECT 1").fetchone()
+        connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, p.last_name
+            FROM race_results AS rr
+            JOIN events AS e ON e.id = rr.event_id
+            JOIN pacemakers AS p ON p.id = rr.pacemaker_id
+            LIMIT 0""")
 
 
 def get_event_target_time_type(source_event_id: str) -> str | None:
