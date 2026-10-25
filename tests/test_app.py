@@ -5,8 +5,8 @@ from pacemaker_registry.db import (
     Registry,
     RegistryEvent,
     RegistryPacemaker,
-    RegistryResult,
 )
+from pacemaker_registry.models import RegistryCard
 from pacemaker_registry.main import app
 from pacemaker_registry.russiarunning import Checkpoint, RaceResult
 
@@ -26,27 +26,16 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
                 initials="ЖС",
                 rating=9.533,
                 results=(
-                    RegistryResult(
+                    RegistryCard(
                         id=1,
                         event_id=1,
                         event_name="Международный Когалымский полумарафон",
                         distance_km="21,1",
                         target_time="01:54",
-                        target_pace="05:24 /км",
                         chip_time="01:53:53",
-                        actual_pace="05:23 /км",
                         finish_rating=9.533,
                         splits_rating=8.7,
                         rating=9.2,
-                        time_difference="−7 с",
-                        checkpoints=(
-                            {
-                                "distance_km": "5,00",
-                                "segment_distance_km": "5,00",
-                                "time": "27:29",
-                                "pace_per_km": "05:25",
-                            },
-                        ),
                     ),
                 ),
             ),
@@ -80,13 +69,13 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert 'Результаты забегов' not in response.text
     assert 'class="visually-hidden">Пейсмейкеры</h1>' in response.text
     assert 'class="filter-hint" role="tooltip">За всю историю пейсера</span>' in response.text
-    assert response.text.count('--rating-color: hsl(') == 5
+    assert response.text.count('--rating-color: hsl(') == 4
     assert 'href="/add"' in response.text
     assert 'href="/results/1?event_id=0&amp;include_splits=true&amp;min_events=1"' in response.text
     assert "Жигалов Сергей" in response.text
     assert "Международный Когалымский полумарафон" in response.text
-    assert "05:24 /км" in response.text
-    assert "05:23 /км" in response.text
+    assert "05:24 /км" not in response.text
+    assert "05:23 /км" not in response.text
     assert 'class="result-event"' not in response.text
     assert "Рейтинг 9,5 из 10" in response.text
     assert '>Цель </span>' in response.text
@@ -115,7 +104,10 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Конструктор" not in response.text
     assert 'href="/events"' in response.text
     assert 'class="event-directory"' not in response.text
-    assert "Детали результата" in response.text
+    assert "Детали результата" not in response.text
+    assert 'result-popover' not in response.text
+    assert 'data-tooltip-id' not in response.text
+    assert 'result-details-' not in response.text
     assert "Здесь появится список выступлений" not in response.text
     assert "Все соревнования" in response.text
     assert "Московский марафон" in response.text
@@ -132,7 +124,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     ('03:59', '04:01:01', '03:59:00', '04:01:01', '+121 с'),
 ])
 def test_card_time_formatting(target, chip, expected_target, expected_chip, delta):
-    result = RegistryResult(1, 1, 'Старт', '10', target, '', chip, '', 10, None, 10, '', ())
+    result = RegistryCard(1, 1, 'Старт', '10', target, chip, 10, None, 10)
     assert result.target_time_display == expected_target
     assert result.chip_time_display == expected_chip
     assert result.finish_difference_display == delta
@@ -142,7 +134,7 @@ def test_card_time_formatting(target, chip, expected_target, expected_chip, delt
 @pytest.mark.anyio
 async def test_card_distinguishes_missing_pace_from_zero(monkeypatch):
     from dataclasses import replace
-    missing = RegistryResult(1, 1, 'Старт', '10', '00:54', '', '54:53', '', 10, None, 10, '', ())
+    missing = RegistryCard(1, 1, 'Старт', '10', '00:54', '54:53', 10, None, 10)
     zero = replace(missing, id=2, splits_rating=0.0)
     registry = Registry((RegistryPacemaker(1, 'Тестовый пейсер', 'ТП', 10, (missing, zero)),), 1, 2)
     monkeypatch.setattr('pacemaker_registry.main.load_registry', lambda *args, **kwargs: registry)

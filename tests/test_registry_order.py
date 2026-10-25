@@ -4,7 +4,8 @@ from decimal import Decimal
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pacemaker_registry.db import Registry, RegistryEvent, RegistryPacemaker, RegistryResult, _sort_pacemakers, load_registry
+from pacemaker_registry.db import Registry, RegistryEvent, RegistryPacemaker, _sort_pacemakers, load_registry
+from pacemaker_registry.models import RegistryCard
 from pacemaker_registry.main import app
 
 
@@ -14,7 +15,7 @@ def anyio_backend():
 
 
 def result(event_id, chip):
-    return RegistryResult(1, event_id, "Забег", "10", "01:00", "06:00", chip, "06:00", 10, None, 10, "", ())
+    return RegistryCard(1, event_id, "Забег", "10", "01:00", chip, 10, None, 10)
 
 
 def test_sort_uses_displayed_rating_then_performances_then_absolute_mean_then_name():
@@ -33,13 +34,13 @@ def test_sort_uses_displayed_rating_then_performances_then_absolute_mean_then_na
 
 def test_min_events_uses_history_and_keeps_event_options(monkeypatch):
     events = [(1, "Первое", "round", None, None), (2, "Второе", "round", None, None)]
-    rows = [(i, "Тестов", str(i), i, 1, "Первое", Decimal(10), "01:00", "00:59:59", "06:00", [], count)
+    rows = [(i, "Тестов", str(i), i, 1, Decimal(10), "01:00", "00:59:59", [], count)
             for i, count in [(1, 1), (2, 3)]]
     class Connection:
         def __enter__(self): return self
         def __exit__(self, *_): pass
         def execute(self, query, parameters=()):
-            self.rows = events if "SELECT e.id" in query else rows
+            self.rows = events if "SELECT e.id" in query else [r for r in rows if r[-1] >= parameters[0]]
             return self
         def fetchall(self): return self.rows
     monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)

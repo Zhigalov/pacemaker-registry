@@ -175,11 +175,9 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
             "Пётр",
             11,
             2,
-            "Московский марафон",
             Decimal("10"),
             "00:55",
             "00:54:53",
-            "05:29 /км",
             [],
             2,
         )
@@ -216,7 +214,11 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
     assert registry.selected_event_id == 2
     assert registry.pacemakers[0].results[0].finish_rating == 10
     assert registry.include_splits is False
-    assert calls[1][1] == (2,)
+    assert calls[1][1] == (1, 2)
+    assert "HAVING count(*) >= %s" in calls[1][0]
+    assert "rr.pace," not in calls[1][0]
+    assert "rr.checkpoints," not in calls[1][0]
+    assert "SELECT count(*)" not in calls[1][0]
     assert [pacemaker.full_name for pacemaker in registry.pacemakers] == [
         "Петров Пётр"
     ]

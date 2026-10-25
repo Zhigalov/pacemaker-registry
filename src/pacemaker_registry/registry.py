@@ -1,7 +1,7 @@
 """Registry assembly and scoring; no database or network operations."""
 from decimal import Decimal, ROUND_HALF_UP
 from math import isfinite
-from pacemaker_registry.models import RegistryResult, RegistryPacemaker
+from pacemaker_registry.models import RegistryCard, RegistryResult, RegistryPacemaker
 from pacemaker_registry.rating import (
     EventRatingConfig, PaceRatingConfig, calculate_rating_for_difference, calculate_split_rating,
 )
@@ -15,18 +15,25 @@ MIN_SPLITS_COVERAGE = Decimal("0.8")
 
 
 def _build_registry_result(result_id, event, distance, target_time, chip_time,
-                           actual_pace, checkpoints, include_splits=True) -> RegistryResult:
+                           actual_pace, checkpoints, include_splits=True, *, details=True) -> RegistryCard | RegistryResult:
     """The registry and detail page must use the very same scoring pipeline."""
     finish_rating = calculate_pacemaker_rating(target_time, chip_time, event.formula)
-    segments = tuple(_rated_segments(target_time, distance, checkpoints, event.pace_formula))
+    segments = _rated_segments(target_time, distance, checkpoints, event.pace_formula)
+    if details:
+        segments = tuple(segments)  # Detail charts reuse the exact scored segments.
     splits_rating = _weighted_splits_rating(distance, segments)
     rating = calculate_combined_rating(finish_rating, splits_rating, include_splits)
-    return RegistryResult(
+    card = dict(
         id=result_id, event_id=event.id, event_name=event.name,
         distance_km=_format_registry_distance(distance), target_time=target_time,
-        target_pace=_calculate_target_pace(target_time, distance), chip_time=chip_time,
-        actual_pace=actual_pace, finish_rating=finish_rating, splits_rating=splits_rating,
+        chip_time=chip_time,
+        finish_rating=finish_rating, splits_rating=splits_rating,
         rating=rating,
+    )
+    if not details:
+        return RegistryCard(**card)
+    return RegistryResult(
+        **card, target_pace=_calculate_target_pace(target_time, distance), actual_pace=actual_pace,
         time_difference=_format_time_difference(_time_difference_seconds(target_time, chip_time)),
         checkpoints=tuple(checkpoints),
         finish_deviation=_time_difference_seconds(target_time, chip_time),

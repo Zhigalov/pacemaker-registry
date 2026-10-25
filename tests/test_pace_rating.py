@@ -137,7 +137,7 @@ def test_database_roundtrip_only_updates_pace_and_scopes_event_id(monkeypatch):
 def test_registry_uses_each_events_pace_config_before_sorting(monkeypatch):
     events = [(1, "Первое", "round", None, None),
               (2, "Второе", "round", None, asdict(PaceRatingConfig(tolerance=20, checkpoint=25, bad=40)))]
-    rows = [(i, "Тестов", str(i), i, i, "Тест", Decimal("10"), "00:50", "00:50:00", "05:00 /км",
+    rows = [(i, "Тестов", str(i), i, i, Decimal("10"), "00:50", "00:50:00",
              [{"segment_distance_km": "10", "pace_per_km": "05:20 /км"}], 1) for i in (1, 2)]
     class Connection:
         def __enter__(self): return self

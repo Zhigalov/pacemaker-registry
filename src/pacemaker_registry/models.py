@@ -6,22 +6,16 @@ from pacemaker_registry.times import time_difference_seconds as _time_difference
 
 
 @dataclass(frozen=True, slots=True)
-class RegistryResult:
+class RegistryCard:
     id: int
     event_id: int
     event_name: str
     distance_km: str
     target_time: str
-    target_pace: str
     chip_time: str
-    actual_pace: str
     finish_rating: float
     splits_rating: float | None
     rating: float
-    time_difference: str
-    checkpoints: tuple[dict[str, str], ...]
-    finish_deviation: int = 0
-    pace_markers: tuple[dict[str, Any], ...] = ()
 
     @property
     def target_time_display(self) -> str:
@@ -46,12 +40,23 @@ class RegistryResult:
 
 
 @dataclass(frozen=True, slots=True)
+class RegistryResult(RegistryCard):
+    """Full information loaded only for an individual performance page."""
+    target_pace: str
+    actual_pace: str
+    time_difference: str
+    checkpoints: tuple[dict[str, str], ...]
+    finish_deviation: int = 0
+    pace_markers: tuple[dict[str, Any], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class RegistryPacemaker:
     id: int
     full_name: str
     initials: str
     rating: float
-    results: tuple[RegistryResult, ...]
+    results: tuple[RegistryCard, ...]
     total_result_count: int = 0
 
     @property

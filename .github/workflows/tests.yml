@@ -41,8 +41,8 @@ jobs:
           python -m pip check
       - name: Python, PostgreSQL and chart parity tests
         run: python -m pytest -q
-      - name: Browser analytics tests
-        run: node --test tests/analytics.test.cjs
+      - name: Browser script tests
+        run: node --test tests/*.test.cjs
       - name: Verify distributable assets
         run: |
           python -m pip wheel --no-build-isolation --no-deps --wheel-dir /tmp/pacers-wheel .

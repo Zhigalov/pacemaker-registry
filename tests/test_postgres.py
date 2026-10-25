@@ -102,6 +102,30 @@ def test_edit_conflict_and_filter_history(database):
     assert not db.load_registry(min_events=3).pacemakers
 
 
+@pytest.mark.parametrize('include_splits', [True, False])
+def test_compact_cards_preserve_detail_scores_and_full_checkpoints(database, include_splits):
+    migrate.migrate()
+    assert db.save_race_result(sample(), '00:50')
+    assert db.save_race_result(sample(source_event_id='other', checkpoints=()), '00:50')
+    registry = db.load_registry(include_splits=include_splits)
+    event = registry.events[0]
+    assert db.save_event_rating(event.id, EventRatingConfig(left_score=6, right_good=10, right_bad=45))
+    assert db.save_event_pace_rating(event.id, PaceRatingConfig(tolerance=2))
+    for card in db.load_registry(include_splits=include_splits).pacemakers[0].results:
+        detail = db.get_result_details(card.id, include_splits).result
+        assert (card.rating, card.finish_rating, card.splits_rating) == (
+            detail.rating, detail.finish_rating, detail.splits_rating)
+        assert card.finish_difference_display == detail.finish_difference_display
+        assert not hasattr(card, 'checkpoints')
+        assert not hasattr(card, 'pace_markers')
+        assert not hasattr(card, 'actual_pace')
+        if card.event_id == event.id:
+            assert detail.checkpoints == tuple(map(asdict, sample().checkpoints))
+            assert len(detail.pace_markers) == 2
+        else:
+            assert card.splits_rating is None
+
+
 def test_concurrent_duplicate_is_inserted_once(database):
     migrate.migrate()
     result = sample()

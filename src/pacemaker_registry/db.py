@@ -16,7 +16,7 @@ from pacemaker_registry.russiarunning import (
 
 
 from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig
-from pacemaker_registry.models import Registry, RegistryEvent, RegistryResult, RegistryPacemaker, ResultDetails
+from pacemaker_registry.models import Registry, RegistryEvent, RegistryPacemaker, ResultDetails
 from pacemaker_registry.registry import _build_registry_result, _sort_pacemakers
 from pacemaker_registry.times import normalize_target_time
 
@@ -126,6 +126,8 @@ def load_registry(
             event_id if event_id in {event.id for event in events} else None
         )
 
+        # Cards need segment weights/paces, not full checkpoint details or chart markers.
+        # Count all history once per pacemaker, before applying the event filter.
         query = """
             SELECT
                 p.id,
@@ -133,23 +135,31 @@ def load_registry(
                 p.first_name,
                 rr.id,
                 e.id,
-                e.name,
                 rr.distance_km,
                 rr.target_time,
                 rr.chip_time,
-                rr.pace,
-                rr.checkpoints,
-                (SELECT count(*)
-                 FROM race_results AS history
-                 WHERE history.pacemaker_id = p.id) AS total_result_count
+                COALESCE((
+                    SELECT jsonb_agg(jsonb_build_object(
+                        'segment_distance_km', point->'segment_distance_km',
+                        'pace_per_km', point->'pace_per_km'
+                    ))
+                    FROM jsonb_array_elements(rr.checkpoints) AS point
+                ), '[]'::jsonb) AS segments,
+                history.total_result_count
             FROM pacemakers AS p
+            JOIN (
+                SELECT pacemaker_id, count(*) AS total_result_count
+                FROM race_results
+                GROUP BY pacemaker_id
+                HAVING count(*) >= %s
+            ) AS history ON history.pacemaker_id = p.id
             JOIN race_results AS rr ON rr.pacemaker_id = p.id
             JOIN events AS e ON e.id = rr.event_id
         """
-        parameters: tuple[int, ...] = ()
+        parameters: tuple[int, ...] = (min_events,)
         if selected_event_id is not None:
             query += " WHERE e.id = %s"
-            parameters = (selected_event_id,)
+            parameters += (selected_event_id,)
         query += """
             ORDER BY
                 lower(p.last_name),
@@ -168,16 +178,12 @@ def load_registry(
             first_name,
             result_id,
             event_id,
-            event_name,
             distance,
             target_time,
             chip_time,
-            actual_pace,
             checkpoints,
             total_result_count,
         ) = row
-        if total_result_count < min_events:
-            continue
         event_ids.add(event_id)
         pacemaker = grouped.setdefault(
             pacemaker_id,
@@ -190,7 +196,7 @@ def load_registry(
         )
         pacemaker["results"].append(
             _build_registry_result(result_id, events_by_id[event_id], distance,
-                                   target_time, chip_time, actual_pace, checkpoints, include_splits)
+                                   target_time, chip_time, None, checkpoints, include_splits, details=False)
         )
 
     pacemakers = []
