@@ -26,8 +26,6 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://registry:registry-dev-password@postgres:5432/pacemaker_registry
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     ports:
       - "8080:8080"
     depends_on:

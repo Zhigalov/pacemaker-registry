@@ -74,7 +74,7 @@ async def test_save_reload_event_and_finish_isolation(monkeypatch):
         return True
     monkeypatch.setattr(main, "save_event_pace_rating", save)
     values = asdict(PaceRatingConfig(tolerance=8, checkpoint=15, bad=45))
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test", auth=("test-admin", "test-only-password")) as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
         page = await client.get("/events/1")
         assert 'action="/events/1/pace-rating"' in page.text
         assert 'data-pace-rating' in page.text
@@ -98,7 +98,7 @@ async def test_db_error_keeps_pace_edits_and_deleted_event_404(monkeypatch):
     def unavailable(*_):
         raise RuntimeError("DB unavailable")
     monkeypatch.setattr(main, "save_event_pace_rating", unavailable)
-    async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test", auth=("test-admin", "test-only-password")) as client:
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
         values = asdict(PaceRatingConfig(bad=55))
         page = await client.post("/events/1/pace-rating", data=values)
         assert page.status_code == 503

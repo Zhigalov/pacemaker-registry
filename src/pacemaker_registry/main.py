@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request
+from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -37,7 +37,6 @@ from pacemaker_registry.russiarunning import (
 )
 from pacemaker_registry.sources import load_race_result, result_source_links as _result_source_links
 from pacemaker_registry.times import normalize_target_time
-from pacemaker_registry.auth import require_editor
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -139,7 +138,7 @@ def event_page(request: Request, event_id: int, saved: bool = False):
     return _event_response(request, _load_event_or_404(event_id), saved=saved)
 
 
-@app.post("/events/{event_id}/rating", response_class=HTMLResponse, dependencies=[Depends(require_editor)])
+@app.post("/events/{event_id}/rating", response_class=HTMLResponse)
 async def update_event_rating(request: Request, event_id: int):
     event = await run_in_threadpool(_load_event_or_404, event_id)
     form = await request.form()
@@ -161,7 +160,7 @@ async def update_event_rating(request: Request, event_id: int):
     return RedirectResponse(f"/events/{event_id}?saved=true", status_code=303)
 
 
-@app.post("/events/{event_id}/pace-rating", response_class=HTMLResponse, dependencies=[Depends(require_editor)])
+@app.post("/events/{event_id}/pace-rating", response_class=HTMLResponse)
 async def update_event_pace_rating(request: Request, event_id: int):
     event = await run_in_threadpool(_load_event_or_404, event_id)
     values = dict(await request.form())
@@ -223,7 +222,7 @@ def result_page(
                             include_splits, event_id, min_events, saved=saved)
 
 
-@app.post("/results/{result_id}/target-time", response_class=HTMLResponse, dependencies=[Depends(require_editor)])
+@app.post("/results/{result_id}/target-time", response_class=HTMLResponse)
 def edit_result_target_time(
     request: Request, result_id: int,
     target_time: Annotated[str, Form(max_length=20)],
