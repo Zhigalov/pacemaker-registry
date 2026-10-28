@@ -30,6 +30,8 @@ def main():
     parser.add_argument('--apply', action='store_true', help='Without this flag, only inspect/plan')
     args = parser.parse_args()
     config = json.loads(Path(__file__).with_name('resources.json').read_text())
+    if args.to == 'vm' and config.get('current_runtime', {}).get('vm_status') == 'DELETED':
+        raise RuntimeError('Temporary VM and IP were deleted; refusing to point DNS to a released address. Reprovision and verify a new target first.')
     original = config['original_dns']
     vm = [dict(name=r['name'], type='A', ttl='60', data=[config['public_ip']]) for r in original]
     expected, desired = (original, vm) if args.to == 'vm' else (vm, original)
