@@ -1,5 +1,13 @@
 {
   "purpose": "temporary-recovery",
+  "return_to_serverless": {
+    "date": "2026-10-28",
+    "revision_id": "bba02glgs2ragli0lbho",
+    "application_commit": "0fa4585",
+    "image_digest": "sha256:652f3596b39a76c63cbacef26b2fb186e3e6ce070f2d4f45093d1461d8612198",
+    "logging_disabled": true,
+    "vm_retained_for_rollback": true
+  },
   "created_on": "2026-10-13",
   "folder_id": "b1genq2j3vqm14gio5vl",
   "zone": "ru-central1-d",
