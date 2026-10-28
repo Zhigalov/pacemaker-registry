@@ -1,5 +1,14 @@
 {
   "purpose": "temporary-recovery",
+  "current_runtime": {
+    "updated_on": "2026-10-28",
+    "serverless_revision_id": "bba9qdnt4mtvu9gelv1q",
+    "min_instances": 0,
+    "logging_disabled": true,
+    "vm_status": "STOPPED",
+    "disk_retained": true,
+    "ip_retained": true
+  },
   "return_to_serverless": {
     "date": "2026-10-28",
     "revision_id": "bba02glgs2ragli0lbho",
