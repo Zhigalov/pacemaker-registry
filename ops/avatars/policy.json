@@ -2,6 +2,16 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ExistingBucketAdministrator",
+      "Effect": "Allow",
+      "Principal": {"CanonicalUser": "ajec2uiqurm9nspakfjn"},
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::pacersreg-avatars-b1genq2j3vqm14gio5vl",
+        "arn:aws:s3:::pacersreg-avatars-b1genq2j3vqm14gio5vl/*"
+      ]
+    },
+    {
       "Sid": "PublicAvatarRead",
       "Effect": "Allow",
       "Principal": "*",

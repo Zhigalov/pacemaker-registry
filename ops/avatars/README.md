@@ -10,16 +10,24 @@ service account, database secret reference, disabled logging and `min_instances=
 
 Object Storage checks base permissions **before** `policy.json`: policy Allow
 rules alone do not grant access. Avatar operation requires `public-read` for
-objects and bucket ACL WRITE for service account `aje9jaio43ql5o6jjelm`, with
+objects and bucket ACL READ+WRITE for service account `aje9jaio43ql5o6jjelm`, with
 `policy.json` kept in place to restrict public reads and application put/delete
 to `avatars/*`. Public listing and public config read remain disabled. Removing
 the policy would expand the base permissions to all objects in this bucket.
+The existing cloud owner `ajec2uiqurm9nspakfjn` retains full management of this
+bucket and its objects through a separately approved administrator rule;
+otherwise the policy blocks legitimate ACL updates. This rule does not apply to
+the application service account or public visitors.
 
-Apply the base settings only after explicit approval, keeping the policy:
+Yandex requires ACL WRITE together with READ; WRITE alone returns 501
+NotImplemented. The prefix policy still denies application listing and bucket
+configuration despite these base permissions. Apply the base settings only after
+explicit approval, keeping the policy:
 
 ```bash
 yc storage bucket update --name pacersreg-avatars-b1genq2j3vqm14gio5vl \
   --public-read \
+  --grants grantee-id=aje9jaio43ql5o6jjelm,grant-type=grant-type-account,permission=permission-read \
   --grants grantee-id=aje9jaio43ql5o6jjelm,grant-type=grant-type-account,permission=permission-write
 ```
 
