@@ -1,5 +1,5 @@
 <!doctype html>
-{% from '_icons.html' import icon %}
+{% from '_result_card.html' import result_card %}
 <html lang="ru">
   <head>
     {% include '_analytics.html' %}
@@ -10,6 +10,7 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
     <link rel="stylesheet" href="/static/styles.css?v=compact-header">
+    <link rel="stylesheet" href="/static/profiles.css?v=1">
     <script src="/static/registry.js?v=filters-only" defer></script>
   </head>
   <body>
@@ -84,7 +85,7 @@
               <header class="pacemaker-profile">
                 <span class="pacemaker-avatar" aria-hidden="true">{{ pacemaker.initials }}</span>
                 <div>
-                  <h2>{{ pacemaker.full_name }}</h2>
+                  <h2><a class="pacemaker-name-link" href="/pacemakers/{{ pacemaker.id }}?include_splits={{ 'true' if registry.include_splits else 'false' }}">{{ pacemaker.full_name }}</a></h2>
                   <span class="pacemaker-event-count" title="Количество выступлений за всю историю, включая разные дистанции одного соревнования">Выступлений: {{ pacemaker.performance_count }}</span>
                   <div
                     class="pacemaker-rating"
@@ -102,27 +103,7 @@
 
               <div class="results-strip">
                 {% for result in pacemaker.results %}
-                  <a
-                    class="result-summary"
-                    href="/results/{{ result.id }}?event_id={{ registry.selected_event_id or 0 }}&amp;include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}"
-                    aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time_display }}, факт {{ result.chip_time_display }}, отклонение {{ result.finish_difference_display }}, финиш {{ '%.1f'|format(result.finish_rating) }}, темп {% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating) }}{% else %}нет данных{% endif %}, итог {{ '%.1f'|format(result.rating) }} из 10"
-                  >
-                    <span class="result-summary-data">
-                      <span class="result-summary-head">
-                        <strong class="result-event-name" title="{{ result.event_name }}">{{ result.event_name }}</strong>
-                        <strong class="result-distance">{{ result.distance_km }} км</strong>
-                      </span>
-                      <span class="result-summary-times">
-                        <span class="result-time result-time--target" title="Цель — время на флаге">{{ icon('target') }}<span class="visually-hidden">Цель </span><strong>{{ result.target_time_display }}</strong></span>
-                        <span class="result-time result-time--actual" title="Факт — чип-тайм">{{ icon('clock') }}<span class="visually-hidden">Факт </span><span class="result-chip-time"><strong>{{ result.chip_time_display }}</strong><sup class="result-deviation" title="Отклонение от цели: минус — раньше, плюс — позже">({{ result.finish_difference_display }})</sup></span></span>
-                      </span>
-                      <span class="result-summary-ratings">
-                        <span class="result-score" style="{{ result.finish_rating | rating_color }}" title="Оценка за финиш">{{ icon('finish') }}<span class="visually-hidden">Финиш </span><strong>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }}</strong></span>
-                        <span class="result-score{% if result.splits_rating is none %} result-score--missing{% endif %}" {% if result.splits_rating is not none %}style="{{ result.splits_rating | rating_color }}"{% endif %} title="{% if result.splits_rating is none %}Недостаточно данных по отсечкам — это не нулевая оценка{% else %}Оценка за темп на отсечках{% if not registry.include_splits %} · не учитывается в итоге{% endif %}{% endif %}">{{ icon('pace') }}<span class="visually-hidden">Темп {% if result.splits_rating is none %}— нет данных{% endif %}</span><strong>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }}{% else %}—{% endif %}</strong></span>
-                        <span class="result-score result-score--total" style="{{ result.rating | rating_color }}" title="Итоговая оценка{% if not registry.include_splits %} · только финиш: учёт темпа выключен{% elif result.splits_rating is none %} · только финиш: недостаточно отсечек{% endif %}"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
-                      </span>
-                    </span>
-                  </a>
+                  {{ result_card(result, registry.include_splits, registry.selected_event_id or 0, registry.min_events) }}
 
                 {% endfor %}
               </div>

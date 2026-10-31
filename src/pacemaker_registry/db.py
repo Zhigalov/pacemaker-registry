@@ -16,7 +16,7 @@ from pacemaker_registry.russiarunning import (
 
 
 from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig
-from pacemaker_registry.models import Registry, RegistryEvent, RegistryPacemaker, ResultDetails
+from pacemaker_registry.models import Registry, RegistryEvent, RegistryPacemaker, ResultDetails, PacemakerProfile
 from pacemaker_registry.registry import _build_registry_result, _sort_pacemakers
 from pacemaker_registry.times import normalize_target_time
 
@@ -80,11 +80,52 @@ def connect_database() -> Connection[Any]:
 def check_database() -> None:
     """A reachable server without the application's schema is not ready."""
     with connect_database() as connection:
-        connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, p.last_name
+        connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, p.last_name,
+            p.motto, p.avatar_key, p.contacts, p.achievements, p.profile_version, p.profile_updated_at
             FROM race_results AS rr
             JOIN events AS e ON e.id = rr.event_id
             JOIN pacemakers AS p ON p.id = rr.pacemaker_id
             LIMIT 0""")
+
+
+def get_pacemaker_profile(pacemaker_id: int, include_splits: bool = True, *,
+                          with_results: bool = True) -> PacemakerProfile | None:
+    with connect_database() as connection:
+        connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+        row = connection.execute(
+            """SELECT id, last_name, first_name, motto, avatar_key, contacts, achievements, profile_version
+               FROM pacemakers WHERE id = %s""", (pacemaker_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        results = []
+        if with_results:
+            rows = connection.execute(
+                """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config,
+                          rr.id, rr.distance_km, rr.target_time, rr.chip_time,
+                          COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                              'segment_distance_km', point->'segment_distance_km',
+                              'pace_per_km', point->'pace_per_km'))
+                              FROM jsonb_array_elements(rr.checkpoints) AS point), '[]'::jsonb)
+                   FROM race_results rr JOIN events e ON e.id = rr.event_id
+                   WHERE rr.pacemaker_id = %s ORDER BY rr.created_at DESC, rr.id DESC""",
+                (pacemaker_id,),
+            ).fetchall()
+            for result in rows:
+                results.append(_build_registry_result(result[5], _event_from_row(result[:5]),
+                    *result[6:9], None, result[9], include_splits, details=False))
+    return PacemakerProfile(*row[:5], tuple(row[5]), tuple(row[6]), row[7], tuple(results))
+
+
+def save_pacemaker_profile(pacemaker_id: int, version: int, motto: str,
+                           contacts: list[dict], achievements: list[str], avatar_key: str | None) -> bool:
+    with connect_database() as connection:
+        return connection.execute(
+            """UPDATE pacemakers SET motto = %s, contacts = %s, achievements = %s, avatar_key = %s,
+                   profile_version = profile_version + 1, profile_updated_at = now()
+               WHERE id = %s AND profile_version = %s RETURNING id""",
+            (motto or None, Jsonb(contacts), Jsonb(achievements), avatar_key, pacemaker_id, version),
+        ).fetchone() is not None
 
 
 def get_event_target_time_type(source_event_id: str) -> str | None:

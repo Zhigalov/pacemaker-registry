@@ -70,6 +70,31 @@ class RegistryPacemaker:
 
 
 @dataclass(frozen=True, slots=True)
+class PacemakerProfile:
+    id: int
+    last_name: str
+    first_name: str
+    motto: str | None = None
+    avatar_key: str | None = None
+    contacts: tuple[dict[str, str], ...] = ()
+    achievements: tuple[str, ...] = ()
+    version: int = 0
+    results: tuple[RegistryCard, ...] = ()
+
+    @property
+    def full_name(self) -> str:
+        return f'{self.last_name} {self.first_name}'
+
+    @property
+    def initials(self) -> str:
+        return self.last_name[0] + self.first_name[0]
+
+    @property
+    def rating(self) -> float | None:
+        return sum(r.rating for r in self.results) / len(self.results) if self.results else None
+
+
+@dataclass(frozen=True, slots=True)
 class RegistryEvent:
     id: int
     name: str

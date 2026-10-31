@@ -53,7 +53,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
         connection.execute((migrate.MIGRATIONS_DIR / '0001_baseline.sql').read_text())
     first = sample()
     assert db.save_race_result(first, '00:50')
-    assert migrate.migrate() == ['0001_baseline.sql']
+    assert migrate.migrate() == ['0001_baseline.sql', '0002_pacemaker_profiles.sql']
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
 
@@ -155,7 +155,28 @@ def test_migration_failure_rolls_back_everything(database, tmp_path, monkeypatch
 
 def test_applied_migrations_are_immutable(database, tmp_path, monkeypatch):
     migrate.migrate()
+    for path in migrate.MIGRATIONS_DIR.glob('*.sql'):
+        (tmp_path / path.name).write_text(path.read_text())
     (tmp_path / '0001_baseline.sql').write_text('SELECT 1;')
     monkeypatch.setattr(migrate, 'MIGRATIONS_DIR', tmp_path)
     with pytest.raises(RuntimeError, match='has changed'):
         migrate.migrate()
+
+
+def test_profile_save_conflict_and_reimport_preserve_fields(database):
+    migrate.migrate()
+    assert db.save_race_result(sample(), '00:50')
+    pacemaker_id = db.load_registry().pacemakers[0].id
+    profile = db.get_pacemaker_profile(pacemaker_id)
+    assert profile.version == 0 and profile.contacts == profile.achievements == ()
+    assert len(profile.results) == 1
+    contacts = [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}]
+    assert db.save_pacemaker_profile(pacemaker_id, 0, 'Ведём вместе', contacts, ['pshp_graduate'], None)
+    assert not db.save_pacemaker_profile(pacemaker_id, 0, 'Overwrite', [], [], None)
+    assert db.save_race_result(sample(), '00:50')
+    changed = db.get_pacemaker_profile(pacemaker_id)
+    assert changed.motto == 'Ведём вместе' and changed.contacts == tuple(contacts)
+    assert changed.achievements == ('pshp_graduate',)
+    assert changed.version == 1 and len(changed.results) == 2
+    assert changed.results[0].rating == db.get_result_details(changed.results[0].id).result.rating
+    assert not db.get_pacemaker_profile(pacemaker_id, with_results=False).results

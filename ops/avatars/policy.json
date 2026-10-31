@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicAvatarRead",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::pacersreg-avatars-b1genq2j3vqm14gio5vl/avatars/*"
+    },
+    {
+      "Sid": "ApplicationAvatarWrite",
+      "Effect": "Allow",
+      "Principal": {"CanonicalUser": "aje9jaio43ql5o6jjelm"},
+      "Action": ["s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::pacersreg-avatars-b1genq2j3vqm14gio5vl/avatars/*"
+    }
+  ]
+}

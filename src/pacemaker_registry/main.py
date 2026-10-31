@@ -72,6 +72,9 @@ templates = Jinja2Templates(
 )
 templates.env.filters["rating_color"] = rating_color_style
 
+from pacemaker_registry.profile_routes import create_profile_router
+app.include_router(create_profile_router(templates))
+
 
 @app.get("/", response_class=HTMLResponse)
 def home(

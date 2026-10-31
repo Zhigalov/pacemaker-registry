@@ -1,0 +1,57 @@
+<!doctype html>
+{% from '_result_card.html' import result_card %}
+<html lang="ru">
+  <head>
+    {% include '_analytics.html' %}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ profile.full_name }} — Реестр пейсмейкеров</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
+    <link rel="stylesheet" href="/static/styles.css?v=compact-header">
+    <link rel="stylesheet" href="/static/profiles.css?v=1">
+    <script src="/static/profile.js?v=1" defer></script>
+  </head>
+  <body>
+    <main class="app-shell profile-shell">
+      {% include '_navigation.html' %}
+      <nav class="profile-breadcrumb"><a href="/">← Рейтинг пейсмейкеров</a></nav>
+      {% if saved %}<p class="success-message" role="status">Профиль сохранён.</p>{% endif %}
+      <section class="profile-intro" aria-labelledby="profile-name">
+        <div class="profile-avatar" aria-label="Фотография пейсмейкера">
+          <span>{{ profile.initials }}</span>
+          {% if avatar_url %}<img src="{{ avatar_url }}" alt="{{ profile.full_name }}" width="128" height="128" data-avatar-image>{% endif %}
+        </div>
+        <div class="profile-identity">
+          <h1 id="profile-name">{{ profile.full_name }}</h1>
+          {% if profile.motto %}<p class="profile-motto">{{ profile.motto }}</p>{% endif %}
+          {% if profile.achievements %}<ul class="profile-achievements" aria-label="Достижения">
+            {% for code in profile.achievements %}{% if code in achievement_types %}
+              <li><span aria-hidden="true">✦</span> {{ achievement_types[code] }}</li>
+            {% endif %}{% endfor %}
+          </ul>{% endif %}
+          {% if contacts %}<ul class="profile-contacts" aria-label="Контакты">
+            {% for contact in contacts %}<li>
+              {% if contact.href %}<a href="{{ contact.href }}"{% if not contact.href.startswith('tel:') %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ contact.label }} <span aria-hidden="true">↗</span></a>
+              {% else %}<span><strong>{{ contact.label }}</strong> {{ contact.value }}</span>{% endif %}
+            </li>{% endfor %}
+          </ul>{% endif %}
+        </div>
+        <a class="button profile-edit-link" href="/pacemakers/{{ profile.id }}/edit">Редактировать профиль</a>
+      </section>
+      <section class="profile-performances" aria-labelledby="performances-title">
+        <div class="profile-results-heading">
+          <h2 id="performances-title">Выступления <span>{{ profile.results|length }}</span></h2>
+          {% if profile.rating is not none %}<span class="profile-average" style="{{ profile.rating | rating_color }}">Рейтинг <strong>{{ '%.1f'|format(profile.rating)|replace('.', ',') }}</strong><small>/10</small></span>{% endif %}
+        </div>
+        <form class="profile-score-toggle" method="get">
+          <input type="hidden" name="include_splits" value="false">
+          <label><input type="checkbox" name="include_splits" value="true" data-profile-filter{% if include_splits %} checked{% endif %}> Учитывать темп в рейтинге</label>
+          <noscript><button class="button" type="submit">Показать</button></noscript>
+        </form>
+        {% if profile.results %}<div class="profile-results-grid">
+          {% for result in profile.results %}{{ result_card(result, include_splits) }}{% endfor %}
+        </div>{% else %}<p class="event-note">В реестре пока нет выступлений этого пейсмейкера.</p>{% endif %}
+      </section>
+    </main>
+  </body>
+</html>

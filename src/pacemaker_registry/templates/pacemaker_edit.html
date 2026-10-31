@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    {% include '_analytics.html' %}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Редактировать профиль · {{ profile.full_name }}</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
+    <link rel="stylesheet" href="/static/styles.css?v=compact-header">
+    <link rel="stylesheet" href="/static/profiles.css?v=1">
+    <script src="/static/profile.js?v=1" defer></script>
+  </head>
+  <body>
+    <main class="app-shell profile-shell">
+      {% include '_navigation.html' %}
+      <nav class="profile-breadcrumb"><a href="/pacemakers/{{ profile.id }}">← Профиль пейсмейкера</a></nav>
+      <div class="profile-edit-heading"><h1>Редактировать профиль</h1><p>{{ profile.full_name }}</p></div>
+      <form class="profile-form" action="/pacemakers/{{ profile.id }}/edit" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="profile_version" value="{{ values.profile_version }}">
+        {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
+        <section class="profile-form-section" aria-labelledby="photo-heading">
+          <h2 id="photo-heading">Фотография и девиз</h2>
+          <div class="profile-photo-controls">
+            <div class="profile-avatar"><span>{{ profile.initials }}</span><img data-avatar-preview{% if avatar_url %} src="{{ avatar_url }}"{% else %} hidden{% endif %} alt="Предпросмотр фотографии" width="128" height="128"></div>
+            <div>
+              <label for="profile-photo">Выбрать фотографию</label>
+              <input id="profile-photo" type="file" name="photo" accept="image/jpeg,image/png,image/webp" data-avatar-input aria-describedby="photo-hint">
+              <p class="event-note" id="photo-hint">JPEG, PNG или WebP · до 5 МБ и 16 мегапикселей. Фото обрезается до квадрата по центру.</p>
+              {% if avatar_url %}<label class="profile-checkbox"><input type="checkbox" name="remove_photo" value="true" data-avatar-remove> Удалить фотографию</label>{% endif %}
+            </div>
+          </div>
+          <label for="profile-motto">Девиз</label>
+          <textarea id="profile-motto" name="motto" maxlength="200" rows="2" placeholder="Что помогает вам вести группу вперёд">{{ values.motto }}</textarea>
+        </section>
+        <section class="profile-form-section" aria-labelledby="contacts-heading">
+          <h2 id="contacts-heading">Контакты</h2>
+          <p class="event-note">Указанные контакты будут видны всем посетителям. Ненужные поля оставьте пустыми.</p>
+          <div class="profile-contact-fields" data-contact-fields>
+            {% for contact in values.contacts %}
+              <div class="profile-contact-row{% if contact.type == 'other' %} profile-contact-row--other{% endif %}">
+                <input type="hidden" name="contact_type" value="{{ contact.type }}">
+                {% if contact.type == 'other' %}
+                  <label>Название<input type="text" name="contact_label" maxlength="60" value="{{ contact.label|default('') }}" placeholder="Например, сайт команды"></label>
+                {% else %}<input type="hidden" name="contact_label" value=""><label>{{ contact_types[contact.type][0] if contact.type in contact_types else 'Контакт' }}{% endif %}
+                {% if contact.type == 'other' %}<label>Ссылка или текст{% endif %}
+                  <input type="text" name="contact_value" maxlength="500" value="{{ contact.value }}" placeholder="{{ contact_types[contact.type][1] if contact.type in contact_types else '' }}">
+                </label>
+                {% if contact.type == 'other' %}<button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <button class="button profile-add-contact" type="button" data-add-contact>＋ Другой контакт</button>
+          <template id="other-contact-template"><div class="profile-contact-row profile-contact-row--other">
+            <input type="hidden" name="contact_type" value="other">
+            <label>Название<input name="contact_label" maxlength="60" placeholder="Например, сайт команды"></label>
+            <label>Ссылка или текст<input name="contact_value" maxlength="500" placeholder="https://…"></label>
+            <button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>
+          </div></template>
+        </section>
+        <section class="profile-form-section" aria-labelledby="achievements-heading">
+          <h2 id="achievements-heading">Достижения</h2>
+          {% for code, title in achievement_types.items() %}<label class="profile-checkbox"><input type="checkbox" name="achievements" value="{{ code }}"{% if code in values.achievements %} checked{% endif %}> {{ title }}</label>{% endfor %}
+        </section>
+        <div class="profile-form-actions"><button class="button button--primary" type="submit">Сохранить профиль</button><a class="button" href="/pacemakers/{{ profile.id }}">Отмена</a></div>
+      </form>
+    </main>
+  </body>
+</html>
