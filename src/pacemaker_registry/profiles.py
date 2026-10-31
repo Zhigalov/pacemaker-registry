@@ -93,8 +93,16 @@ def contact_view(contact: dict) -> dict:
             href = _web_url(value)
         except ValueError:
             pass
-    return {'label': contact.get('label') or CONTACT_TYPES.get(kind, ('Другое', ''))[0],
-            'value': value, 'href': href}
+    display_kind = kind
+    if kind == 'other' and href and not href.startswith('tel:'):
+        host = urlsplit(href).hostname.removeprefix('www.').lower()
+        display_kind = next((service for service, hosts in SERVICE_HOSTS.items() if host in hosts), 'other')
+    display_value = contact_input(dict(contact, type=display_kind)) if href else value
+    if display_kind in CONTACT_PREFIXES and not display_value.startswith(('http://', 'https://')):
+        display_value = '@' + display_value if '/' not in display_value else display_value
+    return {'label': contact.get('label') or CONTACT_TYPES.get(display_kind, ('Другое', ''))[0],
+            'value': value, 'display_value': display_value, 'href': href,
+            'icon': display_kind if display_kind in CONTACT_TYPES else 'other'}
 
 
 def profile_form_values(profile) -> dict:

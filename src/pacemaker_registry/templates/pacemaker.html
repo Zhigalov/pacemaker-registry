@@ -8,8 +8,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ profile.full_name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=compact-header">
-    <link rel="stylesheet" href="/static/profiles.css?v=2">
+    <link rel="stylesheet" href="/static/styles.css?v=profile-navigation">
+    <link rel="stylesheet" href="/static/profiles.css?v=3">
     <script src="/static/profile.js?v=2" defer></script>
   </head>
   <body>
@@ -32,8 +32,12 @@
           </ul>{% endif %}
           {% if contacts %}<ul class="profile-contacts" aria-label="Контакты">
             {% for contact in contacts %}<li>
-              {% if contact.href %}<a href="{{ contact.href }}"{% if not contact.href.startswith('tel:') %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ contact.label }} <span aria-hidden="true">↗</span></a>
-              {% else %}<span><strong>{{ contact.label }}</strong> {{ contact.value }}</span>{% endif %}
+              {% if contact.href %}<a class="profile-contact" href="{{ contact.href }}"{% if not contact.href.startswith('tel:') %} target="_blank" rel="noopener noreferrer"{% endif %}>
+              {% else %}<span class="profile-contact">{% endif %}
+                <img class="contact-brand-icon" src="/static/social-{{ contact.icon }}.svg" alt="" width="28" height="28" aria-hidden="true">
+                <span class="profile-contact-text"><strong>{{ contact.display_value }}</strong><small>{{ contact.label }}</small></span>
+                {% if contact.href %}<span class="profile-contact-arrow" aria-hidden="true">↗</span>{% endif %}
+              {% if contact.href %}</a>{% else %}</span>{% endif %}
             </li>{% endfor %}
           </ul>{% endif %}
         </div>

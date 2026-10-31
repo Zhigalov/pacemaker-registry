@@ -36,5 +36,7 @@ pacemaker_registry = [
     "static/*.js",
     "static/*.png",
     "static/*.jpg",
+    "static/*.svg",
+    "static/*.txt",
     "migrations/*.sql",
 ]

@@ -1,0 +1,9 @@
+Telegram, Instagram, WhatsApp, VK and Facebook paths: Simple Icons (CC0 1.0).
+https://github.com/simple-icons/simple-icons/tree/develop/icons
+https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md
+Brand colours are applied to the original SVG paths.
+
+MAX: official favicon from https://max.ru/favicon.svg (retrieved 2026-10-31).
+Original silhouette with a simplified blue/purple SVG gradient.
+Brand names and logos belong to their respective owners.
+Phone and generic link symbols are project SVG assets.

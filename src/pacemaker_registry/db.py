@@ -26,7 +26,7 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
         row = connection.execute(
             """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config,
                       p.last_name, p.first_name, rr.source_url, rr.id, rr.distance_km,
-                      rr.target_time, rr.chip_time, rr.pace, rr.checkpoints
+                      rr.target_time, rr.chip_time, rr.pace, rr.checkpoints, p.id
                FROM race_results AS rr
                JOIN events AS e ON e.id = rr.event_id
                JOIN pacemakers AS p ON p.id = rr.pacemaker_id
@@ -37,7 +37,8 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
     event = _event_from_row(row[:5])
     return ResultDetails(
         athlete_name=f"{row[5]} {row[6]}", source_url=row[7], event=event,
-        result=_build_registry_result(row[8], event, *row[9:], include_splits=include_splits),
+        result=_build_registry_result(row[8], event, *row[9:14], include_splits=include_splits),
+        pacemaker_id=row[14],
     )
 
 
@@ -186,7 +187,8 @@ def load_registry(
                     ))
                     FROM jsonb_array_elements(rr.checkpoints) AS point
                 ), '[]'::jsonb) AS segments,
-                history.total_result_count
+                history.total_result_count,
+                p.avatar_key
             FROM pacemakers AS p
             JOIN (
                 SELECT pacemaker_id, count(*) AS total_result_count
@@ -224,6 +226,7 @@ def load_registry(
             chip_time,
             checkpoints,
             total_result_count,
+            avatar_key,
         ) = row
         event_ids.add(event_id)
         pacemaker = grouped.setdefault(
@@ -233,6 +236,7 @@ def load_registry(
                 "initials": f"{last_name[0]}{first_name[0]}",
                 "results": [],
                 "total_result_count": total_result_count,
+                "avatar_key": avatar_key,
             },
         )
         pacemaker["results"].append(
@@ -252,6 +256,7 @@ def load_registry(
                 rating=rating,
                 results=results,
                 total_result_count=data["total_result_count"],
+                avatar_key=data["avatar_key"],
             )
         )
     return Registry(

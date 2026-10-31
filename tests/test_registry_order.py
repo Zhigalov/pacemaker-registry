@@ -34,13 +34,13 @@ def test_sort_uses_displayed_rating_then_performances_then_absolute_mean_then_na
 
 def test_min_events_uses_history_and_keeps_event_options(monkeypatch):
     events = [(1, "Первое", "round", None, None), (2, "Второе", "round", None, None)]
-    rows = [(i, "Тестов", str(i), i, 1, Decimal(10), "01:00", "00:59:59", [], count)
+    rows = [(i, "Тестов", str(i), i, 1, Decimal(10), "01:00", "00:59:59", [], count, None)
             for i, count in [(1, 1), (2, 3)]]
     class Connection:
         def __enter__(self): return self
         def __exit__(self, *_): pass
         def execute(self, query, parameters=()):
-            self.rows = events if "SELECT e.id" in query else [r for r in rows if r[-1] >= parameters[0]]
+            self.rows = events if "SELECT e.id" in query else [r for r in rows if r[9] >= parameters[0]]
             return self
         def fetchall(self): return self.rows
     monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)

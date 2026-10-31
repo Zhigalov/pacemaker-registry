@@ -9,7 +9,7 @@
 .profile-identity { min-width: 0; }
 .profile-identity h1, .profile-edit-heading h1 { margin: 0; font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.035em; line-height: 1.2; overflow-wrap: anywhere; }
 .profile-motto { margin: .65rem 0; color: #52655d; white-space: pre-line; overflow-wrap: anywhere; }
-.profile-achievements, .profile-contacts { display: flex; flex-wrap: wrap; gap: .5rem; list-style: none; margin: .9rem 0 0; padding: 0; }
+.profile-achievements { display: flex; flex-wrap: wrap; gap: .5rem; list-style: none; margin: .9rem 0 0; padding: 0; }
 .profile-achievements li { display: block; }
 .achievement-badge { position: relative; display: inline-flex; width: 3.25rem; height: 3.25rem; border: 1px solid #dce6e2; border-radius: .75rem; background: #fff; vertical-align: middle; cursor: help; }
 .achievement-image-window { display: block; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; }
@@ -21,9 +21,16 @@
 .achievement-choice { padding: .6rem; border: 1px solid #dce6e2; border-radius: .85rem; cursor: pointer; }
 .achievement-choice:has(input:checked) { background: #edf7f1; border-color: #8ebdad; }
 .achievement-choice .achievement-badge { cursor: inherit; }
-.profile-contacts li { max-width: 100%; }
-.profile-contacts a, .profile-contacts li > span { display: inline-block; padding: .45rem .65rem; border: 1px solid #dce6e2; border-radius: .6rem; color: #3b5349; text-decoration: none; font-size: .85rem; overflow-wrap: anywhere; }
-.profile-contacts a:hover { background: #f0f7f3; border-color: #8ebdad; }
+.profile-contacts { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 26rem; margin: 1.1rem 0 0; padding: .2rem .75rem; list-style: none; border: 1px solid #e3eae6; border-radius: .85rem; background: #fafcfb; }
+.profile-contacts li { min-width: 0; }
+.profile-contacts li + li { border-top: 1px solid #e7eeea; }
+.profile-contact { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; align-items: center; gap: .8rem; padding: .7rem .2rem; color: #263e33; text-decoration: none; border-radius: .4rem; }
+a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; background: #edf5f0; outline-offset: 2px; }
+.contact-brand-icon { display: block; width: 1.75rem; height: 1.75rem; object-fit: contain; }
+.profile-contact-text { display: grid; gap: .15rem; min-width: 0; overflow-wrap: anywhere; }
+.profile-contact-text strong { font-size: .9rem; font-weight: 650; line-height: 1.35; }
+.profile-contact-text small { font-size: .72rem; color: #73847b; }
+.profile-contact-arrow { color: #91a39a; font-size: .9rem; }
 .profile-edit-link { border-color: #dce6e2; color: #176f59; font-size: .8rem; }
 .profile-performances { margin-top: 2rem; }
 .profile-results-heading { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; }

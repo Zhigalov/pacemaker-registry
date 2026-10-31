@@ -8,9 +8,9 @@ from PIL import Image
 
 from pacemaker_registry import avatars, db
 from pacemaker_registry.main import app
-from pacemaker_registry.models import PacemakerProfile, RegistryCard
+from pacemaker_registry.models import PacemakerProfile, RegistryCard, Registry, RegistryPacemaker
 from pacemaker_registry.profile_routes import _save
-from pacemaker_registry.profiles import normalize_contacts, profile_form_values
+from pacemaker_registry.profiles import normalize_contacts, profile_form_values, contact_view
 
 
 @pytest.fixture
@@ -99,6 +99,30 @@ def test_existing_whatsapp_and_facebook_links_remain_editable_without_migration(
     ]
 
 
+@pytest.mark.parametrize('kind,value,display', [
+    ('telegram', 'https://t.me/pacer_one', '@pacer_one'),
+    ('instagram', 'https://instagram.com/pacer.one', '@pacer.one'),
+    ('vk', 'https://vk.com/id123', '@id123'),
+    ('facebook', 'https://facebook.com/pacer.one', '@pacer.one'),
+    ('max', 'https://max.ru/pacer_one', '@pacer_one'),
+    ('whatsapp', 'https://wa.me/79991234567', '+79991234567'),
+    ('phone', '+79991234567', '+79991234567'),
+])
+def test_contact_rows_show_handle_or_phone_and_matching_brand(kind, value, display):
+    view = contact_view({'type': kind, 'value': value})
+    assert view['display_value'] == display
+    assert view['icon'] == kind
+    assert view['href'] == ('tel:' + value if kind == 'phone' else value)
+
+
+def test_other_telegram_link_keeps_custom_label_and_gets_telegram_icon():
+    view = contact_view({'type': 'other', 'label': 'Глазами пейсмейкера', 'value': 'https://t.me/pacer_eyes'})
+    assert view['icon'] == 'telegram' and view['display_value'] == '@pacer_eyes'
+    assert view['label'] == 'Глазами пейсмейкера'
+    assert contact_view({'type': 'other', 'value': 'Без ссылки'})['href'] is None
+    assert contact_view({'type': 'other', 'value': 'javascript:alert(1)'})['href'] is None
+
+
 @pytest.mark.parametrize('kind,value', [('other', 'javascript:alert(1)'), ('vk', 'https://vk.com.evil.example/'),
     ('telegram', 'https://user:password@t.me/pacer_one'), ('phone', '123'), ('other', 'https://example.org/\nscript')])
 def test_unsafe_contacts_are_rejected(kind, value):
@@ -118,6 +142,8 @@ async def test_profile_cards_contacts_achievements_and_no_empty_motto(monkeypatc
     assert response.text.count('class="result-summary"') == 2
     assert 'class="profile-motto"' not in response.text
     assert 'href="https://t.me/pacer_one"' in response.text
+    assert 'src="/static/social-telegram.svg"' in response.text
+    assert '<strong>@pacer_one</strong>' in response.text
     assert 'Выпускник Первой школы пейсмейкеров' in response.text
     assert 'src="/static/first-pacers-school.jpg"' in response.text
     assert 'class="achievement-tooltip"' in response.text
@@ -203,3 +229,19 @@ async def test_missing_profile_is_404(monkeypatch):
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
         assert (await client.get('/pacemakers/999')).status_code == 404
         assert (await client.get('/pacemakers/999/edit')).status_code == 404
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('key,has_photo', [('avatars/7/' + 'a' * 32 + '.webp', True),
+                                         (None, False), ('https://evil.example/a.jpg', False)])
+async def test_registry_uses_saved_avatar_or_initials_and_links_profile(monkeypatch, key, has_photo):
+    monkeypatch.setenv('AVATAR_BUCKET', 'test-avatars')
+    pacer = RegistryPacemaker(7, 'Петров Пётр', 'ПП', 10, (), avatar_key=key)
+    monkeypatch.setattr('pacemaker_registry.main.load_registry', lambda *a, **k: Registry((pacer,), 0, 0))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get('/')
+    assert response.status_code == 200
+    assert 'ПП</span>' in response.text and 'href="/pacemakers/7?include_splits=true"' in response.text
+    assert ('loading="lazy"' in response.text) == has_photo
+    if has_photo:
+        assert 'https://storage.yandexcloud.net/test-avatars/' + key in response.text

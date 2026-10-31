@@ -9,9 +9,9 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=compact-header">
-    <link rel="stylesheet" href="/static/profiles.css?v=2">
-    <script src="/static/registry.js?v=filters-only" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=profile-navigation">
+    <link rel="stylesheet" href="/static/profiles.css?v=3">
+    <script src="/static/registry.js?v=avatars" defer></script>
   </head>
   <body>
     <main class="app-shell app-shell--registry">
@@ -83,7 +83,11 @@
           {% for pacemaker in registry.pacemakers %}
             <article class="pacemaker-row">
               <header class="pacemaker-profile">
-                <span class="pacemaker-avatar" aria-hidden="true">{{ pacemaker.initials }}</span>
+                <a class="pacemaker-avatar" href="/pacemakers/{{ pacemaker.id }}?include_splits={{ 'true' if registry.include_splits else 'false' }}" aria-label="Профиль: {{ pacemaker.full_name }}">
+                  <span aria-hidden="true">{{ pacemaker.initials }}</span>
+                  {% set photo_url = pacemaker.avatar_key | avatar_url %}
+                  {% if photo_url %}<img src="{{ photo_url }}" alt="" width="45" height="45" loading="lazy" decoding="async" data-avatar-image>{% endif %}
+                </a>
                 <div>
                   <h2><a class="pacemaker-name-link" href="/pacemakers/{{ pacemaker.id }}?include_splits={{ 'true' if registry.include_splits else 'false' }}">{{ pacemaker.full_name }}</a></h2>
                   <span class="pacemaker-event-count" title="Количество выступлений за всю историю, включая разные дистанции одного соревнования">Выступлений: {{ pacemaker.performance_count }}</span>

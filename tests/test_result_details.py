@@ -22,7 +22,7 @@ def details(checkpoints=None, include_splits=True):
         checkpoints = tuple({'distance_km': str(i), 'segment_distance_km': '1',
                              'time': f'{i * 5}:00', 'pace_per_km': '05:00'} for i in range(1, 43))
     result = db._build_registry_result(12, event, Decimal('42.2'), '03:30', '03:29:55', '04:58 /км', checkpoints, include_splits)
-    return db.ResultDetails('Тестов <Первый>', 'https://results.runc.run/event/marathon/result/123/', event, result)
+    return db.ResultDetails('Тестов <Первый>', 'https://results.runc.run/event/marathon/result/123/', event, result, pacemaker_id=7)
 
 
 @pytest.mark.anyio
@@ -49,6 +49,8 @@ async def test_detail_renders_every_split_readonly_graphs_and_context(monkeypatc
     assert marker_sets[1][0]['deviation'] == pytest.approx(300 - 12600 / 42.2)
     assert 'href="/?event_id=1&amp;include_splits=true&amp;min_events=3"' in response.text
     assert 'href="/events/1"' in response.text
+    assert 'href="/pacemakers/7?include_splits=true"' in response.text
+    assert 'Профиль пейсмейкера →' in response.text
     assert 'href="https://results.runc.run/event/marathon/"' in response.text
     assert 'href="https://results.runc.run/event/marathon/result/123/"' in response.text
 
@@ -101,7 +103,7 @@ def test_single_result_query_matches_registry_scoring(monkeypatch):
     event, result = sample.event, sample.result
     row = (event.id, event.name, event.target_time_type, asdict(event.formula), asdict(event.pace_formula),
            'Тестов', '<Первый>', sample.source_url, result.id, Decimal('42.2'), result.target_time,
-           result.chip_time, result.actual_pace, list(result.checkpoints))
+           result.chip_time, result.actual_pace, list(result.checkpoints), sample.pacemaker_id)
     calls = []
     class Connection:
         def __enter__(self): return self
@@ -164,7 +166,7 @@ async def test_edit_flag_redirects_preserves_filters_and_recalculates(monkeypatc
         result = db._build_registry_result(result_id, sample.event, Decimal('42.2'), target,
                                           sample.result.chip_time, sample.result.actual_pace,
                                           sample.result.checkpoints, include_splits)
-        return db.ResultDetails(sample.athlete_name, sample.source_url, sample.event, result)
+        return db.ResultDetails(sample.athlete_name, sample.source_url, sample.event, result, sample.pacemaker_id)
     def save(result_id, value, previous):
         nonlocal target
         calls.append((result_id, value, previous))

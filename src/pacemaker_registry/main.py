@@ -37,6 +37,7 @@ from pacemaker_registry.russiarunning import (
 )
 from pacemaker_registry.sources import load_race_result, result_source_links as _result_source_links
 from pacemaker_registry.times import normalize_target_time
+from pacemaker_registry.avatars import avatar_url
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -71,6 +72,7 @@ templates = Jinja2Templates(
     directory=PACKAGE_DIR / "templates", context_processors=[analytics_context],
 )
 templates.env.filters["rating_color"] = rating_color_style
+templates.env.filters["avatar_url"] = avatar_url
 
 from pacemaker_registry.profile_routes import create_profile_router
 app.include_router(create_profile_router(templates))

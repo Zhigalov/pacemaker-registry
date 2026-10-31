@@ -3,11 +3,13 @@ const assert = require('node:assert/strict');
 const {readFileSync} = require('node:fs');
 const {runInNewContext} = require('node:vm');
 
-test('registry script only auto-submits filters, without card hover handlers', () => {
+test('registry filters auto-submit and broken avatar falls back to initials', () => {
   const handlers = [];
+  const image = {hidden: false, addEventListener: (type, fn) => { assert.equal(type, 'error'); image.onError = fn; }};
   let submitted = 0;
   const document = {
     querySelectorAll: (selector) => {
+      if (selector === '[data-avatar-image]') return [image];
       assert.equal(selector, '[data-registry-filter]');
       return [
         {form: {requestSubmit: () => submitted++}, addEventListener: (type, fn) => handlers.push([type, fn])},
@@ -19,4 +21,6 @@ test('registry script only auto-submits filters, without card hover handlers', (
   assert.deepEqual(handlers.map(([type]) => type), ['change', 'change']);
   handlers.forEach(([, fn]) => fn());
   assert.equal(submitted, 1);
+  image.onError();
+  assert.equal(image.hidden, true);
 });

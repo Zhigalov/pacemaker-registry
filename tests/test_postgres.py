@@ -171,12 +171,15 @@ def test_profile_save_conflict_and_reimport_preserve_fields(database):
     assert profile.version == 0 and profile.contacts == profile.achievements == ()
     assert len(profile.results) == 1
     contacts = [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}]
-    assert db.save_pacemaker_profile(pacemaker_id, 0, 'Ведём вместе', contacts, ['pshp_graduate'], None)
+    avatar = f'avatars/{pacemaker_id}/' + 'a' * 32 + '.webp'
+    assert db.save_pacemaker_profile(pacemaker_id, 0, 'Ведём вместе', contacts, ['pshp_graduate'], avatar)
     assert not db.save_pacemaker_profile(pacemaker_id, 0, 'Overwrite', [], [], None)
     assert db.save_race_result(sample(), '00:50')
     changed = db.get_pacemaker_profile(pacemaker_id)
     assert changed.motto == 'Ведём вместе' and changed.contacts == tuple(contacts)
     assert changed.achievements == ('pshp_graduate',)
     assert changed.version == 1 and len(changed.results) == 2
+    assert changed.avatar_key == db.load_registry().pacemakers[0].avatar_key == avatar
+    assert db.get_result_details(changed.results[0].id).pacemaker_id == pacemaker_id
     assert changed.results[0].rating == db.get_result_details(changed.results[0].id).result.rating
     assert not db.get_pacemaker_profile(pacemaker_id, with_results=False).results

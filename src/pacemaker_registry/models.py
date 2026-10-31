@@ -58,6 +58,7 @@ class RegistryPacemaker:
     rating: float
     results: tuple[RegistryCard, ...]
     total_result_count: int = 0
+    avatar_key: str | None = None
 
     @property
     def performance_count(self) -> int:
@@ -128,3 +129,4 @@ class ResultDetails:
     source_url: str
     event: RegistryEvent
     result: RegistryResult
+    pacemaker_id: int
