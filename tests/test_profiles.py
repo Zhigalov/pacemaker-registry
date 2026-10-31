@@ -10,7 +10,7 @@ from pacemaker_registry import avatars, db
 from pacemaker_registry.main import app
 from pacemaker_registry.models import PacemakerProfile, RegistryCard
 from pacemaker_registry.profile_routes import _save
-from pacemaker_registry.profiles import normalize_contacts
+from pacemaker_registry.profiles import normalize_contacts, profile_form_values
 
 
 @pytest.fixture
@@ -57,6 +57,48 @@ def test_contact_normalization_and_plain_other():
     ]
 
 
+@pytest.mark.parametrize('kind,nick,url', [
+    ('telegram', '@pacer_one', 'https://t.me/pacer_one'),
+    ('instagram', 'pacer.one', 'https://instagram.com/pacer.one'),
+    ('vk', 'id123456', 'https://vk.com/id123456'),
+    ('facebook', '@pacer.one', 'https://facebook.com/pacer.one'),
+    ('max', 'pacer_one', 'https://max.ru/pacer_one'),
+    ('max', 'u/profile_code', 'https://max.ru/u/profile_code'),
+])
+def test_social_handles_build_canonical_urls_and_prefill_as_handles(kind, nick, url):
+    contacts = normalize_contacts([{'type': kind, 'value': nick}])
+    assert contacts == [{'type': kind, 'value': url}]
+    values = profile_form_values(profile(contacts=tuple(contacts)))
+    row = next(c for c in values['contacts'] if c['type'] == kind)
+    assert row['value'] == nick.removeprefix('@')
+    assert normalize_contacts(values['contacts']) == contacts
+
+
+@pytest.mark.parametrize('kind,value', [
+    ('telegram', 'https://t.me/pacer_one'), ('instagram', 'instagram.com/pacer'),
+    ('vk', 'https://vk.com/id123'), ('facebook', 'pacer?redirect=bad'),
+    ('max', 'https://max.ru/u/pacer'), ('whatsapp', 'https://wa.me/79991234567'),
+    ('telegram', '@@pacer_one'), ('instagram', 'name with spaces'),
+])
+def test_social_inputs_reject_urls_or_non_handles(kind, value):
+    with pytest.raises(ValueError):
+        normalize_contacts([{'type': kind, 'value': value}])
+
+
+def test_existing_whatsapp_and_facebook_links_remain_editable_without_migration():
+    values = profile_form_values(profile(contacts=(
+        {'type': 'whatsapp', 'value': 'https://wa.me/79991234567'},
+        {'type': 'facebook', 'value': 'https://www.facebook.com/profile.php?id=123456'},
+    )))
+    nonempty = [c for c in values['contacts'] if c['value']]
+    assert nonempty == [{'type': 'whatsapp', 'value': '+79991234567'},
+                        {'type': 'facebook', 'value': '123456'}]
+    assert normalize_contacts(values['contacts']) == [
+        {'type': 'whatsapp', 'value': 'https://wa.me/79991234567'},
+        {'type': 'facebook', 'value': 'https://facebook.com/123456'},
+    ]
+
+
 @pytest.mark.parametrize('kind,value', [('other', 'javascript:alert(1)'), ('vk', 'https://vk.com.evil.example/'),
     ('telegram', 'https://user:password@t.me/pacer_one'), ('phone', '123'), ('other', 'https://example.org/\nscript')])
 def test_unsafe_contacts_are_rejected(kind, value):
@@ -77,6 +119,8 @@ async def test_profile_cards_contacts_achievements_and_no_empty_motto(monkeypatc
     assert 'class="profile-motto"' not in response.text
     assert 'href="https://t.me/pacer_one"' in response.text
     assert 'Выпускник Первой школы пейсмейкеров' in response.text
+    assert 'src="/static/first-pacers-school.jpg"' in response.text
+    assert 'class="achievement-tooltip"' in response.text
     assert 'не подтвержден' not in response.text
     assert 'href="/pacemakers/7/edit"' in response.text
 
@@ -95,6 +139,9 @@ async def test_edit_ignores_tampered_name_and_saves_only_profile(monkeypatch):
     save.assert_called_once_with(7, 0, 'Ведём вместе',
         [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}], ['pshp_graduate'], None)
     assert 'name="first_name"' not in edit.text and 'name="last_name"' not in edit.text
+    assert 'Выбрать фото</label>' in edit.text
+    assert 'Файл не выбран' in edit.text
+    assert 'class="visually-hidden" id="profile-photo"' in edit.text
 
 
 @pytest.mark.anyio

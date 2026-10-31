@@ -1,0 +1,6 @@
+{% macro achievement_badge(code, achievement, focusable=false) -%}
+<span class="achievement-badge"{% if focusable %} tabindex="0" aria-label="{{ achievement.title }}"{% endif %}>
+  <span class="achievement-image-window"><img src="{{ achievement.image }}" alt="{{ achievement.title }}" width="64" height="64"></span>
+  <span class="achievement-tooltip" id="achievement-{{ code }}" role="tooltip">{{ achievement.title }}</span>
+</span>
+{%- endmacro %}

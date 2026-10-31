@@ -10,7 +10,17 @@
 .profile-identity h1, .profile-edit-heading h1 { margin: 0; font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.035em; line-height: 1.2; overflow-wrap: anywhere; }
 .profile-motto { margin: .65rem 0; color: #52655d; white-space: pre-line; overflow-wrap: anywhere; }
 .profile-achievements, .profile-contacts { display: flex; flex-wrap: wrap; gap: .5rem; list-style: none; margin: .9rem 0 0; padding: 0; }
-.profile-achievements li { background: #e9f5ee; color: #176f59; padding: .45rem .65rem; border-radius: .6rem; font-size: .8rem; }
+.profile-achievements li { display: block; }
+.achievement-badge { position: relative; display: inline-flex; width: 3.25rem; height: 3.25rem; border: 1px solid #dce6e2; border-radius: .75rem; background: #fff; vertical-align: middle; cursor: help; }
+.achievement-image-window { display: block; width: 100%; height: 100%; overflow: hidden; border-radius: inherit; }
+.achievement-image-window img { display: block; width: 145%; height: 145%; max-width: none; object-fit: contain; transform: translate(-15.52%, -15.52%); }
+.achievement-tooltip { position: absolute; bottom: calc(100% + .5rem); left: 0; z-index: 5; width: max-content; max-width: min(17rem, 72vw); padding: .55rem .7rem; border-radius: .6rem; background: #243c32; color: #fff; font-size: .75rem; font-weight: 450; line-height: 1.4; box-shadow: 0 .3rem 1rem #17231f24; opacity: 0; visibility: hidden; pointer-events: none; }
+.achievement-badge:hover .achievement-tooltip, .achievement-badge:focus-visible .achievement-tooltip, .achievement-choice:focus-within .achievement-tooltip { visibility: visible; opacity: 1; }
+.achievement-badge:focus-visible { outline: 2px solid #176f59; outline-offset: 3px; }
+.profile-achievement-choices { display: flex; flex-wrap: wrap; gap: 1rem; }
+.achievement-choice { padding: .6rem; border: 1px solid #dce6e2; border-radius: .85rem; cursor: pointer; }
+.achievement-choice:has(input:checked) { background: #edf7f1; border-color: #8ebdad; }
+.achievement-choice .achievement-badge { cursor: inherit; }
 .profile-contacts li { max-width: 100%; }
 .profile-contacts a, .profile-contacts li > span { display: inline-block; padding: .45rem .65rem; border: 1px solid #dce6e2; border-radius: .6rem; color: #3b5349; text-decoration: none; font-size: .85rem; overflow-wrap: anywhere; }
 .profile-contacts a:hover { background: #f0f7f3; border-color: #8ebdad; }
@@ -38,6 +48,16 @@
 .profile-form input:focus-visible, .profile-form textarea:focus-visible { outline: 2px solid #176f59; outline-offset: 2px; }
 .profile-photo-controls { display: grid; grid-template-columns: 8rem minmax(0, 1fr); align-items: center; gap: 1.25rem; margin-bottom: 1.4rem; }
 .profile-photo-controls input[type="file"] { display: block; max-width: 100%; min-height: 0; padding: 0; border: 0; margin-top: .6rem; font: inherit; font-size: .8rem; }
+.photo-picker { position: relative; display: inline-flex; }
+.profile-form .photo-picker-button { min-height: 2.8rem; margin: 0; background: #e9f4ee; border-color: #b9d7c8; color: #176f59; cursor: pointer; }
+.photo-picker-button:hover { background: #dceee3; }
+.photo-picker input:focus-visible + .photo-picker-button { outline: 2px solid #176f59; outline-offset: 3px; }
+.photo-filename { display: block; margin-top: .55rem; color: #64756d; font-size: .8rem; overflow-wrap: anywhere; }
+.profile-handle-input { display: flex; align-items: center; min-width: 0; margin-top: .4rem; border: 1px solid #cddbd5; border-radius: .65rem; overflow: hidden; }
+.profile-handle-prefix { flex: 0 0 auto; padding-left: .7rem; color: #71807b; font-size: .8rem; font-weight: 400; }
+.profile-form .profile-handle-input input { min-width: 0; margin: 0; border: 0; border-radius: 0; padding-left: .3rem; }
+.profile-handle-input:focus-within { outline: 2px solid #176f59; outline-offset: 2px; }
+.profile-form .profile-handle-input input:focus-visible { outline: 0; }
 .profile-contact-fields { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
 .profile-contact-row { min-width: 0; }
 .profile-contact-row--other { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: .65rem; align-items: end; }

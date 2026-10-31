@@ -17,10 +17,12 @@
   const preview = document.querySelector('[data-avatar-preview]');
   const remove = document.querySelector('[data-avatar-remove]');
   const original = preview?.getAttribute('src');
+  const filename = document.querySelector('[data-photo-filename]');
   let objectURL;
   input?.addEventListener('change', () => {
     if (objectURL) URL.revokeObjectURL(objectURL);
     const file = input.files[0];
+    if (filename) filename.textContent = file ? file.name : 'Файл не выбран';
     input.setCustomValidity(file && file.size > 5 * 1024 * 1024 ? 'Выберите фотографию размером до 5 МБ.' : '');
     if (!input.checkValidity()) { input.reportValidity(); return; }
     if (file) {
@@ -34,7 +36,7 @@
     }
   });
   remove?.addEventListener('change', () => {
-    if (remove.checked) { input.value = ''; input.setCustomValidity(''); preview.hidden = true; }
-    else if (original) { preview.src = original; preview.hidden = false; }
+    if (remove.checked) { input.value = ''; input.setCustomValidity(''); preview.hidden = true; if (filename) filename.textContent = 'Фотография будет удалена'; }
+    else if (original) { preview.src = original; preview.hidden = false; if (filename) filename.textContent = 'Файл не выбран'; }
   });
 })();

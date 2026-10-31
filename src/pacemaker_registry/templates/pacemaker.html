@@ -1,5 +1,6 @@
 <!doctype html>
 {% from '_result_card.html' import result_card %}
+{% from '_achievement.html' import achievement_badge %}
 <html lang="ru">
   <head>
     {% include '_analytics.html' %}
@@ -8,8 +9,8 @@
     <title>{{ profile.full_name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
     <link rel="stylesheet" href="/static/styles.css?v=compact-header">
-    <link rel="stylesheet" href="/static/profiles.css?v=1">
-    <script src="/static/profile.js?v=1" defer></script>
+    <link rel="stylesheet" href="/static/profiles.css?v=2">
+    <script src="/static/profile.js?v=2" defer></script>
   </head>
   <body>
     <main class="app-shell profile-shell">
@@ -26,7 +27,7 @@
           {% if profile.motto %}<p class="profile-motto">{{ profile.motto }}</p>{% endif %}
           {% if profile.achievements %}<ul class="profile-achievements" aria-label="Достижения">
             {% for code in profile.achievements %}{% if code in achievement_types %}
-              <li><span aria-hidden="true">✦</span> {{ achievement_types[code] }}</li>
+              <li>{{ achievement_badge(code, achievement_types[code], true) }}</li>
             {% endif %}{% endfor %}
           </ul>{% endif %}
           {% if contacts %}<ul class="profile-contacts" aria-label="Контакты">

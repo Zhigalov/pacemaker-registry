@@ -20,8 +20,10 @@ otherwise the policy blocks legitimate ACL updates. This rule does not apply to
 the application service account or public visitors.
 
 Yandex requires ACL WRITE together with READ; WRITE alone returns 501
-NotImplemented. The prefix policy still denies application listing and bucket
-configuration despite these base permissions. Apply the base settings only after
+NotImplemented. The prefix policy still denies application listing, ACL/CORS
+reads and writes outside `avatars/*`. S3 allows the application to read the bucket
+policy itself with the required base READ permission; public policy reads remain
+denied. Apply the base settings only after
 explicit approval, keeping the policy:
 
 ```bash

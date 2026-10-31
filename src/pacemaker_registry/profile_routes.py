@@ -9,7 +9,7 @@ from starlette.datastructures import UploadFile
 
 from pacemaker_registry import avatars, db
 from pacemaker_registry.profiles import (
-    ACHIEVEMENTS, CONTACT_TYPES, contact_view, normalize_contacts, profile_form_values,
+    ACHIEVEMENTS, CONTACT_TYPES, CONTACT_PREFIXES, contact_view, normalize_contacts, profile_form_values,
 )
 
 
@@ -52,7 +52,8 @@ def create_profile_router(templates):
         return templates.TemplateResponse(request=request, name='pacemaker_edit.html',
             context={'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
                      'values': profile_form_values(profile) if values is None else values,
-                     'contact_types': CONTACT_TYPES, 'achievement_types': ACHIEVEMENTS, 'error': error},
+                     'contact_types': CONTACT_TYPES, 'contact_prefixes': CONTACT_PREFIXES,
+                     'achievement_types': ACHIEVEMENTS, 'error': error},
             status_code=status_code)
 
     @router.get('/pacemakers/{pacemaker_id}')

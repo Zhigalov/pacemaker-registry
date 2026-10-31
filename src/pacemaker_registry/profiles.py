@@ -1,19 +1,26 @@
 """Profile values and contact links; imported names are never edited here."""
 import re
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
 CONTACT_TYPES = {
-    'telegram': ('Telegram', 'https://t.me/username'),
-    'instagram': ('Instagram', 'https://instagram.com/username'),
+    'telegram': ('Telegram', 'username'),
+    'instagram': ('Instagram', 'username'),
     'whatsapp': ('WhatsApp', '+7 999 123-45-67'),
-    'max': ('MAX', 'https://max.ru/…'),
+    'max': ('MAX', 'username или u/код профиля'),
     'phone': ('Телефон', '+7 999 123-45-67'),
-    'vk': ('ВКонтакте', 'https://vk.com/username'),
-    'facebook': ('Facebook', 'https://facebook.com/username'),
+    'vk': ('ВКонтакте', 'username или id123456'),
+    'facebook': ('Facebook', 'username'),
     'other': ('Другое', 'Ссылка или текст'),
 }
-ACHIEVEMENTS = {'pshp_graduate': 'Выпускник Первой школы пейсмейкеров'}
+ACHIEVEMENTS = {'pshp_graduate': {
+    'title': 'Выпускник Первой школы пейсмейкеров',
+    'image': '/static/first-pacers-school.jpg',
+}}
+CONTACT_PREFIXES = {
+    'telegram': 'https://t.me/', 'instagram': 'https://instagram.com/',
+    'max': 'https://max.ru/', 'vk': 'https://vk.com/', 'facebook': 'https://facebook.com/',
+}
 SERVICE_HOSTS = {
     'telegram': ('t.me', 'telegram.me'),
     'instagram': ('instagram.com',),
@@ -49,7 +56,7 @@ def normalize_contacts(rows: list[dict]) -> list[dict[str, str]]:
             continue
         if kind not in CONTACT_TYPES or len(value) > 500 or len(label) > 60:
             raise ValueError('Проверьте тип и длину контакта (до 500 символов, подпись — до 60).')
-        if kind == 'phone' or (kind == 'whatsapp' and not value.startswith(('http://', 'https://'))):
+        if kind in {'phone', 'whatsapp'}:
             number = re.sub(r'[\s()\-]', '', value)
             if not re.fullmatch(r'\+[1-9][0-9]{6,14}', number):
                 raise ValueError('Укажите телефон с кодом страны, например +7 999 123-45-67.')
@@ -60,12 +67,13 @@ def normalize_contacts(rows: list[dict]) -> list[dict[str, str]]:
             elif re.match(r'(?i)^[a-z][a-z0-9+.-]*:', value):
                 raise ValueError('Для ссылки «Другое» используйте http:// или https://.')
         else:
-            if kind == 'telegram' and re.fullmatch(r'@?[A-Za-z0-9_]{5,32}', value):
-                value = 'https://t.me/' + value.lstrip('@')
-            value = _web_url(value)
-            hostname = urlsplit(value).hostname.removeprefix('www.').lower()
-            if hostname not in SERVICE_HOSTS[kind]:
-                raise ValueError(f'Укажите ссылку на {CONTACT_TYPES[kind][0]}.')
+            nickname = value.removeprefix('@')
+            pattern = {'telegram': r'[A-Za-z0-9_]{5,32}', 'instagram': r'[A-Za-z0-9_.]{1,30}',
+                       'max': r'(?:u/)?[A-Za-z0-9_][A-Za-z0-9_.-]{0,199}'}.get(
+                           kind, r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}')
+            if not re.fullmatch(pattern, nickname):
+                raise ValueError(f'{CONTACT_TYPES[kind][0]}: укажите ник без ссылки и пробелов, например username.')
+            value = CONTACT_PREFIXES[kind] + nickname
         contact = {'type': kind, 'value': value}
         if kind == 'other' and label:
             contact['label'] = label
@@ -96,7 +104,24 @@ def profile_form_values(profile) -> dict:
         if kind == 'other':
             continue
         matches = [c for c in contacts if c['type'] == kind]
-        rows.extend(matches or [{'type': kind, 'value': ''}])
+        rows.extend([dict(c, value=contact_input(c)) for c in matches] or [{'type': kind, 'value': ''}])
     rows.extend(c for c in contacts if c['type'] == 'other')
     return {'motto': profile.motto or '', 'contacts': rows,
             'achievements': list(profile.achievements), 'profile_version': profile.version}
+
+
+def contact_input(contact: dict) -> str:
+    """Existing canonical URLs become editable handles; no data migration needed."""
+    kind, value = contact['type'], contact['value']
+    if kind not in SERVICE_HOSTS or not value.startswith(('https://', 'http://')):
+        return value
+    parsed = urlsplit(value)
+    if not parsed.hostname or parsed.hostname.removeprefix('www.').lower() not in SERVICE_HOSTS[kind]:
+        return value
+    path = parsed.path.strip('/')
+    if kind == 'whatsapp':
+        number = parse_qs(parsed.query).get('phone', [path])[0]
+        return '+' + number.lstrip('+')
+    if kind == 'facebook' and path == 'profile.php':
+        return parse_qs(parsed.query).get('id', [value])[0]
+    return path
