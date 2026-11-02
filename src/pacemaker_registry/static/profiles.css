@@ -80,7 +80,6 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .profile-edit-link { align-self: start; border-color: #dce6e2; color: #176f59; background: #f3f8f5; font-size: .8rem; }
 .profile-information { display: grid; grid-template-columns: minmax(0, 1fr) 18.5rem; align-items: start; gap: 1rem; margin-top: 1rem; }
 .profile-information:not(:has(.profile-contact-panel)) { grid-template-columns: minmax(0, 1fr); }
-.profile-information--contacts-only { grid-template-columns: minmax(0, 26rem); }
 .profile-story { display: grid; gap: 1rem; min-width: 0; }
 .profile-panel { min-width: 0; padding: 1.1rem 1.25rem; border: 1px solid #dce6e2; border-radius: 1rem; background: #fff; }
 .profile-panel h2 { font-size: 1rem; margin: 0 0 .75rem; }
@@ -94,7 +93,7 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .profile-record > span { display: flex; justify-content: space-between; gap: .3rem; font-size: .75rem; color: #64756d; }
 .profile-record strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .profile-record small { color: #64756d; font-size: .7rem; }
-.profile-performances { margin-top: 1.5rem; }
+.profile-performances { margin-top: .5rem; }
 .profile-form-actions .button:not(.button--primary) { color: #176f59; background: #edf5f0; border-color: #cdded4; }
 .profile-form-actions .button:not(.button--primary):hover { background: #dfede5; }
 .contact-field-hint { display: block; margin-top: .4rem; color: #64756d; font-weight: 400; font-size: .75rem; line-height: 1.4; }
@@ -110,7 +109,11 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
   .profile-record-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 42rem) {
-  .profile-information { grid-template-columns: minmax(0, 1fr); }
+  .profile-information { display: flex; flex-direction: column; }
+  .profile-story { display: contents; }
+  .profile-panel, .profile-performances { width: 100%; }
+  .profile-contact-panel { order: 2; }
+  .profile-performances { order: 3; }
   .profile-intro { grid-template-columns: 4.25rem minmax(0, 1fr); padding: 1rem; gap: .85rem; }
   .profile-intro .profile-avatar { width: 4.25rem; height: 4.25rem; align-self: start; }
   .profile-edit-link { grid-column: 1 / -1; justify-self: start; }

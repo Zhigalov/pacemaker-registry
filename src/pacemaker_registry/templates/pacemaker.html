@@ -9,7 +9,7 @@
     <title>{{ profile.full_name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
     <link rel="stylesheet" href="/static/styles.css?v=profile-navigation">
-    <link rel="stylesheet" href="/static/profiles.css?v=5">
+    <link rel="stylesheet" href="/static/profiles.css?v=6">
     <script src="/static/profile.js?v=2" defer></script>
   </head>
   <body>
@@ -38,9 +38,8 @@
         </div>
         <a class="button profile-edit-link" href="/pacemakers/{{ profile.id }}/edit">Редактировать профиль</a>
       </section>
-      {% if profile.about or profile.personal_records or contacts %}
-      <div class="profile-information{% if not profile.about and not profile.personal_records %} profile-information--contacts-only{% endif %}">
-        {% if profile.about or profile.personal_records %}<div class="profile-story">
+      <div class="profile-information">
+        <div class="profile-story">
           {% if profile.about %}<section class="profile-panel profile-about" aria-labelledby="about-title"><h2 id="about-title">О себе</h2><p>{{ profile.about }}</p></section>{% endif %}
           {% if profile.personal_records %}<section class="profile-panel profile-records" aria-labelledby="records-title">
             <h2 id="records-title">Личные рекорды</h2><div class="profile-record-grid">
@@ -50,20 +49,6 @@
               </a>
             {% endif %}{% endfor %}</div>
           </section>{% endif %}
-        </div>{% endif %}
-        {% if contacts %}<aside class="profile-panel profile-contact-panel" aria-labelledby="contact-title"><h2 id="contact-title">Контакты</h2>
-          {% if contacts %}<ul class="profile-contacts" aria-label="Контакты">
-            {% for contact in contacts %}<li>
-              {% if contact.href %}<a class="profile-contact" href="{{ contact.href }}"{% if not contact.href.startswith('tel:') %} target="_blank" rel="noopener noreferrer"{% endif %}>
-              {% else %}<span class="profile-contact">{% endif %}
-                <img class="contact-brand-icon" src="/static/social-{{ contact.icon }}.svg" alt="" width="28" height="28" aria-hidden="true">
-                <span class="profile-contact-text"><strong>{{ contact.display_value }}</strong><small>{{ contact.label }}</small></span>
-                {% if contact.href %}<span class="profile-contact-arrow" aria-hidden="true">↗</span>{% endif %}
-              {% if contact.href %}</a>{% else %}</span>{% endif %}
-            </li>{% endfor %}
-          </ul>{% endif %}
-        </aside>{% endif %}
-      </div>{% endif %}
       <section class="profile-performances" aria-labelledby="performances-title">
         <div class="profile-results-heading">
           <h2 id="performances-title">Выступления <span>{{ profile.results|length }}</span></h2>
@@ -78,6 +63,20 @@
           {% for result in profile.results %}{{ result_card(result, include_splits) }}{% endfor %}
         </div>{% else %}<p class="event-note">В реестре пока нет выступлений этого пейсмейкера.</p>{% endif %}
       </section>
+        </div>
+        {% if contacts %}<aside class="profile-panel profile-contact-panel" aria-labelledby="contact-title"><h2 id="contact-title">Контакты</h2>
+          {% if contacts %}<ul class="profile-contacts" aria-label="Контакты">
+            {% for contact in contacts %}<li>
+              {% if contact.href %}<a class="profile-contact" href="{{ contact.href }}"{% if not contact.href.startswith('tel:') %} target="_blank" rel="noopener noreferrer"{% endif %}>
+              {% else %}<span class="profile-contact">{% endif %}
+                <img class="contact-brand-icon" src="/static/social-{{ contact.icon }}.svg" alt="" width="28" height="28" aria-hidden="true">
+                <span class="profile-contact-text"><strong>{{ contact.display_value }}</strong><small>{{ contact.label }}</small></span>
+                {% if contact.href %}<span class="profile-contact-arrow" aria-hidden="true">↗</span>{% endif %}
+              {% if contact.href %}</a>{% else %}</span>{% endif %}
+            </li>{% endfor %}
+          </ul>{% endif %}
+        </aside>{% endif %}
+      </div>
     </main>
   </body>
 </html>
