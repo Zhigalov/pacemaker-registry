@@ -243,3 +243,22 @@ def test_flag_update_only_changes_one_result_and_checks_previous_value(monkeypat
     assert db.update_result_target_time(12, '03:29', '03:30') is expected
     assert calls == [('UPDATE race_results SET target_time = %s WHERE id = %s AND target_time = %s RETURNING id',
                       ('03:29', 12, '03:30'))]
+
+
+@pytest.mark.anyio
+async def test_result_back_links_and_flag_edit_keep_distance_filter(monkeypatch):
+    monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: details())
+    monkeypatch.setattr(main, 'update_result_target_time', lambda *args: True)
+    query = 'event_id=1&min_events=3&include_splits=false&distance_km=42.200'
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+        page = await client.get('/results/12?' + query)
+        assert page.status_code == 200
+        assert 'href="/?event_id=1&amp;include_splits=false&amp;min_events=3&amp;distance_km=42.2"' in page.text
+        assert '/results/12/target-time?event_id=1&amp;include_splits=false&amp;min_events=3&amp;distance_km=42.2' in page.text
+        invalid = await client.post('/results/12/target-time?' + query,
+            data={'target_time': 'oops', 'previous_target_time': '03:30'})
+        assert invalid.status_code == 422 and 'distance_km=42.2' in invalid.text
+        response = await client.post('/results/12/target-time?' + query,
+            data={'target_time': '03:29', 'previous_target_time': '03:30'})
+        assert response.status_code == 303
+        assert response.headers['location'].endswith('&saved=true&distance_km=42.2')

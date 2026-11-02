@@ -9,7 +9,7 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=profile-navigation">
+    <link rel="stylesheet" href="/static/styles.css?v=distance-filter">
     <link rel="stylesheet" href="/static/profiles.css?v=3">
     <script src="/static/registry.js?v=avatars" defer></script>
   </head>
@@ -35,6 +35,16 @@
                 </select>
               </span>
             </div>
+            <div class="registry-filter-field registry-filter-field--distance">
+              <label for="distance-filter">Дистанция</label>
+              <span class="registry-filter-select">
+                <select id="distance-filter" name="distance_km" data-registry-filter>
+                  <option value="0" {% if registry.selected_distance is none %}selected{% endif %}>Все</option>
+                  {% for distance in registry.distances %}<option value="{{ distance }}" {% if distance == registry.selected_distance %}selected{% endif %}>{{ distance|replace('.', ',') }} км</option>{% endfor %}
+                  {% if registry.selected_distance and registry.selected_distance not in registry.distances %}<option value="{{ registry.selected_distance }}" selected>{{ registry.selected_distance|replace('.', ',') }} км — нет результатов</option>{% endif %}
+                </select>
+              </span>
+            </div>
             <div class="registry-filter-field registry-filter-field--count">
               <div class="filter-label-hint">
                 <label for="min-events-filter" tabindex="0" aria-describedby="min-events-hint">Минимум выступлений</label>
@@ -49,6 +59,7 @@
             </label>
             <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
           </form>
+          <p class="registry-rating-note">Рейтинг рассчитан по показанным выступлениям{% if registry.selected_distance %} на дистанции {{ registry.selected_distance|replace('.', ',') }} км{% endif %}.</p>
         </section>
       {% endif %}
 
@@ -65,7 +76,7 @@
           {% if registry.selected_event_id is not none %}
             <div class="registry-summary-links">
               <a class="quiet-link" href="/events/{{ registry.selected_event_id }}">Настройки соревнования →</a>
-              <a class="quiet-link registry-filter-reset" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}">Все соревнования</a>
+              <a class="quiet-link registry-filter-reset" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}{% if registry.selected_distance %}&amp;distance_km={{ registry.selected_distance }}{% endif %}">Все соревнования</a>
             </div>
           {% endif %}
         </div>
@@ -107,7 +118,7 @@
 
               <div class="results-strip">
                 {% for result in pacemaker.results %}
-                  {{ result_card(result, registry.include_splits, registry.selected_event_id or 0, registry.min_events) }}
+                  {{ result_card(result, registry.include_splits, registry.selected_event_id or 0, registry.min_events, registry.selected_distance) }}
 
                 {% endfor %}
               </div>
@@ -159,8 +170,8 @@
       {% elif registry.events %}
         <section class="empty-state">
           <h2>Нет пейсеров по выбранным условиям</h2>
-          <p>Уменьшите минимальное число выступлений или выберите другое соревнование.</p>
-          <a class="button" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}">Сбросить фильтры</a>
+          <p>Уменьшите минимальное число выступлений или выберите другое соревнование либо дистанцию.</p>
+          <a class="button registry-filter-submit" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}">Сбросить фильтры</a>
         </section>
       {% else %}
         <section class="empty-state" aria-labelledby="empty-title">

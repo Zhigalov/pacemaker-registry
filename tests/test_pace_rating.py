@@ -143,7 +143,7 @@ def test_registry_uses_each_events_pace_config_before_sorting(monkeypatch):
         def __enter__(self): return self
         def __exit__(self, *_): pass
         def execute(self, query, parameters=()):
-            self.rows = events if "SELECT e.id" in query else rows
+            self.rows = events if "SELECT e.id" in query else [(Decimal("10"),)] if "SELECT DISTINCT distance_km" in query else rows
             return self
         def fetchall(self): return self.rows
     monkeypatch.setattr(db, "connect_database", Connection)

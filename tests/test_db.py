@@ -200,7 +200,7 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
 
         def execute(self, query: str, parameters=()):
             calls.append((query, parameters))
-            return FakeQueryResult(event_rows if len(calls) == 1 else result_rows)
+            return FakeQueryResult(event_rows if len(calls) == 1 else [(Decimal('10'),), (Decimal('21.1'),)] if len(calls) == 2 else result_rows)
 
     monkeypatch.setattr(
         "pacemaker_registry.db.connect_database", lambda: FakeConnection()
@@ -215,11 +215,11 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
     assert registry.selected_event_id == 2
     assert registry.pacemakers[0].results[0].finish_rating == 10
     assert registry.include_splits is False
-    assert calls[1][1] == (1, 2)
-    assert "HAVING count(*) >= %s" in calls[1][0]
-    assert "rr.pace," not in calls[1][0]
-    assert "rr.checkpoints," not in calls[1][0]
-    assert "SELECT count(*)" not in calls[1][0]
+    assert calls[2][1] == (1, 2)
+    assert "HAVING count(*) >= %s" in calls[2][0]
+    assert "rr.pace," not in calls[2][0]
+    assert "rr.checkpoints," not in calls[2][0]
+    assert "SELECT count(*)" not in calls[2][0]
     assert [pacemaker.full_name for pacemaker in registry.pacemakers] == [
         "Петров Пётр"
     ]

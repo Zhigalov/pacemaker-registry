@@ -40,7 +40,7 @@ def test_min_events_uses_history_and_keeps_event_options(monkeypatch):
         def __enter__(self): return self
         def __exit__(self, *_): pass
         def execute(self, query, parameters=()):
-            self.rows = events if "SELECT e.id" in query else [r for r in rows if r[9] >= parameters[0]]
+            self.rows = events if "SELECT e.id" in query else [(Decimal("10"),)] if "SELECT DISTINCT distance_km" in query else [r for r in rows if r[9] >= parameters[0]]
             return self
         def fetchall(self): return self.rows
     monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)
@@ -71,7 +71,7 @@ def test_two_distances_outrank_one_when_displayed_rating_is_equal():
 @pytest.mark.anyio
 async def test_min_events_parameter_validation_and_empty_state(monkeypatch):
     calls = []
-    def load(event_id=None, include_splits=True, min_events=1):
+    def load(event_id=None, include_splits=True, min_events=1, distance_km=None):
         calls.append((event_id, include_splits, min_events))
         return Registry((), 0, 0, (RegistryEvent(1, "Первое"),), event_id, include_splits, min_events)
     monkeypatch.setattr("pacemaker_registry.main.load_registry", load)

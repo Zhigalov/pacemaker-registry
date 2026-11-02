@@ -49,7 +49,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "pacemaker_registry.main.load_registry",
-        lambda event_id=None, include_splits=True, min_events=1: registry,
+        lambda event_id=None, include_splits=True, min_events=1, distance_km=None: registry,
     )
 
     async with AsyncClient(
@@ -61,7 +61,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=profile-navigation"' in response.text
+    assert 'href="/static/styles.css?v=distance-filter"' in response.text
     assert 'src="/static/apple-touch-icon.png?v=equal-flags"' in response.text
     assert 'class="registry-heading"' not in response.text
     assert 'Статистика отфильтрованного списка' in response.text
@@ -151,7 +151,7 @@ async def test_card_distinguishes_missing_pace_from_zero(monkeypatch):
 @pytest.mark.anyio
 async def test_home_page_filters_and_checkbox(monkeypatch) -> None:
     requested = []
-    def fake_load_registry(event_id=None, include_splits=True, min_events=1):
+    def fake_load_registry(event_id=None, include_splits=True, min_events=1, distance_km=None):
         requested.append((event_id, include_splits))
         return Registry((), 1, 0, events=(RegistryEvent(2, "Марафон"),),
                         selected_event_id=event_id, include_splits=include_splits)
@@ -443,3 +443,31 @@ async def test_readiness_reports_database_failure(monkeypatch) -> None:
 
     assert response.status_code == 503
     assert response.json() == {"status": "unavailable"}
+
+
+@pytest.mark.anyio
+async def test_distance_selection_switching_combination_and_validation(monkeypatch):
+    from decimal import Decimal
+    requested = []
+    def load(event_id=None, include_splits=True, min_events=1, distance_km=None):
+        requested.append((event_id, include_splits, min_events, distance_km))
+        return Registry((), 0, 0, events=(RegistryEvent(2, 'Марафон'),),
+            selected_event_id=event_id, include_splits=include_splits, min_events=min_events,
+            distances=('5', '10', '21.1', '42.2'),
+            selected_distance=format(distance_km.normalize(), 'f') if distance_km else None)
+    monkeypatch.setattr('pacemaker_registry.main.load_registry', load)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        r = await client.get('/?event_id=2&distance_km=21.100&min_events=3&include_splits=false')
+        assert r.status_code == 200
+        assert 'value="21.1" selected>21,1 км' in r.text
+        assert 'Рейтинг рассчитан по показанным выступлениям на дистанции 21,1 км' in r.text
+        assert 'include_splits=false&amp;min_events=3&amp;distance_km=21.1' in r.text
+        assert 'Нет пейсеров по выбранным условиям' in r.text
+        await client.get('/?distance_km=10')
+        reset = await client.get('/?distance_km=0')
+        assert 'value="0" selected>Все</option>' in reset.text
+        await client.get('/')
+        for value in ('-1', 'oops', 'NaN', 'Infinity', '100000', '0.0001'):
+            assert (await client.get('/?distance_km=' + value)).status_code == 422
+    assert requested == [(2, False, 3, Decimal('21.100')), (None, True, 1, Decimal('10')),
+                         (None, True, 1, None), (None, True, 1, None)]

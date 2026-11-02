@@ -244,3 +244,33 @@ def test_concurrent_login_claim_only_one_profile_and_one_city(database):
     with database() as connection:
         assert connection.execute("SELECT count(*) FROM cities WHERE normalized_name='новый город'").fetchone()[0] == 1
         assert connection.execute("SELECT count(*) FROM running_clubs WHERE normalized_name='новый клуб'").fetchone()[0] == 1
+
+
+def test_distance_filter_combines_with_event_history_and_recalculates_rating(database):
+    from decimal import Decimal
+    migrate.migrate()
+    assert db.save_race_result(sample(athlete_name='First Pacer', distance_km='10', chip_time='00:50:00'), '00:50')
+    assert db.save_race_result(sample(athlete_name='First Pacer', source_event_id='half', distance_km='21.100', chip_time='01:45:00'), '01:40')
+    assert db.save_race_result(sample(athlete_name='Other Pacer', distance_km='10.000', chip_time='00:49:50'), '00:50')
+    assert db.save_race_result(sample(athlete_name='Third Pacer', source_event_id='marathon', distance_km='42.2', chip_time='03:59:00'), '04:00')
+    all_results = db.load_registry(include_splits=False)
+    first = next(p for p in all_results.pacemakers if p.full_name == 'First Pacer')
+    assert first.rating < 10
+    ten = db.load_registry(distance_km=Decimal('10.000'), include_splits=False)
+    assert ten.distances == ('10', '21.1', '42.2') and ten.selected_distance == '10'
+    assert len(ten.pacemakers) == 2 and ten.result_count == 2
+    selected = next(p for p in ten.pacemakers if p.id == first.id)
+    assert selected.rating == 10 and selected.performance_count == 2
+    assert selected.mean_finish_deviation == 0
+    assert all(card.distance_km == '10' for p in ten.pacemakers for card in p.results)
+    half = db.load_registry(distance_km=Decimal('21.1'), include_splits=False, min_events=2)
+    assert [p.id for p in half.pacemakers] == [first.id]
+    half_event = half.pacemakers[0].results[0].event_id
+    combined = db.load_registry(half_event, distance_km=Decimal('21.100'), min_events=2)
+    assert combined.result_count == 1 and combined.selected_event_id == half_event
+    empty = db.load_registry(half_event, distance_km=Decimal('10'))
+    assert not empty.pacemakers and empty.result_count == empty.event_count == 0
+    assert empty.distances == ten.distances and len(empty.events) == 3
+    assert db.load_registry(distance_km=Decimal('7.777')).result_count == 0
+    restored = db.load_registry(include_splits=False)
+    assert restored == all_results

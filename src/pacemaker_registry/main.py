@@ -1,6 +1,7 @@
 import os
 import re
 from dataclasses import asdict, replace
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
@@ -78,12 +79,16 @@ from pacemaker_registry.profile_routes import create_profile_router
 app.include_router(create_profile_router(templates))
 
 
+DistanceFilter = Annotated[Decimal | None, Query(ge=0, le=Decimal('99999.999'), decimal_places=3)]
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(
     request: Request,
     event_id: int | None = None,
     include_splits: bool = True,
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
+    distance_km: DistanceFilter = None,
 ) -> HTMLResponse:
     registry_error = None
     try:
@@ -91,6 +96,7 @@ def home(
             event_id if event_id and event_id > 0 else None,
             include_splits=include_splits,
             min_events=min_events,
+            distance_km=distance_km if distance_km else None,
         )
     except (PsycopgError, RuntimeError):
         registry = Registry((), 0, 0, include_splits=include_splits, min_events=min_events)
@@ -197,9 +203,12 @@ def _load_result_or_404(result_id: int, include_splits: bool):
 
 
 def _result_response(request, details, include_splits, event_id, min_events, *,
-                     target_time=None, error=None, saved=False, status_code=200):
+                     target_time=None, error=None, saved=False, status_code=200, distance_km=None):
     source_url, source_event_url = _result_source_links(details.source_url)
-    query = urlencode({"event_id": event_id, "include_splits": str(include_splits).lower(), "min_events": min_events})
+    params = {"event_id": event_id, "include_splits": str(include_splits).lower(), "min_events": min_events}
+    if distance_km:
+        params['distance_km'] = format(distance_km.normalize(), 'f')
+    query = urlencode(params)
     return templates.TemplateResponse(
         request=request, name="result.html",
         context={
@@ -221,10 +230,11 @@ def result_page(
     request: Request, result_id: int, include_splits: bool = True,
     event_id: Annotated[int, Query(ge=0)] = 0,
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
+    distance_km: DistanceFilter = None,
     saved: bool = False,
 ):
     return _result_response(request, _load_result_or_404(result_id, include_splits),
-                            include_splits, event_id, min_events, saved=saved)
+                            include_splits, event_id, min_events, saved=saved, distance_km=distance_km)
 
 
 @app.post("/results/{result_id}/target-time", response_class=HTMLResponse)
@@ -235,6 +245,7 @@ def edit_result_target_time(
     include_splits: bool = True,
     event_id: Annotated[int, Query(ge=0)] = 0,
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
+    distance_km: DistanceFilter = None,
 ):
     details = _load_result_or_404(result_id, include_splits)
     target_time = target_time.strip()
@@ -242,25 +253,28 @@ def edit_result_target_time(
         target_time = normalize_target_time(target_time)
     except ValueError as error:
         return _result_response(
-            request, details, include_splits, event_id, min_events, target_time=target_time,
+            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km,
             error=str(error), status_code=422,
         )
     try:
         updated = update_result_target_time(result_id, target_time, previous_target_time)
     except (PsycopgError, RuntimeError):
         return _result_response(
-            request, details, include_splits, event_id, min_events, target_time=target_time,
+            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km,
             error="Не удалось сохранить время. Проверьте текущее значение и попробуйте ещё раз.", status_code=503,
         )
     if not updated:
         details = _load_result_or_404(result_id, include_splits)
         return _result_response(
-            request, details, include_splits, event_id, min_events, target_time=target_time,
+            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km,
             error="Время уже изменено в другой вкладке. Сравните с текущей целью и подтвердите сохранение ещё раз.",
             status_code=409,
         )
-    query = urlencode({"event_id": event_id, "include_splits": str(include_splits).lower(),
-                       "min_events": min_events, "saved": "true"})
+    params = {"event_id": event_id, "include_splits": str(include_splits).lower(),
+              "min_events": min_events, "saved": "true"}
+    if distance_km:
+        params['distance_km'] = format(distance_km.normalize(), 'f')
+    query = urlencode(params)
     return RedirectResponse(f"/results/{result_id}?{query}", status_code=303)
 
 

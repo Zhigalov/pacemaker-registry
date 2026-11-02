@@ -181,9 +181,10 @@ def load_registry(
     event_id: int | None = None,
     include_splits: bool = True,
     min_events: int = 1,
+    distance_km: Decimal | None = None,
 ) -> Registry:
     with connect_database() as connection:
-        # Both queries must see the same events and formulas during concurrent saves.
+        # All queries must see the same results and formulas during concurrent saves.
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         event_rows = connection.execute(
             """
@@ -202,6 +203,10 @@ def load_registry(
         selected_event_id = (
             event_id if event_id in {event.id for event in events} else None
         )
+
+        distances = tuple(format(row[0].normalize(), 'f') for row in connection.execute(
+            'SELECT DISTINCT distance_km FROM race_results ORDER BY distance_km').fetchall())
+        selected_distance = format(distance_km.normalize(), 'f') if distance_km else None
 
         # Cards need segment weights/paces, not full checkpoint details or chart markers.
         # Count all history once per pacemaker, before applying the event filter.
@@ -234,10 +239,16 @@ def load_registry(
             JOIN race_results AS rr ON rr.pacemaker_id = p.id
             JOIN events AS e ON e.id = rr.event_id
         """
-        parameters: tuple[int, ...] = (min_events,)
+        parameters: tuple = (min_events,)
+        conditions = []
         if selected_event_id is not None:
-            query += " WHERE e.id = %s"
+            conditions.append("e.id = %s")
             parameters += (selected_event_id,)
+        if distance_km:
+            conditions.append('rr.distance_km = %s')
+            parameters += (distance_km,)
+        if conditions:
+            query += ' WHERE ' + ' AND '.join(conditions)
         query += """
             ORDER BY
                 lower(p.last_name),
@@ -302,6 +313,8 @@ def load_registry(
         selected_event_id=selected_event_id,
         include_splits=include_splits,
         min_events=min_events,
+        distances=distances,
+        selected_distance=selected_distance,
     )
 
 

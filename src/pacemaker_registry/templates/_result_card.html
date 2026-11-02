@@ -1,8 +1,8 @@
 {% from '_icons.html' import icon %}
-{% macro result_card(result, include_splits=true, event_id=0, min_events=1) -%}
+{% macro result_card(result, include_splits=true, event_id=0, min_events=1, distance_km=none) -%}
 <a
   class="result-summary"
-  href="/results/{{ result.id }}?event_id={{ event_id }}&amp;include_splits={{ 'true' if include_splits else 'false' }}&amp;min_events={{ min_events }}"
+  href="/results/{{ result.id }}?event_id={{ event_id }}&amp;include_splits={{ 'true' if include_splits else 'false' }}&amp;min_events={{ min_events }}{% if distance_km %}&amp;distance_km={{ distance_km }}{% endif %}"
   aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time_display }}, факт {{ result.chip_time_display }}, отклонение {{ result.finish_difference_display }}, финиш {{ '%.1f'|format(result.finish_rating) }}, темп {% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating) }}{% else %}нет данных{% endif %}, итог {{ '%.1f'|format(result.rating) }} из 10"
 >
   <span class="result-summary-data">

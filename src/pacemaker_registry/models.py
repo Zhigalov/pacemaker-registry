@@ -129,6 +129,8 @@ class Registry:
     selected_event_id: int | None = None
     include_splits: bool = True
     min_events: int = 1
+    distances: tuple[str, ...] = ()
+    selected_distance: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
