@@ -8,8 +8,9 @@
     <title>Редактировать профиль · {{ profile.full_name }}</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
     <link rel="stylesheet" href="/static/styles.css?v=profile-navigation">
-    <link rel="stylesheet" href="/static/profiles.css?v=6">
-    <script src="/static/profile.js?v=2" defer></script>
+    <link rel="stylesheet" href="/static/profiles.css?v=7">
+    <script src="/static/avatar-upload.js?v=1" defer></script>
+    <script src="/static/profile.js?v=3" defer></script>
   </head>
   <body>
     <main class="app-shell profile-shell">
@@ -29,7 +30,9 @@
                 <label class="button photo-picker-button" for="profile-photo"><span aria-hidden="true">＋</span> Выбрать фото</label>
               </span>
               <span class="photo-filename" id="photo-filename" data-photo-filename aria-live="polite">Файл не выбран</span>
-              <p class="event-note" id="photo-hint">JPEG, PNG или WebP · до 5 МБ и 16 мегапикселей. Фото обрезается до квадрата по центру.</p>
+              <p class="event-note" id="photo-hint">JPEG, PNG или WebP · до 5 МБ и 16 мегапикселей. Перед отправкой автоматически уменьшим фото и обрежем до квадрата по центру.</p>
+              <p class="error-message" data-photo-error role="alert" hidden></p>
+              <noscript><p class="event-note">Без JavaScript выберите фото до 2 МБ.</p></noscript>
               {% if avatar_url %}<label class="profile-checkbox"><input type="checkbox" name="remove_photo" value="true" data-avatar-remove> Удалить фотографию</label>{% endif %}
             </div>
           </div>

@@ -10,7 +10,8 @@ import httpx
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+# Leave room for form fields and proxy integration overhead. Browser sources may be 5 MiB.
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 MAX_PIXELS = 16_000_000
 KEY_PATTERN = r'avatars/[1-9][0-9]*/[0-9a-f]{32}\.webp'
 _decode_slot = Semaphore(1)
@@ -25,7 +26,7 @@ def avatar_url(key: str | None) -> str | None:
 
 def prepare_avatar(data: bytes) -> bytes:
     if not data or len(data) > MAX_UPLOAD_BYTES:
-        raise ValueError('Выберите фотографию размером до 5 МБ.')
+        raise ValueError('Выберите фотографию размером до 2 МБ.')
     try:
         with _decode_slot, warnings.catch_warnings():
             warnings.simplefilter('error', Image.DecompressionBombWarning)

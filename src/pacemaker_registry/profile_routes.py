@@ -91,7 +91,7 @@ def create_profile_router(templates):
             raise HTTPException(403, 'Откройте форму редактирования на сайте реестра.')
         try:
             if int(request.headers.get('content-length', '0')) > avatars.MAX_UPLOAD_BYTES + 100_000:
-                raise HTTPException(413, 'Выберите фотографию размером до 5 МБ.')
+                raise HTTPException(413, 'Выберите фотографию размером до 2 МБ.')
         except ValueError:
             raise HTTPException(400, 'Некорректный размер запроса.') from None
         profile = await run_in_threadpool(_load, pacemaker_id, with_results=False)
@@ -122,7 +122,7 @@ def create_profile_router(templates):
                 upload = form.get('photo')
                 photo = await upload.read(avatars.MAX_UPLOAD_BYTES + 1) if isinstance(upload, UploadFile) else b''
                 if len(photo) > avatars.MAX_UPLOAD_BYTES:
-                    raise ValueError('Выберите фотографию размером до 5 МБ.')
+                    raise ValueError('Выберите фотографию размером до 2 МБ.')
                 if not photo and isinstance(upload, UploadFile) and upload.filename:
                     raise ValueError('Выбранный файл фотографии пуст.')
                 if photo and form.get('remove_photo'):

@@ -18,8 +18,57 @@
   const remove = document.querySelector('[data-avatar-remove]');
   const original = preview?.getAttribute('src');
   const filename = document.querySelector('[data-photo-filename]');
+  const form = input?.form;
+  const photoError = document.querySelector('[data-photo-error]');
+  let preparedSource, preparedPhoto, busy = false;
+  function error(message) {
+    photoError.textContent = message;
+    photoError.hidden = !message;
+    if (message) photoError.scrollIntoView({block: 'center', behavior: 'smooth'});
+  }
+  // Native submission still handles redirects/validation pages. Replace only the file part.
+  form?.addEventListener('formdata', event => {
+    if (preparedPhoto && input.files[0] === preparedSource && !remove?.checked) {
+      event.formData.set('photo', preparedPhoto, 'avatar.jpg');
+    }
+  });
+  form?.addEventListener('submit', async event => {
+    const file = input.files[0];
+    if (!file || remove?.checked) return;
+    if (!('FormDataEvent' in window)) {
+      if (file.size <= 2 * 1024 * 1024) return;
+      event.preventDefault();
+      error('В этом браузере выберите фото до 2 МБ или обновите браузер для автоматического сжатия.');
+      return;
+    }
+    if (preparedSource === file && preparedPhoto) return;
+    event.preventDefault();
+    if (busy) return;
+    busy = true;
+    const button = event.submitter || form.querySelector('[type="submit"]');
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Подготавливаем фото…';
+    error('');
+    try {
+      const photo = await PacersAvatar.prepare(file);
+      // The user can select/remove a file while decoding; never send a stale or raw large file.
+      if (input.files[0] !== file || remove?.checked) return;
+      preparedSource = file;
+      preparedPhoto = photo;
+    } catch (failure) {
+      error(failure.message || 'Не удалось подготовить фото. Выберите другой файл.');
+    } finally {
+      busy = false;
+      button.disabled = false;
+      button.textContent = label;
+    }
+    if (preparedSource === input.files[0] && preparedPhoto) form.requestSubmit(button);
+  });
   let objectURL;
   input?.addEventListener('change', () => {
+    preparedSource = preparedPhoto = null;
+    error('');
     if (objectURL) URL.revokeObjectURL(objectURL);
     const file = input.files[0];
     if (filename) filename.textContent = file ? file.name : 'Файл не выбран';

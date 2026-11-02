@@ -137,3 +137,4 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .profile-identity-meta { position: relative; }
 .profile-identity .achievement-badge { position: static; }
 .profile-identity .achievement-tooltip { left: 0; right: auto; max-width: 100%; }
+.profile-form [data-photo-error][hidden] { display: none; }
