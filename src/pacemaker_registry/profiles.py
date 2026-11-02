@@ -1,5 +1,6 @@
 """Profile values and contact links; imported names are never edited here."""
 import re
+from datetime import date
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
@@ -11,6 +12,7 @@ CONTACT_TYPES = {
     'phone': ('Телефон', '+7 999 123-45-67'),
     'vk': ('ВКонтакте', 'username или id123456'),
     'facebook': ('Facebook', 'username'),
+    'strava': ('Strava', 'Номер спортсмена или ник'),
     'other': ('Другое', 'Ссылка или текст'),
 }
 ACHIEVEMENTS = {'pshp_graduate': {
@@ -18,10 +20,12 @@ ACHIEVEMENTS = {'pshp_graduate': {
     'image': '/static/first-pacers-school.jpg',
 }}
 CONTACT_PREFIXES = {
+    'strava': 'https://www.strava.com/athletes/',
     'telegram': 'https://t.me/', 'instagram': 'https://instagram.com/',
     'max': 'https://max.ru/', 'vk': 'https://vk.com/', 'facebook': 'https://facebook.com/',
 }
 SERVICE_HOSTS = {
+    'strava': ('strava.com',),
     'telegram': ('t.me', 'telegram.me'),
     'instagram': ('instagram.com',),
     'max': ('max.ru',),
@@ -114,7 +118,9 @@ def profile_form_values(profile) -> dict:
         matches = [c for c in contacts if c['type'] == kind]
         rows.extend([dict(c, value=contact_input(c)) for c in matches] or [{'type': kind, 'value': ''}])
     rows.extend(c for c in contacts if c['type'] == 'other')
-    return {'motto': profile.motto or '', 'contacts': rows,
+    return {'about': profile.about or '', 'login': profile.login or '',
+            'city': profile.city or '', 'club': profile.club or '',
+            'personal_records': profile.personal_records or {}, 'contacts': rows,
             'achievements': list(profile.achievements), 'profile_version': profile.version}
 
 
@@ -132,4 +138,38 @@ def contact_input(contact: dict) -> str:
         return '+' + number.lstrip('+')
     if kind == 'facebook' and path == 'profile.php':
         return parse_qs(parsed.query).get('id', [value])[0]
-    return path
+    return path.removeprefix('athletes/') if kind == 'strava' else path
+
+
+RECORD_DISTANCES = ('5', '10', '21.1', '42.2')
+
+
+def normalize_profile_details(values: dict) -> dict:
+    clean = dict(values)
+    if len(clean['about']) > 5000:
+        raise ValueError('Описание «О себе» — до 5000 символов.')
+    login = clean['login'].strip().lower()
+    if login and not re.fullmatch(r'[a-z][a-z0-9_-]{2,29}', login):
+        raise ValueError('Логин: от 3 до 30 латинских букв, цифр, _ или -. Начните с буквы.')
+    clean['login'] = login or None
+    for field, title in (('city', 'Город'), ('club', 'Беговой клуб')):
+        clean[field] = ' '.join(clean[field].split())
+        if len(clean[field]) > 120:
+            raise ValueError(f'{title}: не больше 120 символов.')
+    records = {}
+    for distance in RECORD_DISTANCES:
+        record = values['personal_records'].get(distance, {})
+        time, year, url = (str(record.get(k, '')).strip() for k in ('time', 'year', 'url'))
+        if not any((time, year, url)):
+            continue
+        match = re.fullmatch(r'(?:(\d{1,2}):)?([0-5]?\d):([0-5]\d)', time)
+        if not match or not any(int(v or 0) for v in match.groups()):
+            raise ValueError(f'Рекорд {distance} км: укажите время ЧЧ:ММ:СС или ММ:СС.')
+        if not year.isdigit() or not 1900 <= int(year) <= date.today().year:
+            raise ValueError(f'Рекорд {distance} км: укажите год от 1900 до {date.today().year}.')
+        if not url or len(url) > 1000:
+            raise ValueError(f'Рекорд {distance} км: добавьте ссылку на соревнование или трек.')
+        records[distance] = {'time': ':'.join(f'{int(v or 0):02d}' for v in match.groups()),
+                             'year': int(year), 'url': _web_url(url)}
+    clean['personal_records'] = records
+    return clean

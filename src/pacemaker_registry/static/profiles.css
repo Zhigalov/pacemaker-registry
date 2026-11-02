@@ -85,3 +85,22 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
   .profile-contact-row--other { grid-template-columns: minmax(0, 1fr) auto; }
   .profile-contact-row--other label:first-of-type { grid-column: 1 / -1; }
 }
+
+.profile-location { display: flex; flex-wrap: wrap; gap: .5rem 1rem; color: #52655d; font-size: .9rem; }
+.profile-public-link { display: inline-block; margin-top: .5rem; color: #176f59; font-size: .85rem; overflow-wrap: anywhere; }
+.profile-about { margin-top: 1.2rem; }
+.profile-about h2, .profile-records h2 { font-size: 1.1rem; margin: 0 0 .65rem; }
+.profile-about p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; color: #52655d; }
+.profile-details-fields > label { display: block; margin-top: 1rem; }
+.profile-two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.profile-two-columns > label { min-width: 0; }
+.profile-records { margin-top: 1.75rem; }
+.profile-record-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr)); gap: .75rem; }
+.profile-record { display: grid; gap: .35rem; padding: 1rem; background: #fff; border: 1px solid #dce6e2; border-radius: .85rem; text-decoration: none; color: #176f59; }
+.profile-record strong { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.profile-record small { color: #64756d; }
+.profile-record-fields { display: grid; gap: 1rem; }
+.profile-record-field { border: 1px solid #dce6e2; border-radius: .8rem; padding: 1rem; margin: 0; min-width: 0; }
+.profile-record-field legend { font-weight: 700; padding: 0 .4rem; }
+.profile-record-field > label { display: block; margin-top: .75rem; }
+@media (max-width: 35rem) { .profile-details-fields .profile-two-columns { grid-template-columns: 1fr; } }

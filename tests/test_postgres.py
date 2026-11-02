@@ -53,7 +53,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
         connection.execute((migrate.MIGRATIONS_DIR / '0001_baseline.sql').read_text())
     first = sample()
     assert db.save_race_result(first, '00:50')
-    assert migrate.migrate() == ['0001_baseline.sql', '0002_pacemaker_profiles.sql']
+    assert migrate.migrate() == ['0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql']
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
 
@@ -176,10 +176,71 @@ def test_profile_save_conflict_and_reimport_preserve_fields(database):
     assert not db.save_pacemaker_profile(pacemaker_id, 0, 'Overwrite', [], [], None)
     assert db.save_race_result(sample(), '00:50')
     changed = db.get_pacemaker_profile(pacemaker_id)
-    assert changed.motto == 'Ведём вместе' and changed.contacts == tuple(contacts)
+    assert changed.about == 'Ведём вместе' and changed.contacts == tuple(contacts)
     assert changed.achievements == ('pshp_graduate',)
     assert changed.version == 1 and len(changed.results) == 2
     assert changed.avatar_key == db.load_registry().pacemakers[0].avatar_key == avatar
     assert db.get_result_details(changed.results[0].id).pacemaker_id == pacemaker_id
     assert changed.results[0].rating == db.get_result_details(changed.results[0].id).result.rating
     assert not db.get_pacemaker_profile(pacemaker_id, with_results=False).results
+
+
+def test_profile_details_lookup_reuse_unique_login_and_atomic_conflict(database):
+    migrate.migrate()
+    assert db.save_race_result(sample(), '00:50')
+    assert db.save_race_result(sample(athlete_name='Other Runner'), '00:50')
+    ids = [p.id for p in db.load_registry().pacemakers]
+    first, second = ids
+    records = {'21.1': {'time': '01:20:00', 'year': 2025, 'url': 'https://example.org/race'}}
+    assert db.save_pacemaker_profile(first, 0, 'Я' * 5000, [], [], None,
+        login='test_pacer', city='Москва', club='Бегуны', personal_records=records)
+    changed = db.get_pacemaker_profile(first)
+    assert (changed.login, changed.city, changed.club, changed.personal_records) == (
+        'test_pacer', 'Москва', 'Бегуны', records)
+    assert changed.about == 'Я' * 5000 and changed.public_path == '/p/test_pacer'
+    assert db.find_pacemaker_login('TEST_PACER') == first
+    assert not db.save_pacemaker_profile(first, 0, '', [], [], None, city='Не создавать', club='Не создавать')
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        db.save_pacemaker_profile(second, 0, '', [], [], None,
+            login='test_pacer', city='Откат города', club='Откат клуба')
+    choices = db.get_profile_choices()
+    assert 'Не создавать' not in choices['cities'] and 'Откат города' not in choices['cities']
+    assert 'Не создавать' not in choices['clubs'] and 'Откат клуба' not in choices['clubs']
+    assert db.get_pacemaker_profile(second).version == 0
+    assert db.save_pacemaker_profile(second, 0, '', [], [], None, city='москва', club='бегуны')
+    other = db.get_pacemaker_profile(second)
+    assert (other.city, other.club) == ('Москва', 'Бегуны')
+    with database() as connection:
+        assert connection.execute('SELECT city_id, club_id FROM pacemakers WHERE id IN (%s,%s) ORDER BY id', ids).fetchall()[0] == connection.execute('SELECT city_id, club_id FROM pacemakers WHERE id=%s', (second,)).fetchone()
+    assert len(choices['cities']) > 100
+
+
+def test_previous_mottos_survive_profile_extension(database, tmp_path, monkeypatch):
+    original = migrate.MIGRATIONS_DIR
+    for name in ('0001_baseline.sql', '0002_pacemaker_profiles.sql'):
+        (tmp_path / name).write_text((original / name).read_text())
+    monkeypatch.setattr(migrate, 'MIGRATIONS_DIR', tmp_path)
+    migrate.migrate()
+    with database() as connection:
+        pacer = connection.execute("INSERT INTO pacemakers(last_name,first_name,motto) VALUES ('Old','Pacer','Старый девиз') RETURNING id").fetchone()[0]
+    (tmp_path / '0003_profile_details.sql').write_text((original / '0003_profile_details.sql').read_text())
+    migrate.migrate()
+    assert db.get_pacemaker_profile(pacer).about == 'Старый девиз'
+
+
+def test_concurrent_login_claim_only_one_profile_and_one_city(database):
+    migrate.migrate()
+    for name in ('Runner One', 'Runner Two'):
+        assert db.save_race_result(sample(athlete_name=name), '00:50')
+    ids = [p.id for p in db.load_registry().pacemakers]
+    def save(pacer):
+        try:
+            return db.save_pacemaker_profile(pacer, 0, '', [], [], None,
+                login='concurrent_pacer', city='Новый город', club='Новый клуб')
+        except psycopg.errors.UniqueViolation:
+            return False
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sum(pool.map(save, ids)) == 1
+    with database() as connection:
+        assert connection.execute("SELECT count(*) FROM cities WHERE normalized_name='новый город'").fetchone()[0] == 1
+        assert connection.execute("SELECT count(*) FROM running_clubs WHERE normalized_name='новый клуб'").fetchone()[0] == 1

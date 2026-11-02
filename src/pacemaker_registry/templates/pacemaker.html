@@ -9,7 +9,7 @@
     <title>{{ profile.full_name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
     <link rel="stylesheet" href="/static/styles.css?v=profile-navigation">
-    <link rel="stylesheet" href="/static/profiles.css?v=3">
+    <link rel="stylesheet" href="/static/profiles.css?v=4">
     <script src="/static/profile.js?v=2" defer></script>
   </head>
   <body>
@@ -24,7 +24,9 @@
         </div>
         <div class="profile-identity">
           <h1 id="profile-name">{{ profile.full_name }}</h1>
-          {% if profile.motto %}<p class="profile-motto">{{ profile.motto }}</p>{% endif %}
+          {% if profile.city or profile.club %}<p class="profile-location">{% if profile.city %}<span>⌖ {{ profile.city }}</span>{% endif %}{% if profile.club %}<span>◈ {{ profile.club }}</span>{% endif %}</p>{% endif %}
+          {% if profile.login %}<a class="profile-public-link" href="{{ profile.public_path }}">pacersreg.ru{{ profile.public_path }}</a>{% endif %}
+          {% if profile.about %}<div class="profile-about"><h2>О себе</h2><p>{{ profile.about }}</p></div>{% endif %}
           {% if profile.achievements %}<ul class="profile-achievements" aria-label="Достижения">
             {% for code in profile.achievements %}{% if code in achievement_types %}
               <li>{{ achievement_badge(code, achievement_types[code], true) }}</li>
@@ -43,6 +45,12 @@
         </div>
         <a class="button profile-edit-link" href="/pacemakers/{{ profile.id }}/edit">Редактировать профиль</a>
       </section>
+      {% if profile.personal_records %}<section class="profile-records" aria-labelledby="records-title">
+        <h2 id="records-title">Личные рекорды</h2><div class="profile-record-grid">
+        {% for distance in record_distances %}{% set record = profile.personal_records.get(distance) %}{% if record %}
+          <a class="profile-record" href="{{ record.url }}" target="_blank" rel="noopener noreferrer"><span>{{ distance|replace('.', ',') }} км</span><strong>{{ record.time }}</strong><small>{{ record.year }} · Результат ↗</small></a>
+        {% endif %}{% endfor %}</div>
+      </section>{% endif %}
       <section class="profile-performances" aria-labelledby="performances-title">
         <div class="profile-results-heading">
           <h2 id="performances-title">Выступления <span>{{ profile.results|length }}</span></h2>

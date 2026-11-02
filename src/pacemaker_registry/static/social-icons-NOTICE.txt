@@ -7,3 +7,4 @@ MAX: official favicon from https://max.ru/favicon.svg (retrieved 2026-10-31).
 Original silhouette with a simplified blue/purple SVG gradient.
 Brand names and logos belong to their respective owners.
 Phone and generic link symbols are project SVG assets.
+Strava: Simple Icons (CC0), https://simpleicons.org/?q=strava .

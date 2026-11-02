@@ -82,7 +82,8 @@ def check_database() -> None:
     """A reachable server without the application's schema is not ready."""
     with connect_database() as connection:
         connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, p.last_name,
-            p.motto, p.avatar_key, p.contacts, p.achievements, p.profile_version, p.profile_updated_at
+            p.motto, p.avatar_key, p.contacts, p.achievements, p.profile_version, p.profile_updated_at,
+            p.login, p.city_id, p.club_id, p.personal_records
             FROM race_results AS rr
             JOIN events AS e ON e.id = rr.event_id
             JOIN pacemakers AS p ON p.id = rr.pacemaker_id
@@ -94,8 +95,10 @@ def get_pacemaker_profile(pacemaker_id: int, include_splits: bool = True, *,
     with connect_database() as connection:
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         row = connection.execute(
-            """SELECT id, last_name, first_name, motto, avatar_key, contacts, achievements, profile_version
-               FROM pacemakers WHERE id = %s""", (pacemaker_id,),
+            """SELECT p.id, p.last_name, p.first_name, p.motto, p.avatar_key, p.contacts,
+                      p.achievements, p.profile_version, p.login, c.name, bc.name, p.personal_records
+               FROM pacemakers p LEFT JOIN cities c ON c.id = p.city_id
+               LEFT JOIN running_clubs bc ON bc.id = p.club_id WHERE p.id = %s""", (pacemaker_id,),
         ).fetchone()
         if row is None:
             return None
@@ -115,18 +118,50 @@ def get_pacemaker_profile(pacemaker_id: int, include_splits: bool = True, *,
             for result in rows:
                 results.append(_build_registry_result(result[5], _event_from_row(result[:5]),
                     *result[6:9], None, result[9], include_splits, details=False))
-    return PacemakerProfile(*row[:5], tuple(row[5]), tuple(row[6]), row[7], tuple(results))
+    return PacemakerProfile(*row[:5], tuple(row[5]), tuple(row[6]), row[7], tuple(results), *row[8:])
 
 
-def save_pacemaker_profile(pacemaker_id: int, version: int, motto: str,
-                           contacts: list[dict], achievements: list[str], avatar_key: str | None) -> bool:
+def get_profile_choices() -> dict:
     with connect_database() as connection:
-        return connection.execute(
+        return {key: [r[0] for r in connection.execute(f'SELECT name FROM {table} ORDER BY name').fetchall()]
+                for key, table in (('cities', 'cities'), ('clubs', 'running_clubs'))}
+
+
+def find_pacemaker_login(login: str) -> int | None:
+    with connect_database() as connection:
+        row = connection.execute('SELECT id FROM pacemakers WHERE login = %s', (login.lower(),)).fetchone()
+    return row[0] if row else None
+
+
+def _profile_choice(connection, table: str, name: str) -> int | None:
+    if not name:
+        return None
+    # One key for case, ё/е and repeated whitespace. Unique constraint handles concurrent inserts.
+    key = name.casefold().replace('ё', 'е')
+    return connection.execute(f"""INSERT INTO {table} (name, normalized_name) VALUES (%s, %s)
+        ON CONFLICT (normalized_name) DO UPDATE SET normalized_name = EXCLUDED.normalized_name
+        RETURNING id""", (name, key)).fetchone()[0]
+
+
+def save_pacemaker_profile(pacemaker_id: int, version: int, about: str,
+                           contacts: list[dict], achievements: list[str], avatar_key: str | None,
+                           *, login=None, city='', club='', personal_records=None) -> bool:
+    with connect_database() as connection:
+        # Lock before creating lookup values: stale edits must not leave orphan cities or clubs.
+        row = connection.execute('SELECT profile_version FROM pacemakers WHERE id = %s FOR UPDATE',
+                                 (pacemaker_id,)).fetchone()
+        if row is None or row[0] != version:
+            return False
+        city_id = _profile_choice(connection, 'cities', city)
+        club_id = _profile_choice(connection, 'running_clubs', club)
+        connection.execute(
             """UPDATE pacemakers SET motto = %s, contacts = %s, achievements = %s, avatar_key = %s,
+                   login = %s, city_id = %s, club_id = %s, personal_records = %s,
                    profile_version = profile_version + 1, profile_updated_at = now()
-               WHERE id = %s AND profile_version = %s RETURNING id""",
-            (motto or None, Jsonb(contacts), Jsonb(achievements), avatar_key, pacemaker_id, version),
-        ).fetchone() is not None
+               WHERE id = %s""",
+            (about or None, Jsonb(contacts), Jsonb(achievements), avatar_key, login, city_id, club_id,
+             Jsonb(personal_records or {}), pacemaker_id))
+        return True
 
 
 def get_event_target_time_type(source_event_id: str) -> str | None:

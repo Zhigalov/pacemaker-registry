@@ -4,12 +4,14 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from psycopg import Error as PsycopgError
+from psycopg.errors import UniqueViolation
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
 from pacemaker_registry import avatars, db
 from pacemaker_registry.profiles import (
-    ACHIEVEMENTS, CONTACT_TYPES, CONTACT_PREFIXES, contact_view, normalize_contacts, profile_form_values,
+    ACHIEVEMENTS, CONTACT_TYPES, CONTACT_PREFIXES, RECORD_DISTANCES, contact_view,
+    normalize_contacts, normalize_profile_details, profile_form_values,
 )
 
 
@@ -30,8 +32,9 @@ def _save(profile, values, photo, remove_photo):
         if photo:
             new_key = avatars.upload_avatar(profile.id, photo)
             key = new_key
-        updated = db.save_pacemaker_profile(profile.id, values['profile_version'], values['motto'],
-                                            values['contacts'], values['achievements'], key)
+        updated = db.save_pacemaker_profile(profile.id, values['profile_version'], values['about'],
+                                            values['contacts'], values['achievements'], key,
+                                            **{k: values.get(k, '' if k in ('city', 'club') else None) for k in ('login', 'city', 'club', 'personal_records')})
     except Exception:
         if new_key:
             avatars.delete_avatar(new_key)
@@ -53,8 +56,19 @@ def create_profile_router(templates):
             context={'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
                      'values': profile_form_values(profile) if values is None else values,
                      'contact_types': CONTACT_TYPES, 'contact_prefixes': CONTACT_PREFIXES,
-                     'achievement_types': ACHIEVEMENTS, 'error': error},
+                     'achievement_types': ACHIEVEMENTS, 'record_distances': RECORD_DISTANCES,
+                     'choices': db.get_profile_choices(), 'error': error},
             status_code=status_code)
+
+    @router.get('/p/{login}')
+    def public_profile(request: Request, login: str, include_splits: bool = True, saved: bool = False):
+        try:
+            pacemaker_id = db.find_pacemaker_login(login)
+        except (PsycopgError, RuntimeError):
+            raise HTTPException(503, 'Не удалось загрузить профиль. Попробуйте позже.') from None
+        if pacemaker_id is None:
+            raise HTTPException(404, 'Пейсмейкер не найден.')
+        return profile_page(request, pacemaker_id, include_splits, saved)
 
     @router.get('/pacemakers/{pacemaker_id}')
     def profile_page(request: Request, pacemaker_id: int, include_splits: bool = True, saved: bool = False):
@@ -62,7 +76,7 @@ def create_profile_router(templates):
         return templates.TemplateResponse(request=request, name='pacemaker.html', context={
             'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
             'contacts': [contact_view(c) for c in profile.contacts], 'achievement_types': ACHIEVEMENTS,
-            'include_splits': include_splits, 'saved': saved,
+            'include_splits': include_splits, 'saved': saved, 'record_distances': RECORD_DISTANCES,
         })
 
     @router.get('/pacemakers/{pacemaker_id}/edit')
@@ -81,23 +95,26 @@ def create_profile_router(templates):
         except ValueError:
             raise HTTPException(400, 'Некорректный размер запроса.') from None
         profile = await run_in_threadpool(_load, pacemaker_id, with_results=False)
-        async with request.form(max_files=1, max_fields=80, max_part_size=4096) as form:
+        async with request.form(max_files=1, max_fields=160, max_part_size=64_000) as form:
             types, labels, contacts = (form.getlist(name) for name in ('contact_type', 'contact_label', 'contact_value'))
-            values = {'motto': str(form.get('motto', '')).strip(),
+            values = {'about': str(form.get('about', form.get('motto', ''))).strip(),
+                      'login': str(form.get('login', profile.login or '')).strip(),
+                      'city': str(form.get('city', profile.city or '')).strip(),
+                      'club': str(form.get('club', profile.club or '')).strip(),
+                      'personal_records': {d: {k: str(form.get(f'record_{d}_{k}', '')).strip()
+                                              for k in ('time', 'year', 'url')} for d in RECORD_DISTANCES},
                       'contacts': [{'type': str(kind), 'label': str(label), 'value': str(value)}
                                    for kind, label, value in zip(types, labels, contacts)],
                       'achievements': list(dict.fromkeys(str(c) for c in form.getlist('achievements'))),
                       'profile_version': str(form.get('profile_version', ''))}
             try:
-                if len(values['motto']) > 200:
-                    raise ValueError('Девиз должен быть не длиннее 200 символов.')
                 if not len(types) == len(labels) == len(contacts):
                     raise ValueError('Некорректные поля контактов. Обновите форму.')
                 version = int(values['profile_version'])
                 if version < 0 or version != profile.version:
                     return edit_response(request, profile, values=values, status_code=409,
                         error='Профиль уже изменили. Обновите страницу перед сохранением.')
-                clean = dict(values, profile_version=version, contacts=normalize_contacts(values['contacts']))
+                clean = dict(normalize_profile_details(values), profile_version=version, contacts=normalize_contacts(values['contacts']))
                 if any(code not in ACHIEVEMENTS for code in values['achievements']):
                     raise ValueError('Неизвестное достижение. Обновите форму.')
                 # Preserve achievements introduced by newer versions of the application.
@@ -111,6 +128,11 @@ def create_profile_router(templates):
                 if photo and form.get('remove_photo'):
                     raise ValueError('Выберите новое фото или удаление текущего — одно действие.')
                 updated = await run_in_threadpool(_save, profile, clean, photo, bool(form.get('remove_photo')))
+            except UniqueViolation as error:
+                if error.diag.constraint_name != 'pacemakers_login_key':
+                    raise
+                return edit_response(request, profile, values=values, status_code=422,
+                    error='Этот логин уже занят. Выберите другой.')
             except ValueError as error:
                 return edit_response(request, profile, values=values, error=str(error), status_code=422)
             except (PsycopgError, RuntimeError):
@@ -119,6 +141,6 @@ def create_profile_router(templates):
         if not updated:
             return edit_response(request, profile, values=values, status_code=409,
                 error='Профиль уже изменили. Обновите страницу перед сохранением.')
-        return RedirectResponse(f'/pacemakers/{pacemaker_id}?saved=true', status_code=303)
+        return RedirectResponse((f'/p/{clean["login"]}' if clean['login'] else f'/pacemakers/{pacemaker_id}') + '?saved=true', status_code=303)
 
     return router

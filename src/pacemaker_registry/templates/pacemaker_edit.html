@@ -8,7 +8,7 @@
     <title>Редактировать профиль · {{ profile.full_name }}</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
     <link rel="stylesheet" href="/static/styles.css?v=profile-navigation">
-    <link rel="stylesheet" href="/static/profiles.css?v=3">
+    <link rel="stylesheet" href="/static/profiles.css?v=4">
     <script src="/static/profile.js?v=2" defer></script>
   </head>
   <body>
@@ -20,7 +20,7 @@
         <input type="hidden" name="profile_version" value="{{ values.profile_version }}">
         {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
         <section class="profile-form-section" aria-labelledby="photo-heading">
-          <h2 id="photo-heading">Фотография и девиз</h2>
+          <h2 id="photo-heading">Фотография и профиль</h2>
           <div class="profile-photo-controls">
             <div class="profile-avatar"><span>{{ profile.initials }}</span><img data-avatar-preview{% if avatar_url %} src="{{ avatar_url }}"{% else %} hidden{% endif %} alt="Предпросмотр фотографии" width="128" height="128"></div>
             <div>
@@ -33,8 +33,34 @@
               {% if avatar_url %}<label class="profile-checkbox"><input type="checkbox" name="remove_photo" value="true" data-avatar-remove> Удалить фотографию</label>{% endif %}
             </div>
           </div>
-          <label for="profile-motto">Девиз</label>
-          <textarea id="profile-motto" name="motto" maxlength="200" rows="2" placeholder="Что помогает вам вести группу вперёд">{{ values.motto }}</textarea>
+          <div class="profile-details-fields">
+            <label>Логин<span class="profile-handle-input"><span class="profile-handle-prefix">pacersreg.ru/p/</span><input name="login" value="{{ values.login }}" maxlength="30" pattern="[A-Za-z][A-Za-z0-9_-]{2,29}" placeholder="my_login" autocapitalize="none" spellcheck="false" aria-describedby="login-hint"></span></label>
+            <p class="event-note" id="login-hint">Уникальный адрес профиля. 3–30 латинских букв, цифр, _ или -. Первой должна быть буква.</p>
+            <div class="profile-two-columns">
+              <label>Город<input name="city" list="profile-cities" value="{{ values.city }}" maxlength="120" placeholder="Выберите или впишите свой" autocomplete="address-level2"></label>
+              <label>Беговой клуб / сообщество<input name="club" list="profile-clubs" value="{{ values.club }}" maxlength="120" placeholder="Выберите или впишите свой"></label>
+            </div>
+            <datalist id="profile-cities">{% for name in choices.cities %}<option value="{{ name }}">{% endfor %}</datalist>
+            <datalist id="profile-clubs">{% for name in choices.clubs %}<option value="{{ name }}">{% endfor %}</datalist>
+            <label for="profile-about">О себе</label>
+            <textarea id="profile-about" name="about" maxlength="5000" rows="6" placeholder="Расскажите о себе, своих регалиях и опыте пейсмейкера">{{ values.about }}</textarea>
+            <p class="event-note">До 5000 символов. Имя берём из результатов забегов — здесь оно не редактируется.</p>
+          </div>
+        </section>
+        <section class="profile-form-section" aria-labelledby="records-heading">
+          <h2 id="records-heading">Личные рекорды</h2>
+          <p class="event-note">Для каждого рекорда укажите время, год и ссылку на результат или трек. Незаполненные дистанции не показываем.</p>
+          <div class="profile-record-fields">
+          {% for distance in record_distances %}{% set record = values.personal_records.get(distance, {}) %}
+            <fieldset class="profile-record-field"><legend>{{ distance|replace('.', ',') }} км</legend>
+              <div class="profile-two-columns">
+                <label>Время<input name="record_{{ distance }}_time" value="{{ record.get('time', '') }}" placeholder="ЧЧ:ММ:СС" maxlength="8" inputmode="numeric"></label>
+                <label>Год<input name="record_{{ distance }}_year" value="{{ record.get('year', '') }}" placeholder="2026" maxlength="4" inputmode="numeric"></label>
+              </div>
+              <label>Соревнование или трек<input name="record_{{ distance }}_url" value="{{ record.get('url', '') }}" placeholder="https://…" maxlength="1000" inputmode="url"></label>
+            </fieldset>
+          {% endfor %}
+          </div>
         </section>
         <section class="profile-form-section" aria-labelledby="contacts-heading">
           <h2 id="contacts-heading">Контакты</h2>

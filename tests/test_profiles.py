@@ -13,6 +13,11 @@ from pacemaker_registry.profile_routes import _save
 from pacemaker_registry.profiles import normalize_contacts, profile_form_values, contact_view
 
 
+@pytest.fixture(autouse=True)
+def choices(monkeypatch):
+    monkeypatch.setattr(db, 'get_profile_choices', lambda: {'cities': ['Москва'], 'clubs': []})
+
+
 @pytest.fixture
 def anyio_backend():
     return 'asyncio'
@@ -163,7 +168,7 @@ async def test_edit_ignores_tampered_name_and_saves_only_profile(monkeypatch):
         edit = await client.get('/pacemakers/7/edit')
     assert response.status_code == 303
     save.assert_called_once_with(7, 0, 'Ведём вместе',
-        [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}], ['pshp_graduate'], None)
+        [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}], ['pshp_graduate'], None, login=None, city='', club='', personal_records={})
     assert 'name="first_name"' not in edit.text and 'name="last_name"' not in edit.text
     assert 'Выбрать фото</label>' in edit.text
     assert 'Файл не выбран' in edit.text
@@ -188,9 +193,9 @@ async def test_stale_edit_invalid_photo_and_cross_origin_never_save(monkeypatch)
 def test_photo_cleanup_after_save_or_conflict(monkeypatch, success):
     order = []
     monkeypatch.setattr(avatars, 'upload_avatar', lambda *a: order.append('upload') or 'new-key')
-    monkeypatch.setattr(db, 'save_pacemaker_profile', lambda *a: order.append('save') or success)
+    monkeypatch.setattr(db, 'save_pacemaker_profile', lambda *a, **k: order.append('save') or success)
     monkeypatch.setattr(avatars, 'delete_avatar', lambda key: order.append('delete:' + key))
-    values = dict(profile_version=0, motto='', contacts=[], achievements=[])
+    values = dict(profile_version=0, about='', contacts=[], achievements=[])
     assert _save(profile(avatar_key='old-key'), values, b'photo', False) == success
     assert order == ['upload', 'save', 'delete:old-key' if success else 'delete:new-key']
 
@@ -199,11 +204,11 @@ def test_failed_database_save_removes_new_upload_only(monkeypatch):
     monkeypatch.setattr(avatars, 'upload_avatar', lambda *a: 'new-key')
     delete = Mock()
     monkeypatch.setattr(avatars, 'delete_avatar', delete)
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise RuntimeError('Database unavailable')
     monkeypatch.setattr(db, 'save_pacemaker_profile', fail)
     with pytest.raises(RuntimeError):
-        _save(profile(avatar_key='old-key'), dict(profile_version=0, motto='', contacts=[], achievements=[]), b'image', False)
+        _save(profile(avatar_key='old-key'), dict(profile_version=0, about='', contacts=[], achievements=[]), b'image', False)
     delete.assert_called_once_with('new-key')
 
 
@@ -245,3 +250,90 @@ async def test_registry_uses_saved_avatar_or_initials_and_links_profile(monkeypa
     assert ('loading="lazy"' in response.text) == has_photo
     if has_photo:
         assert 'https://storage.yandexcloud.net/test-avatars/' + key in response.text
+
+
+@pytest.mark.parametrize('login', ['aa', '1name', 'name with spaces', '../admin', 'имя', 'a' * 31])
+def test_login_rejects_invalid_public_addresses(login):
+    from pacemaker_registry.profiles import normalize_profile_details
+    values = profile_form_values(profile())
+    with pytest.raises(ValueError):
+        normalize_profile_details(dict(values, login=login))
+
+
+def test_extended_profile_validation_and_strava_roundtrip():
+    from pacemaker_registry.profiles import normalize_profile_details
+    values = profile_form_values(profile())
+    values.update(login='My_Login', about='Я' * 5000, city='  Новый   город ', club=' Клуб ',
+                  personal_records={'5': {'time': '18:02', 'year': '2025', 'url': 'https://example.org/result'}})
+    clean = normalize_profile_details(values)
+    assert (clean['login'], clean['city'], clean['club']) == ('my_login', 'Новый город', 'Клуб')
+    assert clean['personal_records']['5'] == {'time': '00:18:02', 'year': 2025, 'url': 'https://example.org/result'}
+    contacts = normalize_contacts([{'type': 'strava', 'value': '123456'}])
+    assert contacts == [{'type': 'strava', 'value': 'https://www.strava.com/athletes/123456'}]
+    assert contact_view(contacts[0])['display_value'] == '@123456'
+    assert normalize_contacts(profile_form_values(profile(contacts=tuple(contacts)))['contacts']) == contacts
+
+
+@pytest.mark.parametrize('record', [
+    {'time': '0:00', 'year': '2025', 'url': 'https://example.org'},
+    {'time': '18:60', 'year': '2025', 'url': 'https://example.org'},
+    {'time': '18:02', 'year': '1800', 'url': 'https://example.org'},
+    {'time': '18:02', 'year': '2999', 'url': 'https://example.org'},
+    {'time': '18:02', 'year': '', 'url': 'https://example.org'},
+    {'time': '18:02', 'year': '2025', 'url': 'javascript:alert(1)'},
+    {'time': '18:02', 'year': '2025', 'url': ''},
+])
+def test_incomplete_or_invalid_record_rejected(record):
+    from pacemaker_registry.profiles import normalize_profile_details
+    with pytest.raises(ValueError):
+        normalize_profile_details(dict(profile_form_values(profile()), personal_records={'5': record}))
+
+
+@pytest.mark.anyio
+async def test_public_login_and_details_edit_and_errors_preserve_fields(monkeypatch):
+    monkeypatch.setattr(db, 'get_pacemaker_profile', lambda *a, **k: profile(login='pacer'))
+    monkeypatch.setattr(db, 'find_pacemaker_login', lambda login: 7 if login == 'pacer' else None)
+    save = Mock(return_value=True)
+    monkeypatch.setattr(db, 'save_pacemaker_profile', save)
+    data = {'profile_version': '0', 'about': 'Я' * 5000, 'login': 'MY_LOGIN',
+            'city': ' Новый   город ', 'club': 'Наш клуб', 'record_5_time': '19:01',
+            'record_5_year': '2025', 'record_5_url': 'https://example.org/race'}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        assert (await client.get('/p/pacer')).status_code == 200
+        assert (await client.get('/p/missing')).status_code == 404
+        saved = await client.post('/pacemakers/7/edit', data=data)
+        assert saved.status_code == 303 and saved.headers['location'] == '/p/my_login?saved=true'
+        assert save.call_args.kwargs == {'login': 'my_login', 'city': 'Новый город', 'club': 'Наш клуб',
+            'personal_records': {'5': {'time': '00:19:01', 'year': 2025, 'url': 'https://example.org/race'}}}
+        invalid = await client.post('/pacemakers/7/edit', data=dict(data, login='no spaces allowed'))
+        assert invalid.status_code == 422 and 'Наш клуб' in invalid.text and '19:01' in invalid.text
+        assert 'Я' * 5000 in invalid.text
+        assert save.call_count == 1
+
+
+@pytest.mark.anyio
+async def test_profile_renders_records_and_about_as_plain_text(monkeypatch):
+    monkeypatch.setattr(db, 'get_pacemaker_profile', lambda *a, **k: profile(
+        login='pacer', city='Москва', club='Наш клуб', about='<script>alert(1)</script>',
+        personal_records={'42.2': {'time': '03:00:00', 'year': 2025, 'url': 'https://example.org/race'}}))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get('/pacemakers/7')
+    assert 'pacersreg.ru/p/pacer' in response.text and 'Наш клуб' in response.text
+    assert '&lt;script&gt;alert(1)&lt;/script&gt;' in response.text
+    assert '42,2 км' in response.text and '03:00:00' in response.text
+
+
+@pytest.mark.anyio
+async def test_login_collision_is_explained_without_losing_entered_fields(monkeypatch):
+    from psycopg.errors import UniqueViolation
+    monkeypatch.setattr(db, 'get_pacemaker_profile', lambda *a, **k: profile())
+    class LoginConflict(UniqueViolation):
+        @property
+        def diag(self):
+            return type('Diagnostic', (), {'constraint_name': 'pacemakers_login_key'})()
+    monkeypatch.setattr(db, 'save_pacemaker_profile', Mock(side_effect=LoginConflict()))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        r = await client.post('/pacemakers/7/edit', data={'profile_version': '0', 'login': 'taken',
+            'about': 'Моё описание', 'city': 'Москва', 'club': 'Мой клуб'})
+    assert r.status_code == 422 and 'Этот логин уже занят' in r.text
+    assert 'Моё описание' in r.text and 'Мой клуб' in r.text and 'value="taken"' in r.text

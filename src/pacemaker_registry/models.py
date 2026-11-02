@@ -75,12 +75,20 @@ class PacemakerProfile:
     id: int
     last_name: str
     first_name: str
-    motto: str | None = None
+    about: str | None = None
     avatar_key: str | None = None
     contacts: tuple[dict[str, str], ...] = ()
     achievements: tuple[str, ...] = ()
     version: int = 0
     results: tuple[RegistryCard, ...] = ()
+    login: str | None = None
+    city: str | None = None
+    club: str | None = None
+    personal_records: dict | None = None
+
+    @property
+    def public_path(self) -> str:
+        return f'/p/{self.login}' if self.login else f'/pacemakers/{self.id}'
 
     @property
     def full_name(self) -> str:
