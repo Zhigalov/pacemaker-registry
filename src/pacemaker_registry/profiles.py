@@ -12,7 +12,7 @@ CONTACT_TYPES = {
     'phone': ('Телефон', '+7 999 123-45-67'),
     'vk': ('ВКонтакте', 'username или id123456'),
     'facebook': ('Facebook', 'username'),
-    'strava': ('Strava', 'Номер спортсмена или ник'),
+    'strava': ('Strava', 'ID, ник или ссылка на профиль'),
     'other': ('Другое', 'Ссылка или текст'),
 }
 ACHIEVEMENTS = {'pshp_graduate': {
@@ -25,7 +25,7 @@ CONTACT_PREFIXES = {
     'max': 'https://max.ru/', 'vk': 'https://vk.com/', 'facebook': 'https://facebook.com/',
 }
 SERVICE_HOSTS = {
-    'strava': ('strava.com',),
+    'strava': ('strava.com', 'strava.app.link'),
     'telegram': ('t.me', 'telegram.me'),
     'instagram': ('instagram.com',),
     'max': ('max.ru',),
@@ -65,6 +65,8 @@ def normalize_contacts(rows: list[dict]) -> list[dict[str, str]]:
             if not re.fullmatch(r'\+[1-9][0-9]{6,14}', number):
                 raise ValueError('Укажите телефон с кодом страны, например +7 999 123-45-67.')
             value = number if kind == 'phone' else 'https://wa.me/' + number[1:]
+        elif kind == 'strava':
+            value = normalize_strava(value)
         elif kind == 'other':
             if value.startswith(('https://', 'http://')):
                 value = _web_url(value)
@@ -102,7 +104,9 @@ def contact_view(contact: dict) -> dict:
         host = urlsplit(href).hostname.removeprefix('www.').lower()
         display_kind = next((service for service, hosts in SERVICE_HOSTS.items() if host in hosts), 'other')
     display_value = contact_input(dict(contact, type=display_kind)) if href else value
-    if display_kind in CONTACT_PREFIXES and not display_value.startswith(('http://', 'https://')):
+    if display_kind == 'strava' and href and urlsplit(href).hostname == 'strava.app.link':
+        display_value = 'Профиль Strava'
+    if display_kind in CONTACT_PREFIXES and display_value != 'Профиль Strava' and not display_value.startswith(('http://', 'https://')):
         display_value = '@' + display_value if '/' not in display_value else display_value
     return {'label': contact.get('label') or CONTACT_TYPES.get(display_kind, ('Другое', ''))[0],
             'value': value, 'display_value': display_value, 'href': href,
@@ -133,6 +137,8 @@ def contact_input(contact: dict) -> str:
     if not parsed.hostname or parsed.hostname.removeprefix('www.').lower() not in SERVICE_HOSTS[kind]:
         return value
     path = parsed.path.strip('/')
+    if kind == 'strava' and parsed.hostname == 'strava.app.link':
+        return value
     if kind == 'whatsapp':
         number = parse_qs(parsed.query).get('phone', [path])[0]
         return '+' + number.lstrip('+')
@@ -173,3 +179,19 @@ def normalize_profile_details(values: dict) -> dict:
                              'year': int(year), 'url': _web_url(url)}
     clean['personal_records'] = records
     return clean
+
+
+def normalize_strava(value: str) -> str:
+    if re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}', value.removeprefix('@')):
+        return CONTACT_PREFIXES['strava'] + value.removeprefix('@')
+    urls = re.findall(r'https?://[^\s<>]+', value)
+    if len(urls) == 1:
+        url = _web_url(urls[0].rstrip('.,!;)'))
+        parsed = urlsplit(url)
+        if parsed.scheme == 'https':
+            if parsed.hostname == 'strava.app.link' and re.fullmatch(r'/[A-Za-z0-9]+/?', parsed.path):
+                return url
+            if parsed.hostname in {'strava.com', 'www.strava.com'} and re.fullmatch(
+                    r'/athletes/[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}/?', parsed.path):
+                return CONTACT_PREFIXES['strava'] + parsed.path.strip('/').removeprefix('athletes/')
+    raise ValueError('Strava: укажите ID, ник или ссылку из «Поделиться профилем» (strava.app.link или strava.com/athletes/…).')

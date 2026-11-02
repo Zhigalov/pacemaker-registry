@@ -337,3 +337,33 @@ async def test_login_collision_is_explained_without_losing_entered_fields(monkey
             'about': 'Моё описание', 'city': 'Москва', 'club': 'Мой клуб'})
     assert r.status_code == 422 and 'Этот логин уже занят' in r.text
     assert 'Моё описание' in r.text and 'Мой клуб' in r.text and 'value="taken"' in r.text
+
+
+@pytest.mark.parametrize('value,expected', [
+    ('123456', 'https://www.strava.com/athletes/123456'),
+    ('https://www.strava.com/athletes/123456?utm_source=app', 'https://www.strava.com/athletes/123456'),
+    ('https://strava.com/athletes/pacer_one/', 'https://www.strava.com/athletes/pacer_one'),
+    ('https://strava.app.link/E7j9NbZnJ7b', 'https://strava.app.link/E7j9NbZnJ7b'),
+    ('Sergey Zhigalov пользуется Strava. https://strava.app.link/E7j9NbZnJ7b', 'https://strava.app.link/E7j9NbZnJ7b'),
+])
+def test_strava_accepts_shared_text_profile_links_and_id(value, expected):
+    clean = normalize_contacts([{'type': 'strava', 'value': value}])
+    assert clean == [{'type': 'strava', 'value': expected}]
+    form = profile_form_values(profile(contacts=tuple(clean)))
+    assert normalize_contacts(form['contacts']) == clean
+    view = contact_view(clean[0])
+    assert view['href'] == expected and view['icon'] == 'strava'
+    if 'app.link' in expected:
+        assert view['display_value'] == 'Профиль Strava'
+
+
+@pytest.mark.parametrize('value', [
+    'https://strava.app.link.evil.example/test', 'https://strava.com/activities/123',
+    'https://strava.com/clubs/123', 'http://strava.app.link/test',
+    'https://user:password@strava.app.link/test',
+    'https://strava.app.link/test https://example.org',
+    'javascript:alert(1)', 'https://strava.app.link/test/extra',
+])
+def test_strava_rejects_non_profile_web_urls_and_unsafe_links(value):
+    with pytest.raises(ValueError):
+        normalize_contacts([{'type': 'strava', 'value': value}])

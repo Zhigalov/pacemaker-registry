@@ -8,7 +8,7 @@
     <title>Редактировать профиль · {{ profile.full_name }}</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
     <link rel="stylesheet" href="/static/styles.css?v=profile-navigation">
-    <link rel="stylesheet" href="/static/profiles.css?v=4">
+    <link rel="stylesheet" href="/static/profiles.css?v=5">
     <script src="/static/profile.js?v=2" defer></script>
   </head>
   <body>
@@ -49,22 +49,22 @@
         </section>
         <section class="profile-form-section" aria-labelledby="records-heading">
           <h2 id="records-heading">Личные рекорды</h2>
-          <p class="event-note">Для каждого рекорда укажите время, год и ссылку на результат или трек. Незаполненные дистанции не показываем.</p>
+          <p class="event-note">Время, год и подтверждающая ссылка. Незаполненные дистанции скрыты.</p>
           <div class="profile-record-fields">
-          {% for distance in record_distances %}{% set record = values.personal_records.get(distance, {}) %}
-            <fieldset class="profile-record-field"><legend>{{ distance|replace('.', ',') }} км</legend>
-              <div class="profile-two-columns">
-                <label>Время<input name="record_{{ distance }}_time" value="{{ record.get('time', '') }}" placeholder="ЧЧ:ММ:СС" maxlength="8" inputmode="numeric"></label>
-                <label>Год<input name="record_{{ distance }}_year" value="{{ record.get('year', '') }}" placeholder="2026" maxlength="4" inputmode="numeric"></label>
+            <div class="profile-record-column-headings" aria-hidden="true"><span>Км</span><span>Время</span><span>Год</span><span>Результат или трек</span></div>
+            {% for distance in record_distances %}{% set record = values.personal_records.get(distance, {}) %}
+              <div class="profile-record-edit-row" role="group" aria-label="Рекорд на {{ distance|replace('.', ',') }} км">
+                <strong class="record-distance">{{ distance|replace('.', ',') }}<small> км</small></strong>
+                <label><span class="visually-hidden">Время на {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_time" value="{{ record.get('time', '') }}" placeholder="ЧЧ:ММ:СС" maxlength="8"></label>
+                <label><span class="visually-hidden">Год рекорда на {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_year" value="{{ record.get('year', '') }}" placeholder="Год" maxlength="4" inputmode="numeric"></label>
+                <label class="record-source"><span class="visually-hidden">Ссылка на рекорд {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_url" value="{{ record.get('url', '') }}" placeholder="Ссылка https://…" maxlength="1000" inputmode="url"></label>
               </div>
-              <label>Соревнование или трек<input name="record_{{ distance }}_url" value="{{ record.get('url', '') }}" placeholder="https://…" maxlength="1000" inputmode="url"></label>
-            </fieldset>
-          {% endfor %}
+            {% endfor %}
           </div>
         </section>
         <section class="profile-form-section" aria-labelledby="contacts-heading">
           <h2 id="contacts-heading">Контакты</h2>
-          <p class="event-note">В соцсетях укажите только ник, можно с @ — ссылку соберём сами. Для WhatsApp нужен номер телефона. Контакты будут видны всем посетителям.</p>
+          <p class="event-note">В соцсетях укажите только ник, можно с @ — ссылку соберём сами. Для Strava подойдёт и ссылка из приложения, для WhatsApp — номер телефона. Контакты видны всем посетителям.</p>
           <div class="profile-contact-fields" data-contact-fields>
             {% for contact in values.contacts %}
               <div class="profile-contact-row{% if contact.type == 'other' %} profile-contact-row--other{% endif %}">
@@ -73,9 +73,10 @@
                   <label>Название<input type="text" name="contact_label" maxlength="60" value="{{ contact.label|default('') }}" placeholder="Например, сайт команды"></label>
                 {% else %}<input type="hidden" name="contact_label" value=""><label>{{ contact_types[contact.type][0] if contact.type in contact_types else 'Контакт' }}{% endif %}
                 {% if contact.type == 'other' %}<label>Ссылка или текст{% endif %}
-                  {% if contact.type in contact_prefixes %}<span class="profile-handle-input"><span class="profile-handle-prefix" aria-hidden="true">{{ contact_prefixes[contact.type]|replace('https://', '') }}</span>{% endif %}
-                  <input type="text" name="contact_value" maxlength="{{ 201 if contact.type in contact_prefixes else 500 }}" value="{{ contact.value }}" placeholder="{{ contact_types[contact.type][1] if contact.type in contact_types else '' }}"{% if contact.type in contact_prefixes %} autocapitalize="none" spellcheck="false"{% elif contact.type in ['phone', 'whatsapp'] %} inputmode="tel"{% endif %}>
-                  {% if contact.type in contact_prefixes %}</span>{% endif %}
+                  {% if contact.type in contact_prefixes and contact.type != 'strava' %}<span class="profile-handle-input"><span class="profile-handle-prefix" aria-hidden="true">{{ contact_prefixes[contact.type]|replace('https://', '') }}</span>{% endif %}
+                  <input type="text" name="contact_value" maxlength="{{ 201 if contact.type in contact_prefixes and contact.type != 'strava' else 500 }}" value="{{ contact.value }}" placeholder="{{ contact_types[contact.type][1] if contact.type in contact_types else '' }}"{% if contact.type in contact_prefixes and contact.type != 'strava' %} autocapitalize="none" spellcheck="false"{% elif contact.type in ['phone', 'whatsapp'] %} inputmode="tel"{% endif %}>
+                  {% if contact.type in contact_prefixes and contact.type != 'strava' %}</span>{% endif %}
+                  {% if contact.type == 'strava' %}<small class="contact-field-hint">ID, ник или ссылка из «Поделиться профилем». Можно вставить весь текст из приложения.</small>{% endif %}
                 </label>
                 {% if contact.type == 'other' %}<button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>{% endif %}
               </div>
