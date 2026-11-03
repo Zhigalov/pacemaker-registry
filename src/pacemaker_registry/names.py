@@ -3,7 +3,7 @@
 
 def matches_name(full_name: str, query: str) -> bool:
     parts = full_name.casefold().replace('ё', 'е').split()
-    terms = sorted(set(query.casefold().replace('ё', 'е').split()), key=len, reverse=True)
+    terms = sorted(query.casefold().replace('ё', 'е').split(), key=len, reverse=True)
     if len(terms) > len(parts):
         return False
 
