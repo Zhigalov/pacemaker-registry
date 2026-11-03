@@ -80,6 +80,16 @@ app.include_router(create_profile_router(templates))
 
 
 DistanceFilter = Annotated[Decimal | None, Query(ge=0, le=Decimal('99999.999'), decimal_places=3)]
+NameSearch = Annotated[str, Query(max_length=160)]
+
+
+def _registry_parameters(event_id, include_splits, min_events, distance_km=None, q=''):
+    params = {'event_id': event_id or 0, 'include_splits': str(include_splits).lower(), 'min_events': min_events}
+    if distance_km:
+        params['distance_km'] = format(distance_km.normalize(), 'f')
+    if q.strip():
+        params['q'] = ' '.join(q.split())
+    return params
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -89,7 +99,9 @@ def home(
     include_splits: bool = True,
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
     distance_km: DistanceFilter = None,
+    q: NameSearch = "",
 ) -> HTMLResponse:
+    q = ' '.join(q.split())
     registry_error = None
     try:
         registry = load_registry(
@@ -97,13 +109,16 @@ def home(
             include_splits=include_splits,
             min_events=min_events,
             distance_km=distance_km if distance_km else None,
+            search=q,
         )
     except (PsycopgError, RuntimeError):
-        registry = Registry((), 0, 0, include_splits=include_splits, min_events=min_events)
+        registry = Registry((), 0, 0, include_splits=include_splits, min_events=min_events, search=q)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
     return templates.TemplateResponse(
         request=request, name="index.html",
-        context={"registry": registry, "registry_error": registry_error},
+        context={"registry": registry, "registry_error": registry_error,
+                 "clear_search_url": '/?' + urlencode(_registry_parameters(
+                     registry.selected_event_id, include_splits, min_events, distance_km))},
     )
 
 
@@ -203,11 +218,9 @@ def _load_result_or_404(result_id: int, include_splits: bool):
 
 
 def _result_response(request, details, include_splits, event_id, min_events, *,
-                     target_time=None, error=None, saved=False, status_code=200, distance_km=None):
+                     target_time=None, error=None, saved=False, status_code=200, distance_km=None, q=''):
     source_url, source_event_url = _result_source_links(details.source_url)
-    params = {"event_id": event_id, "include_splits": str(include_splits).lower(), "min_events": min_events}
-    if distance_km:
-        params['distance_km'] = format(distance_km.normalize(), 'f')
+    params = _registry_parameters(event_id, include_splits, min_events, distance_km, q)
     query = urlencode(params)
     return templates.TemplateResponse(
         request=request, name="result.html",
@@ -231,10 +244,11 @@ def result_page(
     event_id: Annotated[int, Query(ge=0)] = 0,
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
     distance_km: DistanceFilter = None,
+    q: NameSearch = "",
     saved: bool = False,
 ):
     return _result_response(request, _load_result_or_404(result_id, include_splits),
-                            include_splits, event_id, min_events, saved=saved, distance_km=distance_km)
+                            include_splits, event_id, min_events, saved=saved, distance_km=distance_km, q=q)
 
 
 @app.post("/results/{result_id}/target-time", response_class=HTMLResponse)
@@ -246,6 +260,7 @@ def edit_result_target_time(
     event_id: Annotated[int, Query(ge=0)] = 0,
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
     distance_km: DistanceFilter = None,
+    q: NameSearch = "",
 ):
     details = _load_result_or_404(result_id, include_splits)
     target_time = target_time.strip()
@@ -253,27 +268,25 @@ def edit_result_target_time(
         target_time = normalize_target_time(target_time)
     except ValueError as error:
         return _result_response(
-            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km,
+            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km, q=q,
             error=str(error), status_code=422,
         )
     try:
         updated = update_result_target_time(result_id, target_time, previous_target_time)
     except (PsycopgError, RuntimeError):
         return _result_response(
-            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km,
+            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km, q=q,
             error="Не удалось сохранить время. Проверьте текущее значение и попробуйте ещё раз.", status_code=503,
         )
     if not updated:
         details = _load_result_or_404(result_id, include_splits)
         return _result_response(
-            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km,
+            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km, q=q,
             error="Время уже изменено в другой вкладке. Сравните с текущей целью и подтвердите сохранение ещё раз.",
             status_code=409,
         )
-    params = {"event_id": event_id, "include_splits": str(include_splits).lower(),
-              "min_events": min_events, "saved": "true"}
-    if distance_km:
-        params['distance_km'] = format(distance_km.normalize(), 'f')
+    params = _registry_parameters(event_id, include_splits, min_events, distance_km, q)
+    params['saved'] = 'true'
     query = urlencode(params)
     return RedirectResponse(f"/results/{result_id}?{query}", status_code=303)
 

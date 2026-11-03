@@ -49,7 +49,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "pacemaker_registry.main.load_registry",
-        lambda event_id=None, include_splits=True, min_events=1, distance_km=None: registry,
+        lambda event_id=None, include_splits=True, min_events=1, distance_km=None, search="": registry,
     )
 
     async with AsyncClient(
@@ -61,7 +61,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=distance-filter"' in response.text
+    assert 'href="/static/styles.css?v=name-search"' in response.text
     assert 'src="/static/apple-touch-icon.png?v=equal-flags"' in response.text
     assert 'class="registry-heading"' not in response.text
     assert 'Статистика отфильтрованного списка' in response.text
@@ -151,7 +151,7 @@ async def test_card_distinguishes_missing_pace_from_zero(monkeypatch):
 @pytest.mark.anyio
 async def test_home_page_filters_and_checkbox(monkeypatch) -> None:
     requested = []
-    def fake_load_registry(event_id=None, include_splits=True, min_events=1, distance_km=None):
+    def fake_load_registry(event_id=None, include_splits=True, min_events=1, distance_km=None, search=""):
         requested.append((event_id, include_splits))
         return Registry((), 1, 0, events=(RegistryEvent(2, "Марафон"),),
                         selected_event_id=event_id, include_splits=include_splits)
@@ -449,7 +449,7 @@ async def test_readiness_reports_database_failure(monkeypatch) -> None:
 async def test_distance_selection_switching_combination_and_validation(monkeypatch):
     from decimal import Decimal
     requested = []
-    def load(event_id=None, include_splits=True, min_events=1, distance_km=None):
+    def load(event_id=None, include_splits=True, min_events=1, distance_km=None, search=""):
         requested.append((event_id, include_splits, min_events, distance_km))
         return Registry((), 0, 0, events=(RegistryEvent(2, 'Марафон'),),
             selected_event_id=event_id, include_splits=include_splits, min_events=min_events,
@@ -471,3 +471,47 @@ async def test_distance_selection_switching_combination_and_validation(monkeypat
             assert (await client.get('/?distance_km=' + value)).status_code == 422
     assert requested == [(2, False, 3, Decimal('21.100')), (None, True, 1, Decimal('10')),
                          (None, True, 1, None), (None, True, 1, None)]
+
+
+@pytest.mark.anyio
+async def test_name_search_url_clear_and_empty_state_preserve_other_filters(monkeypatch):
+    from decimal import Decimal
+    import html
+    import re
+    from urllib.parse import parse_qs, urlsplit
+    calls = []
+    def load(event_id=None, include_splits=True, min_events=1, distance_km=None, search=''):
+        calls.append(search)
+        return Registry((), 0, 0, events=(RegistryEvent(2, 'Забег'),), selected_event_id=event_id,
+            include_splits=include_splits, min_events=min_events, distances=('10',),
+            selected_distance='10', search=search)
+    monkeypatch.setattr('pacemaker_registry.main.load_registry', load)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get('/', params={'q': '  Иван   ПЕТРОВ ', 'event_id': 2,
+            'distance_km': '10', 'min_events': 3, 'include_splits': 'false'})
+        assert response.status_code == 200 and 'Никого не нашли' in response.text
+        assert 'value="Иван ПЕТРОВ"' in response.text
+        clear = html.unescape(re.search(r'class="registry-search-clear" href="([^"]+)"', response.text).group(1))
+        assert parse_qs(urlsplit(clear).query) == {'event_id': ['2'], 'distance_km': ['10'],
+            'min_events': ['3'], 'include_splits': ['false']}
+        await client.get(clear)
+        invalid = await client.get('/', params={'q': 'a' * 161})
+        assert invalid.status_code == 422
+        unsafe = await client.get('/', params={'q': '<script>alert(1)</script>'})
+        assert '<script>alert(1)</script>' not in unsafe.text
+        assert '&lt;script&gt;alert(1)&lt;/script&gt;' in unsafe.text
+    assert calls == ['Иван ПЕТРОВ', '', '<script>alert(1)</script>']
+
+
+@pytest.mark.anyio
+async def test_name_search_is_carried_by_result_cards(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+    import html,re
+    card = RegistryCard(7, 2, 'Забег', '10', '00:50', '00:50:00', 10, None, 10)
+    registry = Registry((RegistryPacemaker(1, 'Петров Иван', 'ПИ', 10, (card,)),), 1, 1,
+        events=(RegistryEvent(2, 'Забег'),), distances=('10',), selected_distance='10', search='Иван Петров')
+    monkeypatch.setattr('pacemaker_registry.main.load_registry', lambda *a, **k: registry)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        r = await client.get('/?q=Иван+Петров&distance_km=10')
+    link = html.unescape(re.search(r'class="result-summary"\s+href="([^"]+)"',r.text).group(1))
+    assert parse_qs(urlsplit(link).query)['q'] == ['Иван Петров']

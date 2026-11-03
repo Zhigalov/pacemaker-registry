@@ -274,3 +274,33 @@ def test_distance_filter_combines_with_event_history_and_recalculates_rating(dat
     assert db.load_registry(distance_km=Decimal('7.777')).result_count == 0
     restored = db.load_registry(include_splits=False)
     assert restored == all_results
+
+
+def test_name_search_all_words_order_case_yo_and_other_filters(database):
+    migrate.migrate()
+    for name, event, distance in (
+        ('Петров Иван', 'one', '10'), ('Петров Иван', 'two', '21.1'),
+        ('Петров Пётр', 'one', '10'), ('Иванов Сергей', 'one', '10'),
+        ('Сидоров Иван', 'one', '10'), ('Елкин Артём', 'one', '10'),
+    ):
+        assert db.save_race_result(sample(athlete_name=name, source_event_id=event, distance_km=distance), '00:50')
+    def names(query, **filters):
+        return {p.full_name for p in db.load_registry(search=query, **filters).pacemakers}
+    assert names('иван') == {'Петров Иван', 'Иванов Сергей', 'Сидоров Иван'}
+    assert names('ИВАН ПЕТРОВ') == names('  Петров\t\nИван  ') == {'Петров Иван'}
+    assert names('Ив петр') == {'Петров Иван'}
+    assert names('ПЕТР') == {'Петров Иван', 'Петров Пётр'}
+    assert names('петр петров') == {'Петров Пётр'}
+    assert names('ёЛКИН АРТЕМ') == {'Елкин Артём'}
+    from decimal import Decimal
+    filtered = db.load_registry(search='Иван Петров', distance_km=Decimal('10'), min_events=2)
+    assert len(filtered.pacemakers) == 1 and filtered.result_count == 1
+    assert filtered.pacemakers[0].performance_count == 2
+    event = filtered.pacemakers[0].results[0].event_id
+    assert names('Петров Иван', event_id=event, distance_km=Decimal('21.1')) == set()
+    assert filtered.distances == ('10', '21.1') and len(filtered.events) == 2
+    for query in ('%', '_', "' OR 1=1 --", 'Неизвестный'):
+        assert names(query) == set()  # No LIKE wildcards or SQL interpolation.
+    assert names('   ') == names('')
+    with database() as connection:
+        assert connection.execute("SELECT first_name FROM pacemakers WHERE last_name='Елкин'").fetchone()[0] == 'Артём'

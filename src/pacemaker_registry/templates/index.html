@@ -9,9 +9,9 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=distance-filter">
+    <link rel="stylesheet" href="/static/styles.css?v=name-search">
     <link rel="stylesheet" href="/static/profiles.css?v=3">
-    <script src="/static/registry.js?v=avatars" defer></script>
+    <script src="/static/registry.js?v=name-search" defer></script>
   </head>
   <body>
     <main class="app-shell app-shell--registry">
@@ -19,9 +19,17 @@
 
       <h1 id="page-title" class="visually-hidden">Пейсмейкеры</h1>
 
-      {% if registry.events %}
+      {% if registry.events or registry.search %}
         <section class="registry-toolbar" aria-label="Фильтр реестра">
           <form class="registry-filter" method="get" action="/">
+            <div class="registry-filter-field registry-filter-field--search">
+              <label for="name-search">Пейсмейкер</label>
+              <div class="registry-search-control">
+                <input id="name-search" type="search" name="q" value="{{ registry.search }}" maxlength="160" placeholder="Фамилия или имя" autocomplete="off" data-registry-search>
+                {% if registry.search %}<a class="registry-search-clear" href="{{ clear_search_url }}" aria-label="Очистить поиск">×</a>{% endif %}
+                <button class="button registry-filter-submit" type="submit">Найти</button>
+              </div>
+            </div>
             <div class="registry-filter-field registry-filter-field--event">
               <label for="event-filter">Соревнование</label>
               <span class="registry-filter-select">
@@ -76,7 +84,7 @@
           {% if registry.selected_event_id is not none %}
             <div class="registry-summary-links">
               <a class="quiet-link" href="/events/{{ registry.selected_event_id }}">Настройки соревнования →</a>
-              <a class="quiet-link registry-filter-reset" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}{% if registry.selected_distance %}&amp;distance_km={{ registry.selected_distance }}{% endif %}">Все соревнования</a>
+              <a class="quiet-link registry-filter-reset" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}{% if registry.selected_distance %}&amp;distance_km={{ registry.selected_distance }}{% endif %}{% if registry.search %}&amp;q={{ registry.search|urlencode }}{% endif %}">Все соревнования</a>
             </div>
           {% endif %}
         </div>
@@ -118,7 +126,7 @@
 
               <div class="results-strip">
                 {% for result in pacemaker.results %}
-                  {{ result_card(result, registry.include_splits, registry.selected_event_id or 0, registry.min_events, registry.selected_distance) }}
+                  {{ result_card(result, registry.include_splits, registry.selected_event_id or 0, registry.min_events, registry.selected_distance, registry.search) }}
 
                 {% endfor %}
               </div>
@@ -167,6 +175,12 @@
             <p>Сравниваем рейтинг, округлённый до десятых, как на карточках. При равенстве выше пейсер с большим числом выступлений за всю историю, включая разные дистанции одного соревнования. Если и оно совпало — с меньшим средним абсолютным отклонением финиша от цели в секундах по показанным выступлениям. Ранний и поздний финиш не компенсируют друг друга.</p>
           </div>
         </details>
+      {% elif registry.search %}
+        <section class="empty-state">
+          <h2>Никого не нашли</h2>
+          <p>По запросу «{{ registry.search }}» нет пейсеров с выбранными фильтрами. Попробуйте другое имя или очистите поиск.</p>
+          <a class="button registry-filter-submit" href="{{ clear_search_url }}">Очистить поиск</a>
+        </section>
       {% elif registry.events %}
         <section class="empty-state">
           <h2>Нет пейсеров по выбранным условиям</h2>

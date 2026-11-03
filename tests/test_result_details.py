@@ -261,4 +261,25 @@ async def test_result_back_links_and_flag_edit_keep_distance_filter(monkeypatch)
         response = await client.post('/results/12/target-time?' + query,
             data={'target_time': '03:29', 'previous_target_time': '03:30'})
         assert response.status_code == 303
-        assert response.headers['location'].endswith('&saved=true&distance_km=42.2')
+        assert response.headers['location'].endswith('&distance_km=42.2&saved=true')
+
+
+@pytest.mark.anyio
+async def test_result_navigation_and_flag_edit_preserve_name_search(monkeypatch):
+    import html
+    from urllib.parse import parse_qs,urlsplit
+    monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: details())
+    monkeypatch.setattr(main, 'update_result_target_time', lambda *args: True)
+    params={'q':'Петров Иван','distance_km':'42.2','event_id':1,'min_events':2,'include_splits':'false'}
+    async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
+        page = await client.get('/results/12', params=params)
+        back = html.unescape(re.search(r'class="button result-back" href="([^"]+)"',page.text).group(1))
+        assert parse_qs(urlsplit(back).query) == {k:[str(v)] for k,v in params.items()}
+        invalid = await client.post('/results/12/target-time', params=params,
+            data={'target_time':'oops','previous_target_time':'03:30'})
+        assert invalid.status_code==422 and 'q=%D0' in invalid.text
+        saved = await client.post('/results/12/target-time', params=params,
+            data={'target_time':'03:29','previous_target_time':'03:30'})
+        assert saved.status_code==303
+        query = parse_qs(urlsplit(saved.headers['location']).query)
+        assert query['q']==['Петров Иван'] and query['distance_km']==['42.2']

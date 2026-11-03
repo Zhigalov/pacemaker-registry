@@ -71,7 +71,7 @@ def test_two_distances_outrank_one_when_displayed_rating_is_equal():
 @pytest.mark.anyio
 async def test_min_events_parameter_validation_and_empty_state(monkeypatch):
     calls = []
-    def load(event_id=None, include_splits=True, min_events=1, distance_km=None):
+    def load(event_id=None, include_splits=True, min_events=1, distance_km=None, search=""):
         calls.append((event_id, include_splits, min_events))
         return Registry((), 0, 0, (RegistryEvent(1, "Первое"),), event_id, include_splits, min_events)
     monkeypatch.setattr("pacemaker_registry.main.load_registry", load)

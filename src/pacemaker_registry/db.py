@@ -16,6 +16,7 @@ from pacemaker_registry.russiarunning import (
 
 
 from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig
+from pacemaker_registry.names import matches_name
 from pacemaker_registry.models import Registry, RegistryEvent, RegistryPacemaker, ResultDetails, PacemakerProfile
 from pacemaker_registry.registry import _build_registry_result, _sort_pacemakers
 from pacemaker_registry.times import normalize_target_time
@@ -182,6 +183,7 @@ def load_registry(
     include_splits: bool = True,
     min_events: int = 1,
     distance_km: Decimal | None = None,
+    search: str = "",
 ) -> Registry:
     with connect_database() as connection:
         # All queries must see the same results and formulas during concurrent saves.
@@ -247,6 +249,13 @@ def load_registry(
         if distance_km:
             conditions.append('rr.distance_km = %s')
             parameters += (distance_km,)
+        search = ' '.join(search.split())
+        if search:
+            # Fetch only names for matching; SQL loads result/segment data only for matching IDs.
+            names = connection.execute('SELECT id, last_name, first_name FROM pacemakers').fetchall()
+            matching_ids = [pid for pid, last, first in names if matches_name(f'{last} {first}', search)]
+            conditions.append('p.id = ANY(%s)')
+            parameters += (matching_ids,)
         if conditions:
             query += ' WHERE ' + ' AND '.join(conditions)
         query += """
@@ -315,6 +324,7 @@ def load_registry(
         min_events=min_events,
         distances=distances,
         selected_distance=selected_distance,
+        search=search,
     )
 
 

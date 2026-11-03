@@ -131,6 +131,7 @@ class Registry:
     min_events: int = 1
     distances: tuple[str, ...] = ()
     selected_distance: str | None = None
+    search: str = ""
 
 
 @dataclass(frozen=True, slots=True)
