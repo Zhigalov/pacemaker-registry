@@ -87,7 +87,11 @@
               </div>
               <div class="result-heading-actions">
                 <a class="source-link" href="{{ result.source_url }}" target="_blank" rel="noreferrer">Открыть источник ↗</a>
+                {% if signed_in_account %}
                 <button class="button button--primary" type="submit">Сохранить в реестр</button>
+                {% else %}
+                <a class="button button--primary" href="/auth/yandex">Войти, чтобы сохранить</a>
+                {% endif %}
               </div>
             </div>
 

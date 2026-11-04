@@ -17,13 +17,14 @@
     <main class="app-shell event-shell">
       {% include '_navigation.html' %}
       <section class="event-heading">
-        <p class="eyebrow"><a href="/events">Соревнования</a> / Настройки</p>
+        <p class="eyebrow"><a href="/events">Соревнования</a>{% if can_edit_event %} / Настройки{% endif %}</p>
         <h1>{{ event.name }}</h1>
         <p>Время на флаге: <strong>{% if event.target_time_type == 'sub_minute' %}саб-минута · 1:29, 1:34, 1:39{% elif event.target_time_type == 'round' %}ровное · 1:30, 1:35, 1:40{% else %}ещё не определено{% endif %}</strong></p>
         <a class="quiet-link" href="/?event_id={{ event.id }}">Результаты соревнования →</a>
       </section>
       {% if saved %}<p class="event-success" role="status">Формула сохранена. Рейтинг результатов этого соревнования пересчитан при отображении.</p>{% endif %}
       {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
+      {% if can_edit_event %}
       <form class="event-editor" action="/events/{{ event.id }}/rating" method="post" data-event-rating data-rating-widget>
         <div class="event-editor-heading">
           <div><h2>Оценка за финиш</h2><p>Сдвигайте границы на графике или вводите секунды. Минус — раньше времени на флаге, плюс — позже.</p></div>
@@ -57,10 +58,22 @@
         <script type="application/json" data-rating-config>{{ defaults | tojson }}</script>
       </form>
       {% include '_pace_editor.html' %}
+      {% else %}
+      <section class="event-editor" data-rating-widget>
+        <h2>Оценка за финиш</h2>
+        {% include '_rating_chart.html' %}
+        <script type="application/json" data-rating-config>{{ values | tojson }}</script>
+      </section>
+      <section class="event-editor pace-editor" id="pace-rating" data-pace-widget>
+        <h2>Оценка за темп на отрезках</h2>
+        {% include '_pace_chart.html' %}
+        <script type="application/json" data-pace-defaults>{{ pace_values | tojson }}</script>
+      </section>
+      {% endif %}
       <details class="rating-methodology">
         <summary>Как получается итоговая оценка</summary>
         <div class="rating-methodology-content">
-          <p>На этой странице независимо настраиваются оценки за финиш и за темп только этого соревнования. Сохраняйте каждый блок отдельно. Когда включён учёт темпа, итог состоит из 60% оценки за финиш и 40% оценки за темп на отрезках.</p>
+          <p>{% if can_edit_event %}На этой странице можно настроить оценки за финиш и темп. Сохраняйте каждый блок отдельно. {% endif %}Когда включён учёт темпа, итог состоит из 60% оценки за финиш и 40% оценки за темп на отрезках.</p>
           <div class="rating-composition-bar"><span class="rating-composition-finish"><strong>60%</strong> финиш</span><span class="rating-composition-splits"><strong>40%</strong> темп</span></div>
           <p>Оценки за темп взвешиваются по длине отрезков. Без достаточных отсечек или с выключенным учётом темпа итог равен оценке за финиш.</p>
         </div>

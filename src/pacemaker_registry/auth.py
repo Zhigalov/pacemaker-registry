@@ -63,15 +63,47 @@ class SignedInAccount:
     last_name: str | None = None
     first_name: str | None = None
 
+    is_admin: bool = False
+    pacemaker_id: int | None = None
+
+    def can_edit_profile(self, pacemaker_id: int) -> bool:
+        return self.is_admin or self.pacemaker_id == pacemaker_id
+
+    def can_edit_event(self, event) -> bool:
+        return self.is_admin or self.id == event.captain_account_id
+
     @property
     def avatar_url(self) -> str | None:
         return yandex_avatar_url(self.avatar_id)
 
 
+def request_account(request: Request) -> SignedInAccount | None:
+    return getattr(request.state, "account", None)
+
+
+def require_account(request: Request) -> SignedInAccount:
+    account = request_account(request)
+    if account is None:
+        raise HTTPException(401, "Войдите в реестр, чтобы продолжить.")
+    return account
+
+
+def check_origin(request: Request) -> None:
+    settings = oauth_settings()
+    if not settings or request.headers.get("origin") != settings[1]:
+        raise HTTPException(403, "Откройте форму на сайте реестра.")
+
+
+def require_write(request: Request) -> SignedInAccount:
+    account = require_account(request)
+    check_origin(request)
+    return account
+
+
 def auth_context(request: Request) -> dict:
     return {
         "yandex_login_enabled": oauth_settings() is not None,
-        "signed_in_account": getattr(request.state, "account", None),
+        "signed_in_account": request_account(request),
         "auth_message": AUTH_MESSAGES.get(request.query_params.get("auth_error"))
         if request.url.path == "/" else None,
     }
@@ -89,8 +121,9 @@ def current_account(request: Request) -> SignedInAccount | None:
     with db.connect_database() as connection:
         row = connection.execute(
             """SELECT a.id, a.yandex_login, a.yandex_avatar_id, a.yandex_email,
-                      a.yandex_last_name, a.yandex_first_name
+                      a.yandex_last_name, a.yandex_first_name, a.is_admin, p.id
                FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
+               LEFT JOIN pacemakers AS p ON p.account_id = a.id
                WHERE s.token_hash = %s AND s.expires_at > now()""",
             (token_hash,),
         ).fetchone()

@@ -9,6 +9,8 @@ from httpx import ASGITransport, AsyncClient
 from pacemaker_registry import db, main
 from pacemaker_registry.rating import EventRatingConfig, PaceRatingConfig
 
+pytestmark = pytest.mark.usefixtures("admin_session")
+
 
 @pytest.fixture
 def anyio_backend():
@@ -103,7 +105,7 @@ def test_single_result_query_matches_registry_scoring(monkeypatch):
     event, result = sample.event, sample.result
     row = (event.id, event.name, event.target_time_type, asdict(event.formula), asdict(event.pace_formula),
            'Тестов', '<Первый>', sample.source_url, result.id, Decimal('42.2'), result.target_time,
-           result.chip_time, result.actual_pace, list(result.checkpoints), sample.pacemaker_id)
+           result.chip_time, result.actual_pace, list(result.checkpoints), sample.pacemaker_id, None)
     calls = []
     class Connection:
         def __enter__(self): return self

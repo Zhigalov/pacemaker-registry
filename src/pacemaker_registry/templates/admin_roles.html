@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Управление ролями — Реестр пейсмейкеров</title>
+  <link rel="stylesheet" href="/static/styles.css?v=account-spacing">
+</head>
+<body>
+  <main class="app-shell event-shell">
+    {% include '_navigation.html' %}
+    <section class="event-heading"><h1>Управление ролями</h1></section>
+    {% if saved %}<p class="event-success" role="status">Права сохранены.</p>{% endif %}
+    <form class="event-editor" method="post">
+      <h2>Администраторы</h2>
+      <label>Аккаунт
+        <select name="account_id" required>
+          <option value="" disabled selected>Выберите аккаунт</option>
+          {% for id, login, admin in accounts %}
+          <option value="{{ id }}">{{ login or ('Аккаунт №' ~ id) }}{% if admin %} · админ{% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="event-editor-actions">
+        <button class="button button--primary" name="make_admin" value="true">Назначить админом</button>
+        <button class="button result-link-button" name="make_admin" value="false">Снять права админа</button>
+      </div>
+    </form>
+    <section class="event-editor">
+      <h2>Капитаны соревнований</h2>
+      {% for event_id, name, captain_id in events %}
+      <form method="post" class="event-editor-actions">
+        <input type="hidden" name="event_id" value="{{ event_id }}">
+        <label>{{ name }}
+          <select name="account_id">
+            <option value="0">Капитан не назначен</option>
+            {% for id, login, admin in accounts %}
+            <option value="{{ id }}"{% if id == captain_id %} selected{% endif %}>{{ login or ('Аккаунт №' ~ id) }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="button result-link-button" type="submit">Сохранить капитана</button>
+      </form>
+      {% else %}<p>Соревнований пока нет.</p>{% endfor %}
+    </section>
+  </main>
+</body>
+</html>

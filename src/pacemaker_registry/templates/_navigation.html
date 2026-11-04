@@ -35,6 +35,7 @@
             </div>
           </div>
           <a class="button site-account" href="/account/profile">Мой профиль</a>
+          {% if signed_in_account.is_admin %}<a class="button site-account" href="/admin/roles">Управление ролями</a>{% endif %}
           <form method="post" action="/auth/logout">
             <button type="submit" class="button site-account">Выйти</button>
           </form>

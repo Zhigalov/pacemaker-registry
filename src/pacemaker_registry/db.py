@@ -27,7 +27,7 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
         row = connection.execute(
             """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config,
                       p.last_name, p.first_name, rr.source_url, rr.id, rr.distance_km,
-                      rr.target_time, rr.chip_time, rr.pace, rr.checkpoints, p.id
+                      rr.target_time, rr.chip_time, rr.pace, rr.checkpoints, p.id, e.captain_account_id
                FROM race_results AS rr
                JOIN events AS e ON e.id = rr.event_id
                JOIN pacemakers AS p ON p.id = rr.pacemaker_id
@@ -35,7 +35,7 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
         ).fetchone()
     if row is None:
         return None
-    event = _event_from_row(row[:5])
+    event = _event_from_row(row[:5], captain_account_id=row[15])
     return ResultDetails(
         athlete_name=f"{row[5]} {row[6]}", source_url=row[7], event=event,
         result=_build_registry_result(row[8], event, *row[9:14], include_splits=include_splits),
@@ -84,13 +84,13 @@ def check_database() -> None:
     with connect_database() as connection:
         connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, p.last_name,
             p.motto, p.avatar_key, p.contacts, p.achievements, p.profile_version, p.profile_updated_at,
-            p.login, p.city_id, p.club_id, p.personal_records, p.account_id
+            p.login, p.city_id, p.club_id, p.personal_records, p.account_id, e.captain_account_id
             FROM race_results AS rr
             JOIN events AS e ON e.id = rr.event_id
             JOIN pacemakers AS p ON p.id = rr.pacemaker_id
             LIMIT 0""")
         connection.execute("""SELECT a.yandex_user_id, a.yandex_login, a.yandex_avatar_id, a.yandex_email,
-            a.yandex_last_name, a.yandex_first_name, s.token_hash, s.expires_at
+            a.yandex_last_name, a.yandex_first_name, a.is_admin, s.token_hash, s.expires_at
             FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
             LIMIT 0""")
 
@@ -332,7 +332,7 @@ def load_registry(
     )
 
 
-def save_race_result(result: RaceResult, target_time: str) -> bool:
+def save_race_result(result: RaceResult, target_time: str, account_id: int | None = None) -> bool:
     target_time = normalize_target_time(target_time)
     last_name, first_name = _split_athlete_name(result.athlete_name)
     checkpoints = [asdict(checkpoint) for checkpoint in result.checkpoints]
@@ -401,7 +401,18 @@ def save_race_result(result: RaceResult, target_time: str) -> bool:
                     Jsonb(checkpoints),
                 ),
             )
-            return cursor.fetchone() is not None
+            inserted = cursor.fetchone()
+            if inserted and account_id is not None:
+                # The event upsert holds the row lock until commit, serializing first imports.
+                cursor.execute(
+                    """UPDATE events SET captain_account_id = %s
+                       WHERE id = %s AND captain_account_id IS NULL
+                       AND NOT EXISTS (
+                           SELECT 1 FROM race_results WHERE event_id = %s AND id <> %s
+                       )""",
+                    (account_id, event_id, event_id, inserted[0]),
+                )
+            return inserted is not None
 
 
 def _target_time_type_from_target_time(target_time: str) -> str:
@@ -418,21 +429,22 @@ def _split_athlete_name(full_name: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def _event_from_row(row: tuple) -> RegistryEvent:
+def _event_from_row(row: tuple, *, captain_account_id: int | None = None) -> RegistryEvent:
     return RegistryEvent(
         id=row[0], name=row[1], target_time_type=row[2],
         rating_config=parse_event_rating(row[3], allow_legacy=True) if row[3] is not None else None,
         pace_rating_config=parse_pace_rating(row[4]) if row[4] is not None else None,
+        captain_account_id=captain_account_id,
     )
 
 
 def get_event(event_id: int) -> RegistryEvent | None:
     with connect_database() as connection:
         row = connection.execute(
-            "SELECT id, name, target_time_type, rating_config, pace_rating_config FROM events WHERE id = %s",
+            "SELECT id, name, target_time_type, rating_config, pace_rating_config, captain_account_id FROM events WHERE id = %s",
             (event_id,),
         ).fetchone()
-    return _event_from_row(row) if row else None
+    return _event_from_row(row, captain_account_id=row[5]) if row else None
 
 
 def list_events() -> tuple[RegistryEvent, ...]:

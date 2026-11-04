@@ -93,6 +93,7 @@
             <button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>
           </div></template>
         </section>
+        {% if can_edit_achievements %}
         <section class="profile-form-section" aria-labelledby="achievements-heading">
           <h2 id="achievements-heading">Достижения</h2>
           <div class="profile-achievement-choices">{% for code, achievement in achievement_types.items() %}
@@ -102,6 +103,7 @@
             </label>
           {% endfor %}</div>
         </section>
+        {% endif %}
         <div class="profile-form-actions"><button class="button button--primary" type="submit">Сохранить профиль</button><a class="button" href="/pacemakers/{{ profile.id }}">Отмена</a></div>
       </form>
     </main>

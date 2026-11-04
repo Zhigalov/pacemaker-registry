@@ -55,7 +55,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
     assert db.save_race_result(first, '00:50')
     assert migrate.migrate() == [
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
-        '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql',
+        '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql', '0008_roles.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -420,3 +420,71 @@ def test_profile_onboarding_creates_with_optional_identity_details(database, mon
         page = client.get(created.headers['location'])
         assert 'https://avatars.yandex.net/get-yapic/123/image/islands-200' in page.text
         assert ('test@example.com' in page.text) is publish_email
+
+
+def test_first_successful_import_assigns_only_one_captain(database):
+    migrate.migrate()
+    with database() as connection:
+        account_ids = [row[0] for row in connection.execute(
+            "INSERT INTO accounts (yandex_user_id) VALUES ('111'), ('222') RETURNING id"
+        )]
+    assert db.save_race_result(sample(source_event_id='existing'), '00:50')
+    assert db.save_race_result(sample(source_event_id='existing'), '00:50', account_ids[0])
+    existing = next(e for e in db.list_events() if e.id == 1)
+    assert db.get_event(existing.id).captain_account_id is None
+
+    first_result, second_result = (sample(athlete_name=name) for name in ('First Runner', 'Second Runner'))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(db.save_race_result, first_result, '00:50', account_ids[0])
+        second = pool.submit(db.save_race_result, second_result, '00:50', account_ids[1])
+        assert first.result() and second.result()
+    with database() as connection:
+        first_insert = connection.execute("""
+            SELECT e.captain_account_id, rr.source_participant_id::text
+            FROM race_results rr JOIN events e ON e.id = rr.event_id
+            WHERE e.source_event_id = %s ORDER BY rr.id LIMIT 1
+        """, (first_result.source_event_id,)).fetchone()
+    expected = {first_result.source_participant_id: account_ids[0], second_result.source_participant_id: account_ids[1]}
+    assert first_insert[0] == expected[first_insert[1]]
+    assert not db.save_race_result(first_result, '00:50', account_ids[1])
+
+
+def test_admin_role_management_and_protected_achievement(database, monkeypatch):
+    from fastapi.testclient import TestClient
+    from pacemaker_registry.main import app
+
+    migrate.migrate()
+    monkeypatch.setenv('YANDEX_OAUTH_CLIENT_ID', 'test-client')
+    origin = 'https://pacersreg.ru'
+    headers = {'Origin': origin}
+    admin_token = auth.create_session(auth.YandexIdentity('101', 'admin'), None)
+    owner_token = auth.create_session(auth.YandexIdentity('102', 'owner'), None)
+    assert db.save_race_result(sample(), '00:50')
+    with database() as connection:
+        admin_id = connection.execute(
+            "UPDATE accounts SET is_admin = true WHERE yandex_user_id = '101' RETURNING id"
+        ).fetchone()[0]
+        owner_id = connection.execute("SELECT id FROM accounts WHERE yandex_user_id = '102'").fetchone()[0]
+        profile_id = connection.execute(
+            "UPDATE pacemakers SET account_id = %s, achievements = '[\"pshp_graduate\"]' RETURNING id",
+            (owner_id,),
+        ).fetchone()[0]
+        event_id = connection.execute("SELECT id FROM events").fetchone()[0]
+    with TestClient(app, base_url=origin, follow_redirects=False) as client:
+        client.cookies.set(auth.SESSION_COOKIE, owner_token)
+        path = f'/pacemakers/{profile_id}/edit'
+        edit = client.get(path)
+        assert edit.status_code == 200 and 'name="achievements"' not in edit.text
+        assert client.post(path, data={'profile_version': 0, 'about': 'О себе'}, headers=headers).status_code == 303
+        assert db.get_pacemaker_profile(profile_id).achievements == ('pshp_graduate',)
+        assert client.post('/admin/roles', data={'account_id': owner_id, 'make_admin': 'true'}, headers=headers).status_code == 403
+        client.cookies.set(auth.SESSION_COOKIE, admin_token)
+        assert client.get('/admin/roles').status_code == 200
+        assert client.post('/admin/roles', data={'account_id': admin_id, 'make_admin': 'false'}, headers=headers).status_code == 409
+        assert client.post('/admin/roles', data={'account_id': owner_id, 'event_id': event_id}, headers=headers).status_code == 303
+        assert db.get_event(event_id).captain_account_id == owner_id
+        assert client.post(path, data={'profile_version': 1}, headers=headers).status_code == 303
+        assert db.get_pacemaker_profile(profile_id).achievements == ()
+        assert client.post('/admin/roles', data={'account_id': owner_id, 'make_admin': 'true'}, headers=headers).status_code == 303
+        client.cookies.set(auth.SESSION_COOKIE, owner_token)
+        assert client.get('/admin/roles').status_code == 200

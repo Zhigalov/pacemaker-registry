@@ -1,0 +1,2 @@
+ALTER TABLE accounts ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE events ADD COLUMN captain_account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;

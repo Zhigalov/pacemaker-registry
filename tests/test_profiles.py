@@ -12,6 +12,8 @@ from pacemaker_registry.models import PacemakerProfile, RegistryCard, Registry, 
 from pacemaker_registry.profile_routes import _save
 from pacemaker_registry.profiles import normalize_contacts, profile_form_values, contact_view
 
+pytestmark = pytest.mark.usefixtures("admin_session")
+
 
 @pytest.fixture(autouse=True)
 def choices(monkeypatch):

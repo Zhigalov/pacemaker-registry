@@ -8,6 +8,8 @@ from httpx import ASGITransport, AsyncClient
 from pacemaker_registry import db, main, registry
 from pacemaker_registry.rating import PaceRatingConfig, EventRatingConfig, calculate_split_rating, parse_pace_rating
 
+pytestmark = pytest.mark.usefixtures("admin_session")
+
 
 @pytest.fixture
 def anyio_backend():
@@ -121,7 +123,7 @@ def test_database_roundtrip_only_updates_pace_and_scopes_event_id(monkeypatch):
                 stored = parameters[0].obj
                 self.row = (7,)
             else:
-                self.row = (7, "Тест", "round", finish, stored)
+                self.row = (7, "Тест", "round", finish, stored, None)
             return self
         def fetchone(self): return self.row
     monkeypatch.setattr(db, "connect_database", Connection)

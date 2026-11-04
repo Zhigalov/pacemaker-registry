@@ -12,6 +12,8 @@ from pacemaker_registry.rating import (
     default_event_rating, parse_event_rating,
 )
 
+pytestmark = pytest.mark.usefixtures("admin_session")
+
 
 @pytest.fixture
 def anyio_backend():
@@ -136,7 +138,7 @@ def test_database_roundtrip_uses_event_id_and_json(monkeypatch):
                 stored = parameters[0].obj
                 self.result = (7,)
             else:
-                self.result = (7, "Марафон", "round", stored, None)
+                self.result = (7, "Марафон", "round", stored, None, None)
             return self
         def fetchone(self): return self.result
     monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)
@@ -178,7 +180,7 @@ async def test_events_list_is_readonly_and_links_to_editors(monkeypatch):
         assert response.status_code == 200
         assert response.text.count('data-rating-widget') == 2
         assert 'data-event-rating' not in response.text
-        assert '<form' not in response.text
+        assert 'action="/events/' not in response.text
         assert 'href="/events/1"' in response.text
         assert 'href="/events/2"' in response.text
         assert '"left_score": 6' in response.text

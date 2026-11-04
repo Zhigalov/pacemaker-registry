@@ -4,6 +4,8 @@ from fastapi.testclient import TestClient
 from pacemaker_registry import main
 from pacemaker_registry.russiarunning import RaceResult, RussiaRunningError
 
+pytestmark = pytest.mark.usefixtures("admin_session")
+
 
 @pytest.mark.parametrize("counter", ["", "0", "-1", "1.5", "1<script>", "1e5", "١٢٣", "9" * 16])
 def test_invalid_counter_disables_analytics(monkeypatch, counter):

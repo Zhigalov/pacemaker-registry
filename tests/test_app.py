@@ -10,6 +10,8 @@ from pacemaker_registry.models import RegistryCard
 from pacemaker_registry.main import app
 from pacemaker_registry.russiarunning import Checkpoint, RaceResult
 
+pytestmark = pytest.mark.usefixtures("admin_session")
+
 
 @pytest.fixture
 def anyio_backend() -> str:
@@ -349,7 +351,7 @@ async def test_result_can_be_saved_after_review(monkeypatch) -> None:
 
     saved: list[str] = []
 
-    def fake_save_race_result(_: RaceResult, target_time: str) -> bool:
+    def fake_save_race_result(_: RaceResult, target_time: str, account_id: int) -> bool:
         saved.append(target_time)
         return True
 

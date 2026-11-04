@@ -10,6 +10,8 @@ from pacemaker_registry.russiarunning import RaceResult, InvalidResultUrl
 from pacemaker_registry.sources import load_race_result
 from pacemaker_registry.times import normalize_target_time, elapsed_seconds
 
+pytestmark = pytest.mark.usefixtures("admin_session")
+
 
 @pytest.fixture
 def anyio_backend():

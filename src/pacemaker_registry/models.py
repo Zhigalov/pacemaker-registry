@@ -110,6 +110,7 @@ class RegistryEvent:
     target_time_type: str | None = None
     rating_config: EventRatingConfig | None = None
     pace_rating_config: PaceRatingConfig | None = None
+    captain_account_id: int | None = None
 
     @property
     def formula(self) -> EventRatingConfig:

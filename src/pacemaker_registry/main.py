@@ -95,11 +95,13 @@ templates = Jinja2Templates(
 templates.env.filters["rating_color"] = rating_color_style
 templates.env.filters["avatar_url"] = avatar_url
 
+from pacemaker_registry.admin import create_admin_router
 from pacemaker_registry.profile_routes import create_profile_router
 from pacemaker_registry.profile_linking import create_profile_link_router
 app.include_router(create_profile_router(templates))
 app.include_router(create_profile_link_router(templates))
 app.include_router(auth.router)
+app.include_router(create_admin_router(templates))
 
 
 DistanceFilter = Annotated[Decimal | None, Query(ge=0, le=Decimal('99999.999'), decimal_places=3)]
@@ -155,11 +157,21 @@ def _load_event_or_404(event_id: int):
     return event
 
 
+def _can_edit_event(request, event):
+    account = auth.request_account(request)
+    return account is not None and account.can_edit_event(event)
+
+
+def _require_event_editor(account, event):
+    if not account.can_edit_event(event):
+        raise HTTPException(403, "Настройки доступны капитану этого соревнования или администратору.")
+
+
 def _event_response(request, event, *, values=None, pace_values=None, error=None, saved=False, status_code=200):
     return templates.TemplateResponse(
         request=request, name="event.html",
         context={
-            "event": event,
+            "event": event, "can_edit_event": _can_edit_event(request, event),
             "values": values if values is not None else asdict(event.formula),
             "defaults": asdict(default_event_rating(event.target_time_type)),
             "pace_values": pace_values if pace_values is not None else asdict(event.pace_formula),
@@ -189,7 +201,9 @@ def event_page(request: Request, event_id: int, saved: bool = False):
 
 @app.post("/events/{event_id}/rating", response_class=HTMLResponse)
 async def update_event_rating(request: Request, event_id: int):
+    account = auth.require_write(request)
     event = await run_in_threadpool(_load_event_or_404, event_id)
+    _require_event_editor(account, event)
     form = await request.form()
     values = dict(form)
     try:
@@ -211,7 +225,9 @@ async def update_event_rating(request: Request, event_id: int):
 
 @app.post("/events/{event_id}/pace-rating", response_class=HTMLResponse)
 async def update_event_pace_rating(request: Request, event_id: int):
+    account = auth.require_write(request)
     event = await run_in_threadpool(_load_event_or_404, event_id)
+    _require_event_editor(account, event)
     values = dict(await request.form())
     try:
         config = parse_pace_rating(values)
@@ -249,6 +265,7 @@ def _result_response(request, details, include_splits, event_id, min_events, *,
         request=request, name="result.html",
         context={
             "details": details, "result": details.result, "event": details.event,
+            "can_edit_event": _can_edit_event(request, details.event),
             "source_url": source_url, "source_event_url": source_event_url,
             "finish_config": asdict(details.event.formula),
             "pace_config": asdict(details.event.pace_formula), "include_splits": include_splits,
@@ -285,7 +302,9 @@ def edit_result_target_time(
     distance_km: DistanceFilter = None,
     q: NameSearch = "",
 ):
+    account = auth.require_write(request)
     details = _load_result_or_404(result_id, include_splits)
+    _require_event_editor(account, details.event)
     target_time = target_time.strip()
     try:
         target_time = normalize_target_time(target_time)
@@ -366,6 +385,7 @@ async def save_result(
     result_url: Annotated[str, Form(min_length=1, max_length=500)],
     target_time: Annotated[str, Form(min_length=4, max_length=5)],
 ) -> HTMLResponse:
+    account = auth.require_write(request)
     result = None
     error = None
     saved_message = None
@@ -381,7 +401,7 @@ async def save_result(
         try:
             result = await load_race_result(result_url)
             result = replace(result, target_time=target_time)
-            created = await run_in_threadpool(save_race_result, result, target_time)
+            created = await run_in_threadpool(save_race_result, result, target_time, account.id)
             result_created = created
             saved_message = (
                 "Результат сохранён в реестр."
