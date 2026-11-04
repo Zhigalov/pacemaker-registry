@@ -95,13 +95,14 @@ def test_parse_result_html_calculates_split_paces_and_finish() -> None:
     )
 
 
-def test_parse_result_html_works_without_intermediate_points() -> None:
-    html_without_points = RESULT_HTML.replace(
-        '<div class="results-race-detail__body-time-points">',
-        '<div class="other-section">',
+@pytest.mark.parametrize(
+    ("original", "replacement"),
+    [("results-race-detail__body-time-points", "other-section"), ("0:19:32", "-")],
+)
+def test_parse_result_html_works_without_intermediate_points(original, replacement) -> None:
+    result = parse_result_html(
+        parse_result_url(RESULT_URL), RESULT_HTML.replace(original, replacement)
     )
-
-    result = parse_result_html(parse_result_url(RESULT_URL), html_without_points)
 
     assert result.checkpoints == (
         Checkpoint(

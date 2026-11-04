@@ -84,7 +84,11 @@ def parse_result_html(link: RuncResultLink, document: str) -> RaceResult:
     for distance_value, elapsed_time in checkpoint_values:
         if distance_value <= previous_distance:
             continue
-        elapsed_seconds = _time_to_seconds(elapsed_time)
+        try:
+            elapsed_seconds = _time_to_seconds(elapsed_time)
+        except ValueError:
+            # RUNC can show a placeholder for an unrecorded split.
+            continue
         if elapsed_seconds <= previous_time:
             continue
         checkpoints.append(
