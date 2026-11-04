@@ -92,8 +92,9 @@ def test_login_logout_and_cross_origin_rejection(client, monkeypatch):
     assert client.cookies[auth.SESSION_COOKIE] == token
     assert "Max-Age=604800" in result.headers["set-cookie"]
     logged_in = client.get("/")
-    assert '<details class="site-account-menu">' in logged_in.text
-    assert "sample.login" in logged_in.text
+    assert 'aria-expanded="false" aria-controls="site-account-panel"' in logged_in.text
+    assert 'id="site-account-panel" hidden' in logged_in.text
+    assert "<strong>sample.login</strong>" in logged_in.text
     assert "https://avatars.yandex.net/get-yapic/123/avatar-test/islands-retina-middle" in logged_in.text
     assert 'action="/auth/logout"' in logged_in.text
     assert 'href="/auth/yandex"' not in logged_in.text
@@ -140,6 +141,7 @@ def test_account_without_photo_has_initial(client, monkeypatch):
     client.cookies.set(auth.SESSION_COOKIE, "t" * 43)
     monkeypatch.setattr(auth, "current_account", lambda request: auth.SignedInAccount(10, "sample.login", None))
     page = client.get("/").text
-    assert '<span aria-hidden="true">S</span>' in page
+    assert '<span class="site-account-portrait" aria-hidden="true">' in page
+    assert "\n          S\n" in page
     assert "sample.login" in page
     assert "avatars.yandex.net" not in page
