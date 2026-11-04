@@ -104,6 +104,7 @@ a, button, input { -webkit-tap-highlight-color: transparent; }
   display: flex;
   align-items: center;
   gap: .75rem;
+  margin-bottom: .625rem;
   padding: .85rem;
   border-radius: .75rem;
   background: #f0f7f3;
@@ -112,7 +113,7 @@ a, button, input { -webkit-tap-highlight-color: transparent; }
 .site-account-login { min-width: 0; overflow-wrap: anywhere; }
 .site-account-login span { display: block; margin-bottom: .18rem; color: #52675e; font-size: .78rem; }
 .site-account-login strong { display: block; color: #17231f; font-size: 1rem; }
-.site-account-panel form { margin: .5rem 0 0; }
+.site-account-panel form { margin: .25rem 0 0; }
 .site-account-panel .site-account { justify-content: flex-start; width: 100%; background: transparent; }
 .site-auth-message { margin: .75rem 0; color: #8a342c; }
 .site-add[aria-current="page"] { outline: 2px solid #b1d8c7; outline-offset: 2px; }
