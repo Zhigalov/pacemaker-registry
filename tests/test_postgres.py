@@ -9,7 +9,7 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict
 import pytest
 
-from pacemaker_registry import db, migrate
+from pacemaker_registry import auth, db, migrate
 from pacemaker_registry.rating import EventRatingConfig, PaceRatingConfig
 from pacemaker_registry.russiarunning import Checkpoint, RaceResult
 
@@ -53,7 +53,10 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
         connection.execute((migrate.MIGRATIONS_DIR / '0001_baseline.sql').read_text())
     first = sample()
     assert db.save_race_result(first, '00:50')
-    assert migrate.migrate() == ['0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql']
+    assert migrate.migrate() == [
+        '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
+        '0004_accounts.sql',
+    ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
 
@@ -304,3 +307,34 @@ def test_name_search_all_words_order_case_yo_and_other_filters(database):
     assert names('   ') == names('')
     with database() as connection:
         assert connection.execute("SELECT first_name FROM pacemakers WHERE last_name='Елкин'").fetchone()[0] == 'Артём'
+
+
+def test_account_sessions_are_independent_and_reusable(database):
+    from hashlib import sha256
+    from starlette.requests import Request
+
+    def request(token):
+        return Request({"type": "http", "headers": [
+            (b"cookie", f"{auth.SESSION_COOKIE}={token}".encode()),
+        ]})
+
+    migrate.migrate()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        phone, laptop = list(pool.map(lambda _: auth.create_session("12345", None), range(2)))
+    account_id = auth.current_account_id(request(phone))
+    assert account_id is not None
+    assert auth.current_account_id(request(laptop)) == account_id
+    assert auth.current_account_id(request("unknown")) is None
+
+    auth.end_session(request(phone))
+    assert auth.current_account_id(request(phone)) is None
+    assert auth.current_account_id(request(laptop)) == account_id
+
+    with database() as connection:
+        assert connection.execute("SELECT count(*) FROM accounts").fetchone() == (1,)
+        assert connection.execute("SELECT count(*) FROM pacemakers").fetchone() == (0,)
+        assert connection.execute("SELECT token_hash FROM account_sessions").fetchone() == (
+            sha256(laptop.encode()).digest(),
+        )
+        connection.execute("UPDATE account_sessions SET expires_at = now()")
+    assert auth.current_account_id(request(laptop)) is None

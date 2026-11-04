@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 from psycopg import Error as PsycopgError
 
+from pacemaker_registry import auth
 from pacemaker_registry.db import (
     Registry,
     list_events,
@@ -64,19 +65,39 @@ app = FastAPI(
     openapi_url=None,
 )
 app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
+
+
+@app.middleware("http")
+async def account_session(request: Request, call_next):
+    enabled = auth.oauth_settings() is not None
+    has_session = enabled and auth.SESSION_COOKIE in request.cookies
+    if has_session and not request.url.path.startswith(("/static/", "/auth/")):
+        try:
+            request.state.account_id = await run_in_threadpool(auth.current_account_id, request)
+        except (PsycopgError, RuntimeError):
+            request.state.account_id = None
+    response = await call_next(request)
+    if enabled and response.headers.get("content-type", "").startswith("text/html"):
+        response.headers.add_vary_header("Cookie")
+        if has_session:
+            response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
 def analytics_context(request: Request) -> dict:
     counter_id = os.getenv("YANDEX_METRICA_ID", "")
     return {"metrica_id": counter_id if re.fullmatch(r"[1-9][0-9]{0,14}", counter_id) else None}
 
 
 templates = Jinja2Templates(
-    directory=PACKAGE_DIR / "templates", context_processors=[analytics_context],
+    directory=PACKAGE_DIR / "templates", context_processors=[analytics_context, auth.auth_context],
 )
 templates.env.filters["rating_color"] = rating_color_style
 templates.env.filters["avatar_url"] = avatar_url
 
 from pacemaker_registry.profile_routes import create_profile_router
 app.include_router(create_profile_router(templates))
+app.include_router(auth.router)
 
 
 DistanceFilter = Annotated[Decimal | None, Query(ge=0, le=Decimal('99999.999'), decimal_places=3)]

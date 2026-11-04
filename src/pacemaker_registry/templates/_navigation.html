@@ -7,5 +7,19 @@
     <a class="site-menu-link" href="/"{% if request.url.path == '/' or request.url.path.startswith(('/results/', '/pacemakers/')) %} aria-current="page"{% endif %}>Пейсмейкеры</a>
     <a class="site-menu-link" href="/events"{% if request.url.path.startswith('/events') %} aria-current="page"{% endif %}>Соревнования</a>
   </nav>
-  <a class="button button--primary site-add" href="/add" aria-label="Добавить результат"{% if request.url.path in ['/add', '/results'] %} aria-current="page"{% endif %}><span aria-hidden="true">＋</span> Добавить<span class="site-add-long"> результат</span></a>
+  <div class="site-actions">
+    <a class="button button--primary site-add" href="/add" aria-label="Добавить результат"{% if request.url.path in ['/add', '/results'] %} aria-current="page"{% endif %}><span aria-hidden="true">＋</span> Добавить<span class="site-add-long"> результат</span></a>
+    {% if yandex_login_enabled %}
+      {% if signed_in %}
+      <form method="post" action="/auth/logout">
+        <button type="submit" class="button site-account">Выйти</button>
+      </form>
+      {% else %}
+      <a class="button site-account" href="/auth/yandex" aria-label="Войти через Яндекс">Войти<span class="site-auth-long"> через Яндекс</span></a>
+      {% endif %}
+    {% endif %}
+  </div>
 </header>
+{% if auth_message %}
+<p class="site-auth-message" role="alert">{{ auth_message }}</p>
+{% endif %}
