@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ details.athlete_name }} · {{ event.name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=account-spacing">
+    <link rel="stylesheet" href="/static/styles.css?v=result-navigation">
     <script src="/static/result-markers.js?v=1" defer></script>
     <script src="/static/rating-models.js?v=1" defer></script>
     <script src="/static/chart-utils.js?v=1" defer></script>
@@ -19,15 +19,20 @@
       {% include '_navigation.html' %}
       <section class="event-heading">
         <a class="button result-back" href="{{ back_url }}">← Обратно к списку</a>
-        <h1><a class="result-athlete-link" href="/pacemakers/{{ details.pacemaker_id }}?include_splits={{ 'true' if include_splits else 'false' }}">{{ details.athlete_name }}</a></h1>
+        <h1><a class="result-athlete-link" href="/pacemakers/{{ details.pacemaker_id }}?include_splits={{ 'true' if include_splits else 'false' }}">{{ details.athlete_name }} <span class="result-profile-arrow" aria-hidden="true">→</span></a></h1>
         <h2><a href="/events/{{ event.id }}">{{ event.name }}</a> · {{ result.distance_km }} км</h2>
         <p>Время на флаге: {% if event.target_time_type == 'sub_minute' %}саб-минута{% elif event.target_time_type == 'round' %}ровное{% else %}тип ещё не определён{% endif %}</p>
         <nav class="result-links" aria-label="Ссылки на соревнование">
-          <a href="/pacemakers/{{ details.pacemaker_id }}?include_splits={{ 'true' if include_splits else 'false' }}">Профиль пейсмейкера →</a>
-          <a href="/?event_id={{ event.id }}&amp;include_splits={{ 'true' if include_splits else 'false' }}">Все пейсеры соревнования</a>
-          <a href="/events/{{ event.id }}">Настройки соревнования</a>
-          {% if source_event_url %}<a href="{{ source_event_url }}" target="_blank" rel="noopener noreferrer">Соревнование на сайте организатора ↗</a>{% endif %}
-          {% if source_url %}<a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Исходный результат ↗</a>{% endif %}
+          <a class="button result-link-button" href="/?event_id={{ event.id }}&amp;include_splits={{ 'true' if include_splits else 'false' }}">Все пейсеры соревнования</a>
+          {% if source_event_url or source_url %}
+          <details class="result-sources">
+            <summary class="result-link-button">На сайте организатора</summary>
+            <ul>
+              {% if source_event_url %}<li><a href="{{ source_event_url }}" target="_blank" rel="noopener noreferrer">Соревнование ↗</a></li>{% endif %}
+              {% if source_url %}<li><a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Исходный результат ↗</a></li>{% endif %}
+            </ul>
+          </details>
+          {% endif %}
         </nav>
       </section>
       <section class="event-editor" aria-label="Показатели выступления">

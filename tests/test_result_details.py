@@ -50,7 +50,7 @@ async def test_detail_renders_every_split_readonly_graphs_and_context(monkeypatc
     assert 'href="/?event_id=1&amp;include_splits=true&amp;min_events=3"' in response.text
     assert 'href="/events/1"' in response.text
     assert 'href="/pacemakers/7?include_splits=true"' in response.text
-    assert 'Профиль пейсмейкера →' in response.text
+    assert 'class="result-athlete-link"' in response.text
     assert 'href="https://results.runc.run/event/marathon/"' in response.text
     assert 'href="https://results.runc.run/event/marathon/result/123/"' in response.text
 

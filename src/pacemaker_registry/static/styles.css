@@ -1298,7 +1298,23 @@ tbody tr:hover { background: #fbfcfc; }
 .result-detail h2 { font-size: 1.15rem; line-height: 1.4; }
 .result-detail a:not(.button) { color: #176f59; }
 .result-back { margin: .5rem 0; background: #e9f5ef; color: #176f59; }
-.result-links { display: flex; flex-wrap: wrap; gap: .7rem 1.5rem; font-size: .9rem; }
+.result-profile-arrow { font-size: .65em; vertical-align: .12em; }
+.result-links { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; }
+.result-link-button {
+  min-height: 2.75rem;
+  padding: .65rem .85rem;
+  border: 1px solid #d4e1da;
+  border-radius: .7rem;
+  background: #fff;
+  color: #176f59;
+  font-size: .88rem;
+  font-weight: 650;
+}
+.result-link-button:hover { background: #e9f5ef; }
+.result-sources summary { cursor: pointer; }
+.result-sources summary:focus-visible { outline: 2px solid #176f59; outline-offset: 2px; }
+.result-sources ul { margin: .4rem 0 0; padding: .25rem .85rem; list-style: none; font-size: .88rem; }
+.result-sources li + li { margin-top: .5rem; }
 .result-detail .result-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4rem; margin: 0 0 1.5rem; }
 .result-detail .result-facts dt { color: #64756d; font-size: .8rem; margin-bottom: .35rem; }
 .result-detail .result-facts dd { font-weight: 700; font-variant-numeric: tabular-nums; }
