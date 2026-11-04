@@ -1,6 +1,7 @@
 import base64
 import os
 import re
+from dataclasses import dataclass
 from hashlib import sha256
 from hmac import compare_digest
 from secrets import token_urlsafe
@@ -20,6 +21,7 @@ FLOW_COOKIE = "__Host-pacers-oauth"
 SESSION_COOKIE = "__Host-pacers-session"
 FLOW_SECONDS = 600
 SESSION_SECONDS = 7 * 24 * 60 * 60
+AVATAR_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}(?:/[A-Za-z0-9_-]{1,128})?")
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}")
 COOKIE_OPTIONS = {"secure": True, "httponly": True, "samesite": "lax", "path": "/"}
 
@@ -42,10 +44,30 @@ def oauth_settings() -> tuple[str, str] | None:
     return None
 
 
+@dataclass(frozen=True)
+class YandexIdentity:
+    user_id: str
+    login: str | None = None
+    avatar_id: str | None = None
+
+
+@dataclass(frozen=True)
+class SignedInAccount:
+    id: int
+    login: str | None
+    avatar_id: str | None
+
+    @property
+    def avatar_url(self) -> str | None:
+        if self.avatar_id:
+            return f"https://avatars.yandex.net/get-yapic/{self.avatar_id}/islands-retina-middle"
+        return None
+
+
 def auth_context(request: Request) -> dict:
     return {
         "yandex_login_enabled": oauth_settings() is not None,
-        "signed_in": getattr(request.state, "account_id", None) is not None,
+        "signed_in_account": getattr(request.state, "account", None),
         "auth_message": AUTH_MESSAGES.get(request.query_params.get("auth_error"))
         if request.url.path == "/" else None,
     }
@@ -56,26 +78,30 @@ def _session_hash(request: Request) -> bytes | None:
     return sha256(token.encode("ascii")).digest() if TOKEN_PATTERN.fullmatch(token) else None
 
 
-def current_account_id(request: Request) -> int | None:
+def current_account(request: Request) -> SignedInAccount | None:
     token_hash = _session_hash(request)
     if token_hash is None:
         return None
     with db.connect_database() as connection:
         row = connection.execute(
-            "SELECT account_id FROM account_sessions WHERE token_hash = %s AND expires_at > now()",
+            """SELECT a.id, a.yandex_login, a.yandex_avatar_id
+               FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
+               WHERE s.token_hash = %s AND s.expires_at > now()""",
             (token_hash,),
         ).fetchone()
-    return row[0] if row else None
+    return SignedInAccount(*row) if row else None
 
 
-def create_session(yandex_user_id: str, previous_hash: bytes | None) -> str:
+def create_session(identity: YandexIdentity, previous_hash: bytes | None) -> str:
     token = token_urlsafe(32)
     with db.connect_database() as connection:
         account_id, = connection.execute(
-            """INSERT INTO accounts (yandex_user_id) VALUES (%s)
-               ON CONFLICT (yandex_user_id) DO UPDATE SET yandex_user_id = EXCLUDED.yandex_user_id
+            """INSERT INTO accounts (yandex_user_id, yandex_login, yandex_avatar_id)
+               VALUES (%s, %s, %s)
+               ON CONFLICT (yandex_user_id) DO UPDATE
+               SET yandex_login = EXCLUDED.yandex_login, yandex_avatar_id = EXCLUDED.yandex_avatar_id
                RETURNING id""",
-            (yandex_user_id,),
+            (identity.user_id, identity.login, identity.avatar_id),
         ).fetchone()
         connection.execute("DELETE FROM account_sessions WHERE expires_at <= now()")
         if previous_hash is not None:
@@ -115,6 +141,7 @@ def login() -> RedirectResponse:
         "client_id": client_id,
         "redirect_uri": origin + CALLBACK_PATH,
         "scope": "login:info",
+        "optional_scope": "login:avatar",
         "state": state,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
@@ -124,7 +151,7 @@ def login() -> RedirectResponse:
     return response
 
 
-def yandex_user_id(client_id: str, code: str, verifier: str) -> str:
+def yandex_identity(client_id: str, code: str, verifier: str) -> YandexIdentity:
     with httpx.Client(timeout=4.0, trust_env=False) as client:
         token = client.post("https://oauth.yandex.ru/token", data={
             "grant_type": "authorization_code",
@@ -143,7 +170,12 @@ def yandex_user_id(client_id: str, code: str, verifier: str) -> str:
     subject = identity["id"]
     if identity["client_id"] != client_id or not isinstance(subject, str) or not re.fullmatch(r"[0-9]{1,64}", subject):
         raise ValueError("Invalid Yandex identity")
-    return subject
+    login_name = identity.get("login")
+    login_name = login_name.strip() if isinstance(login_name, str) else ""
+    avatar_id = identity.get("default_avatar_id")
+    if identity.get("is_avatar_empty") is not False or not isinstance(avatar_id, str) or not AVATAR_ID_PATTERN.fullmatch(avatar_id):
+        avatar_id = None
+    return YandexIdentity(subject, login_name[:128] or None, avatar_id)
 
 
 @router.get("/yandex/callback")
@@ -166,8 +198,8 @@ def callback(request: Request) -> RedirectResponse:
         location = "/?auth_error=unavailable"
     else:
         try:
-            subject = yandex_user_id(client_id, code, verifier)
-            session = create_session(subject, _session_hash(request))
+            identity = yandex_identity(client_id, code, verifier)
+            session = create_session(identity, _session_hash(request))
             location = "/"
         except (httpx.HTTPError, ValueError, KeyError, TypeError, PsycopgError, RuntimeError):
             location = "/?auth_error=unavailable"

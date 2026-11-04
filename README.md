@@ -186,13 +186,13 @@ cp .env.example .env
 
 ### Вход через Яндекс ID
 
-Примените миграцию `0004_accounts.sql` и укажите `YANDEX_OAUTH_CLIENT_ID`.
+Примените миграции `0004_accounts.sql` и `0005_account_identity.sql` и укажите `YANDEX_OAUTH_CLIENT_ID`.
 В настройках веб-приложения Яндекс OAuth добавьте разрешение `login:info`
-и Redirect URI `https://pacersreg.ru/auth/yandex/callback`. Для отдельного
+и опциональный доступ к портрету `login:avatar`, а также Redirect URI `https://pacersreg.ru/auth/yandex/callback`. Для отдельного
 HTTPS-окружения укажите его origin в `YANDEX_OAUTH_ORIGIN` и зарегистрируйте
 соответствующий callback. Для обмена кода используется PKCE S256.
 
-`accounts` хранит ID Яндекса и дату создания учётной записи. Сессии действуют
+`accounts` хранит ID Яндекса, логин, идентификатор доступного портрета и дату создания учётной записи. Сессии действуют
 семь дней. В `account_sessions` хранится хеш случайного токена, а сам токен
 передаётся только в защищённой cookie. Выход закрывает текущую сессию.
 Просроченные сессии удаляются при следующих успешных входах.

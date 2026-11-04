@@ -10,12 +10,26 @@
   <div class="site-actions">
     <a class="button button--primary site-add" href="/add" aria-label="Добавить результат"{% if request.url.path in ['/add', '/results'] %} aria-current="page"{% endif %}><span aria-hidden="true">＋</span> Добавить<span class="site-add-long"> результат</span></a>
     {% if yandex_login_enabled %}
-      {% if signed_in %}
-      <form method="post" action="/auth/logout">
-        <button type="submit" class="button site-account">Выйти</button>
-      </form>
+      {% if signed_in_account %}
+      <details class="site-account-menu">
+        <summary class="site-account-avatar" aria-label="Меню аккаунта">
+          {% if signed_in_account.avatar_url %}
+          <img src="{{ signed_in_account.avatar_url }}" width="40" height="40" alt="" referrerpolicy="no-referrer">
+          {% elif signed_in_account.login %}
+          <span aria-hidden="true">{{ signed_in_account.login[:1]|upper }}</span>
+          {% else %}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2"/></svg>
+          {% endif %}
+        </summary>
+        <div class="site-account-panel">
+          <div class="site-account-login">{{ signed_in_account.login or 'Аккаунт' }}</div>
+          <form method="post" action="/auth/logout">
+            <button type="submit" class="button site-account">Выйти</button>
+          </form>
+        </div>
+      </details>
       {% else %}
-      <a class="button site-account" href="/auth/yandex" aria-label="Войти через Яндекс">Войти<span class="site-auth-long"> через Яндекс</span></a>
+      <a class="button site-account" href="/auth/yandex">Войти</a>
       {% endif %}
     {% endif %}
   </div>

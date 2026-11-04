@@ -55,7 +55,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
     assert db.save_race_result(first, '00:50')
     assert migrate.migrate() == [
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
-        '0004_accounts.sql',
+        '0004_accounts.sql', '0005_account_identity.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -319,16 +319,17 @@ def test_account_sessions_are_independent_and_reusable(database):
         ]})
 
     migrate.migrate()
+    identity = auth.YandexIdentity("12345", "sample.login", "123/avatar-test")
     with ThreadPoolExecutor(max_workers=2) as pool:
-        phone, laptop = list(pool.map(lambda _: auth.create_session("12345", None), range(2)))
-    account_id = auth.current_account_id(request(phone))
-    assert account_id is not None
-    assert auth.current_account_id(request(laptop)) == account_id
-    assert auth.current_account_id(request("unknown")) is None
+        phone, laptop = list(pool.map(lambda _: auth.create_session(identity, None), range(2)))
+    account = auth.current_account(request(phone))
+    assert account == auth.SignedInAccount(account.id, identity.login, identity.avatar_id)
+    assert auth.current_account(request(laptop)) == account
+    assert auth.current_account(request("unknown")) is None
 
     auth.end_session(request(phone))
-    assert auth.current_account_id(request(phone)) is None
-    assert auth.current_account_id(request(laptop)) == account_id
+    assert auth.current_account(request(phone)) is None
+    assert auth.current_account(request(laptop)) == account
 
     with database() as connection:
         assert connection.execute("SELECT count(*) FROM accounts").fetchone() == (1,)
@@ -337,4 +338,4 @@ def test_account_sessions_are_independent_and_reusable(database):
             sha256(laptop.encode()).digest(),
         )
         connection.execute("UPDATE account_sessions SET expires_at = now()")
-    assert auth.current_account_id(request(laptop)) is None
+    assert auth.current_account(request(laptop)) is None

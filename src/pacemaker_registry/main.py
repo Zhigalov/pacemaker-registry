@@ -73,9 +73,9 @@ async def account_session(request: Request, call_next):
     has_session = enabled and auth.SESSION_COOKIE in request.cookies
     if has_session and not request.url.path.startswith(("/static/", "/auth/")):
         try:
-            request.state.account_id = await run_in_threadpool(auth.current_account_id, request)
+            request.state.account = await run_in_threadpool(auth.current_account, request)
         except (PsycopgError, RuntimeError):
-            request.state.account_id = None
+            request.state.account = None
     response = await call_next(request)
     if enabled and response.headers.get("content-type", "").startswith("text/html"):
         response.headers.add_vary_header("Cookie")

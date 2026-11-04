@@ -40,6 +40,7 @@ def start_flow(client):
         "redirect_uri": [ORIGIN + auth.CALLBACK_PATH],
         "response_type": ["code"],
         "scope": ["login:info"],
+        "optional_scope": ["login:avatar"],
         "state": [state],
         "code_challenge": [urlsafe_b64encode(sha256(verifier.encode()).digest()).decode().rstrip("=")],
         "code_challenge_method": ["S256"],
@@ -61,7 +62,10 @@ def test_login_logout_and_cross_origin_rejection(client, monkeypatch):
             return httpx.Response(200, json={"access_token": "upstream-token"})
         assert request.url.host == "login.yandex.ru"
         assert request.headers["authorization"] == "OAuth upstream-token"
-        return httpx.Response(200, json={"id": "12345", "client_id": CLIENT_ID})
+        return httpx.Response(200, json={
+            "id": "12345", "client_id": CLIENT_ID, "login": "sample.login",
+            "default_avatar_id": "123/avatar-test", "is_avatar_empty": False,
+        })
 
     monkeypatch.setattr(auth.httpx, "Client", lambda **kwargs: upstream_client(
         transport=httpx.MockTransport(provider), **kwargs,
@@ -69,14 +73,14 @@ def test_login_logout_and_cross_origin_rejection(client, monkeypatch):
     token = "t" * 43
     sessions = {}
 
-    def create_session(subject, previous_hash):
-        assert subject == "12345"
+    def create_session(identity, previous_hash):
+        assert identity == auth.YandexIdentity("12345", "sample.login", "123/avatar-test")
         assert previous_hash is None
-        sessions[token] = 10
+        sessions[token] = auth.SignedInAccount(10, identity.login, identity.avatar_id)
         return token
 
     monkeypatch.setattr(auth, "create_session", create_session)
-    monkeypatch.setattr(auth, "current_account_id", lambda request: sessions.get(request.cookies.get(auth.SESSION_COOKIE)))
+    monkeypatch.setattr(auth, "current_account", lambda request: sessions.get(request.cookies.get(auth.SESSION_COOKIE)))
     monkeypatch.setattr(auth, "end_session", lambda request: sessions.pop(request.cookies[auth.SESSION_COOKIE]))
 
     assert 'href="/auth/yandex"' in client.get("/").text
@@ -88,7 +92,11 @@ def test_login_logout_and_cross_origin_rejection(client, monkeypatch):
     assert client.cookies[auth.SESSION_COOKIE] == token
     assert "Max-Age=604800" in result.headers["set-cookie"]
     logged_in = client.get("/")
+    assert '<details class="site-account-menu">' in logged_in.text
+    assert "sample.login" in logged_in.text
+    assert "https://avatars.yandex.net/get-yapic/123/avatar-test/islands-retina-middle" in logged_in.text
     assert 'action="/auth/logout"' in logged_in.text
+    assert 'href="/auth/yandex"' not in logged_in.text
     assert logged_in.headers["cache-control"] == "private, no-store"
     assert "Cookie" in logged_in.headers["vary"]
     assert client.get("/auth/logout").status_code == 405
@@ -114,7 +122,7 @@ def test_callback_errors(client, monkeypatch, query, message):
         assert code == "rejected"
         raise httpx.ConnectError("test failure")
 
-    monkeypatch.setattr(auth, "yandex_user_id", reject)
+    monkeypatch.setattr(auth, "yandex_identity", reject)
     result = client.get(auth.CALLBACK_PATH, params={"state": state, **query})
     assert result.headers["location"] == f"/?auth_error={message}"
     assert client.cookies.get(auth.FLOW_COOKIE) is None
@@ -126,3 +134,12 @@ def test_login_is_hidden_when_not_configured(client, monkeypatch):
     monkeypatch.delenv("YANDEX_OAUTH_CLIENT_ID")
     assert 'href="/auth/yandex"' not in client.get("/").text
     assert client.get("/auth/yandex").status_code == 404
+
+
+def test_account_without_photo_has_initial(client, monkeypatch):
+    client.cookies.set(auth.SESSION_COOKIE, "t" * 43)
+    monkeypatch.setattr(auth, "current_account", lambda request: auth.SignedInAccount(10, "sample.login", None))
+    page = client.get("/").text
+    assert '<span aria-hidden="true">S</span>' in page
+    assert "sample.login" in page
+    assert "avatars.yandex.net" not in page
