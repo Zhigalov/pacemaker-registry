@@ -65,6 +65,7 @@ def test_login_logout_and_cross_origin_rejection(client, monkeypatch):
         return httpx.Response(200, json={
             "id": "12345", "client_id": CLIENT_ID, "login": "sample.login",
             "default_avatar_id": "123/avatar-test", "is_avatar_empty": False,
+            "last_name": "  Семёнов ", "first_name": "Артём",
         })
 
     monkeypatch.setattr(auth.httpx, "Client", lambda **kwargs: upstream_client(
@@ -74,7 +75,7 @@ def test_login_logout_and_cross_origin_rejection(client, monkeypatch):
     sessions = {}
 
     def create_session(identity, previous_hash):
-        assert identity == auth.YandexIdentity("12345", "sample.login", "123/avatar-test")
+        assert identity == auth.YandexIdentity("12345", "sample.login", "123/avatar-test", None, "Семёнов", "Артём")
         assert previous_hash is None
         sessions[token] = auth.SignedInAccount(10, identity.login, identity.avatar_id)
         return token

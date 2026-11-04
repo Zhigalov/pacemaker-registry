@@ -13,7 +13,7 @@
     {% include '_navigation.html' %}
     <section class="profile-link">
       <h1>Мой профиль</h1>
-      <p>Введите фамилию и имя, чтобы найти свою карточку в реестре.</p>
+      <p>Проверьте фамилию и имя, чтобы найти свою карточку в реестре.</p>
       {% if error %}<p class="profile-link-error" role="alert">{{ error }}</p>{% endif %}
       <form method="post" class="profile-link-search">
         <label>Фамилия <input name="last_name" value="{{ last_name }}" autocomplete="family-name" maxlength="120" required></label>

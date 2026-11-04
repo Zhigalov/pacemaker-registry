@@ -55,7 +55,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
     assert db.save_race_result(first, '00:50')
     assert migrate.migrate() == [
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
-        '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql',
+        '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -356,13 +356,16 @@ def test_profile_onboarding_finds_and_claims_only_unlinked_exact_names(database,
     origin = 'https://pacersreg.ru'
     path = '/account/profile'
     names = {'last_name': '  СЕМЕНОВ ', 'first_name': 'артем'}
-    token = auth.create_session(auth.YandexIdentity('111', 'test.pacer'), None)
+    token = auth.create_session(auth.YandexIdentity('111', 'test.pacer', last_name='Семёнов', first_name='Артём'), None)
     other_token = auth.create_session(auth.YandexIdentity('222', 'second.pacer'), None)
     with TestClient(app, base_url=origin, follow_redirects=False) as client:
         assert client.get(path).headers['location'] == '/auth/yandex'
         assert client.post(path, data=dict(names, action='search'), headers={'Origin': origin}).status_code == 403
         client.cookies.set(auth.SESSION_COOKIE, token)
-        assert client.get(path).status_code == 200
+        setup = client.get(path)
+        assert setup.status_code == 200
+        assert 'name="last_name" value="Семёнов"' in setup.text
+        assert 'name="first_name" value="Артём"' in setup.text
         assert client.post(path, data=dict(names, action='search'), headers={'Origin': 'https://example.test'}).status_code == 403
         candidates = client.post(path, data=dict(names, action='search'), headers={'Origin': origin})
         assert f'name="candidate_id" value="{pacemaker_id}"' in candidates.text

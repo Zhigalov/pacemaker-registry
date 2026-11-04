@@ -89,7 +89,8 @@ def check_database() -> None:
             JOIN events AS e ON e.id = rr.event_id
             JOIN pacemakers AS p ON p.id = rr.pacemaker_id
             LIMIT 0""")
-        connection.execute("""SELECT a.yandex_user_id, a.yandex_login, a.yandex_avatar_id, a.yandex_email, s.token_hash, s.expires_at
+        connection.execute("""SELECT a.yandex_user_id, a.yandex_login, a.yandex_avatar_id, a.yandex_email,
+            a.yandex_last_name, a.yandex_first_name, s.token_hash, s.expires_at
             FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
             LIMIT 0""")
 

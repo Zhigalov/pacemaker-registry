@@ -50,6 +50,8 @@ class YandexIdentity:
     login: str | None = None
     avatar_id: str | None = None
     email: str | None = None
+    last_name: str | None = None
+    first_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -58,6 +60,8 @@ class SignedInAccount:
     login: str | None
     avatar_id: str | None
     email: str | None = None
+    last_name: str | None = None
+    first_name: str | None = None
 
     @property
     def avatar_url(self) -> str | None:
@@ -84,7 +88,8 @@ def current_account(request: Request) -> SignedInAccount | None:
         return None
     with db.connect_database() as connection:
         row = connection.execute(
-            """SELECT a.id, a.yandex_login, a.yandex_avatar_id, a.yandex_email
+            """SELECT a.id, a.yandex_login, a.yandex_avatar_id, a.yandex_email,
+                      a.yandex_last_name, a.yandex_first_name
                FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
                WHERE s.token_hash = %s AND s.expires_at > now()""",
             (token_hash,),
@@ -96,13 +101,16 @@ def create_session(identity: YandexIdentity, previous_hash: bytes | None) -> str
     token = token_urlsafe(32)
     with db.connect_database() as connection:
         account_id, = connection.execute(
-            """INSERT INTO accounts (yandex_user_id, yandex_login, yandex_avatar_id, yandex_email)
-               VALUES (%s, %s, %s, %s)
+            """INSERT INTO accounts (yandex_user_id, yandex_login, yandex_avatar_id, yandex_email,
+                                     yandex_last_name, yandex_first_name)
+               VALUES (%s, %s, %s, %s, %s, %s)
                ON CONFLICT (yandex_user_id) DO UPDATE
                SET yandex_login = EXCLUDED.yandex_login, yandex_avatar_id = EXCLUDED.yandex_avatar_id,
-                   yandex_email = EXCLUDED.yandex_email
+                   yandex_email = EXCLUDED.yandex_email,
+                   yandex_last_name = EXCLUDED.yandex_last_name, yandex_first_name = EXCLUDED.yandex_first_name
                RETURNING id""",
-            (identity.user_id, identity.login, identity.avatar_id, identity.email),
+            (identity.user_id, identity.login, identity.avatar_id, identity.email,
+             identity.last_name, identity.first_name),
         ).fetchone()
         connection.execute("DELETE FROM account_sessions WHERE expires_at <= now()")
         if previous_hash is not None:
@@ -152,6 +160,14 @@ def login() -> RedirectResponse:
     return response
 
 
+def _name_from_yandex(value: object) -> str | None:
+    if isinstance(value, str):
+        name = " ".join(value.split())
+        if name and len(name) <= 120 and name.isprintable():
+            return name
+    return None
+
+
 def yandex_identity(client_id: str, code: str, verifier: str) -> YandexIdentity:
     with httpx.Client(timeout=4.0, trust_env=False) as client:
         token = client.post("https://oauth.yandex.ru/token", data={
@@ -179,7 +195,10 @@ def yandex_identity(client_id: str, code: str, verifier: str) -> YandexIdentity:
     email = identity.get("default_email")
     if not isinstance(email, str) or not re.fullmatch(r"[^\s@\x00-\x1f]+@[^\s@\x00-\x1f]+", email) or len(email) > 254:
         email = None
-    return YandexIdentity(subject, login_name[:128] or None, avatar_id, email)
+    return YandexIdentity(
+        subject, login_name[:128] or None, avatar_id, email,
+        _name_from_yandex(identity.get("last_name")), _name_from_yandex(identity.get("first_name")),
+    )
 
 
 @router.get("/yandex/callback")

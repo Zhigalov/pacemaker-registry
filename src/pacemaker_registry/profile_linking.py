@@ -92,7 +92,7 @@ def create_profile_link_router(templates):
     @router.get('/account/profile')
     def profile_setup(request: Request):
         if account := getattr(request.state, 'account', None):
-            return render(request, account)
+            return render(request, account, last_name=account.last_name or '', first_name=account.first_name or '')
         return _redirect('/auth/yandex' if auth.oauth_settings() else '/')
 
     @router.post('/account/profile')
