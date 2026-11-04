@@ -77,6 +77,9 @@ a, button, input { -webkit-tap-highlight-color: transparent; }
   .site-header .site-add, .site-header .site-account { padding: .7rem .55rem; font-size: .85rem; }
   .site-add-long, .site-auth-long { display: none; }
 }
+@media (max-width: 23rem) {
+  .site-header:has(.site-account) .brand-name { display: none; }
+}
 
 .button {
   display: inline-flex;
