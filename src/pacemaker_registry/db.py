@@ -84,12 +84,12 @@ def check_database() -> None:
     with connect_database() as connection:
         connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, p.last_name,
             p.motto, p.avatar_key, p.contacts, p.achievements, p.profile_version, p.profile_updated_at,
-            p.login, p.city_id, p.club_id, p.personal_records
+            p.login, p.city_id, p.club_id, p.personal_records, p.account_id
             FROM race_results AS rr
             JOIN events AS e ON e.id = rr.event_id
             JOIN pacemakers AS p ON p.id = rr.pacemaker_id
             LIMIT 0""")
-        connection.execute("""SELECT a.yandex_user_id, a.yandex_login, a.yandex_avatar_id, s.token_hash, s.expires_at
+        connection.execute("""SELECT a.yandex_user_id, a.yandex_login, a.yandex_avatar_id, a.yandex_email, s.token_hash, s.expires_at
             FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
             LIMIT 0""")
 

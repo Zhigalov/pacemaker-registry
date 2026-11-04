@@ -150,14 +150,18 @@ def contact_input(contact: dict) -> str:
 RECORD_DISTANCES = ('5', '10', '21.1', '42.2')
 
 
+def normalize_profile_login(value: str) -> str | None:
+    login = value.strip().lower()
+    if login and not re.fullmatch(r'[a-z][a-z0-9_-]{2,29}', login):
+        raise ValueError('Логин: от 3 до 30 латинских букв, цифр, _ или -. Начните с буквы.')
+    return login or None
+
+
 def normalize_profile_details(values: dict) -> dict:
     clean = dict(values)
     if len(clean['about']) > 5000:
         raise ValueError('Описание «О себе» — до 5000 символов.')
-    login = clean['login'].strip().lower()
-    if login and not re.fullmatch(r'[a-z][a-z0-9_-]{2,29}', login):
-        raise ValueError('Логин: от 3 до 30 латинских букв, цифр, _ или -. Начните с буквы.')
-    clean['login'] = login or None
+    clean['login'] = normalize_profile_login(clean['login'])
     for field, title in (('city', 'Город'), ('club', 'Беговой клуб')):
         clean[field] = ' '.join(clean[field].split())
         if len(clean[field]) > 120:

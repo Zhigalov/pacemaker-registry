@@ -13,15 +13,24 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 # Leave room for form fields and proxy integration overhead. Browser sources may be 5 MiB.
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 MAX_PIXELS = 16_000_000
+YANDEX_AVATAR_ID_PATTERN = r"[A-Za-z0-9_-]{1,128}(?:/[A-Za-z0-9_-]{1,128})?"
 KEY_PATTERN = r'avatars/[1-9][0-9]*/[0-9a-f]{32}\.webp'
 _decode_slot = Semaphore(1)
 
 
 def avatar_url(key: str | None) -> str | None:
+    if key and key.startswith('yandex/'):
+        return yandex_avatar_url(key.removeprefix('yandex/'), 'islands-200')
     bucket = os.getenv('AVATAR_BUCKET', '')
     if not key or not bucket or not re.fullmatch(KEY_PATTERN, key):
         return None
     return f'https://storage.yandexcloud.net/{bucket}/{key}'
+
+
+def yandex_avatar_url(avatar_id: str | None, size: str = 'islands-retina-middle') -> str | None:
+    if avatar_id and re.fullmatch(YANDEX_AVATAR_ID_PATTERN, avatar_id):
+        return f'https://avatars.yandex.net/get-yapic/{avatar_id}/{size}'
+    return None
 
 
 def prepare_avatar(data: bytes) -> bytes:
@@ -49,7 +58,7 @@ def prepare_avatar(data: bytes) -> bytes:
 
 def _request(method: str, key: str, data: bytes | None = None) -> None:
     url = avatar_url(key)
-    if not url:
+    if not re.fullmatch(KEY_PATTERN, key) or not url:
         raise RuntimeError('Avatar storage is not configured.')
     # No static keys: the existing container service account supplies a short-lived token.
     try:
@@ -74,7 +83,7 @@ def upload_avatar(pacemaker_id: int, data: bytes) -> str:
 
 
 def delete_avatar(key: str | None) -> bool:
-    if not key:
+    if not key or key.startswith('yandex/'):
         return True
     try:
         _request('DELETE', key)

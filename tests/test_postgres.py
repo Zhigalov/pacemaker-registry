@@ -55,7 +55,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
     assert db.save_race_result(first, '00:50')
     assert migrate.migrate() == [
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
-        '0004_accounts.sql', '0005_account_identity.sql',
+        '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -339,3 +339,81 @@ def test_account_sessions_are_independent_and_reusable(database):
         )
         connection.execute("UPDATE account_sessions SET expires_at = now()")
     assert auth.current_account(request(laptop)) is None
+
+
+def test_profile_onboarding_finds_and_claims_only_unlinked_exact_names(database, monkeypatch):
+    from fastapi.testclient import TestClient
+    from pacemaker_registry.main import app
+
+    migrate.migrate()
+    assert db.save_race_result(sample(athlete_name='Семёнов Артём'), '00:50')
+    pacemaker_id = db.load_registry().pacemakers[0].id
+    with database() as connection:
+        another = connection.execute(
+            "INSERT INTO pacemakers (last_name, first_name) VALUES ('Семенов', 'Артемий') RETURNING id"
+        ).fetchone()[0]
+    monkeypatch.setenv('YANDEX_OAUTH_CLIENT_ID', 'test-client')
+    origin = 'https://pacersreg.ru'
+    path = '/account/profile'
+    names = {'last_name': '  СЕМЕНОВ ', 'first_name': 'артем'}
+    token = auth.create_session(auth.YandexIdentity('111', 'test.pacer'), None)
+    other_token = auth.create_session(auth.YandexIdentity('222', 'second.pacer'), None)
+    with TestClient(app, base_url=origin, follow_redirects=False) as client:
+        assert client.get(path).headers['location'] == '/auth/yandex'
+        assert client.post(path, data=dict(names, action='search'), headers={'Origin': origin}).status_code == 403
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        assert client.get(path).status_code == 200
+        assert client.post(path, data=dict(names, action='search'), headers={'Origin': 'https://example.test'}).status_code == 403
+        candidates = client.post(path, data=dict(names, action='search'), headers={'Origin': origin})
+        assert f'name="candidate_id" value="{pacemaker_id}"' in candidates.text
+        assert f'name="candidate_id" value="{another}"' not in candidates.text
+        invalid = client.post(path, data=dict(names, action='link', candidate_id=another), headers={'Origin': origin})
+        assert invalid.status_code == 422
+        result = client.post(path, data=dict(names, action='link', candidate_id=pacemaker_id), headers={'Origin': origin})
+        assert result.headers['location'] == f'/pacemakers/{pacemaker_id}'
+        assert client.get(path).headers['location'] == result.headers['location']
+        client.cookies.set(auth.SESSION_COOKIE, other_token)
+        blocked = client.post(path, data=dict(names, action='link', candidate_id=pacemaker_id), headers={'Origin': origin})
+        assert blocked.status_code == 422
+        assert 'уже связан' in blocked.text
+    assert len(db.get_pacemaker_profile(pacemaker_id).results) == 1
+
+
+@pytest.mark.parametrize('publish_email', [False, True])
+def test_profile_onboarding_creates_with_optional_identity_details(database, monkeypatch, publish_email):
+    from fastapi.testclient import TestClient
+    from pacemaker_registry.main import app
+
+    migrate.migrate()
+    monkeypatch.setenv('YANDEX_OAUTH_CLIENT_ID', 'test-client')
+    origin = 'https://pacersreg.ru'
+    identity = auth.YandexIdentity('1234', 'new.pacer', '123/image', 'test@example.com')
+    token = auth.create_session(identity, None)
+    with database() as connection:
+        connection.execute(
+            "INSERT INTO pacemakers(last_name, first_name, login) VALUES ('Другое', 'Имя', 'new-pacer')"
+        )
+    with TestClient(app, base_url=origin, follow_redirects=False) as client:
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        fields = {'last_name': 'Тестов', 'first_name': 'Новый'}
+        headers = {'Origin': origin}
+        found = client.post('/account/profile', data=dict(fields, action='search'), headers=headers)
+        assert 'value="new-pacer"' in found.text
+        assert 'name="publish_email" value="true" checked' not in found.text
+        assert 'test@example.com' in found.text
+        assert found.headers['cache-control'] == 'private, no-store'
+        details = dict(fields, action='create', publish_email=str(publish_email).lower(), use_photo='true')
+        duplicate = client.post('/account/profile', data=dict(details, login='new-pacer'), headers=headers)
+        assert duplicate.status_code == 422
+        assert 'логин уже занят' in duplicate.text
+        created = client.post('/account/profile', data=dict(details, login='new-pacer-2'), headers=headers)
+        assert created.status_code == 303
+        profile = db.get_pacemaker_profile(int(created.headers['location'].split('/')[-1]))
+        assert profile.login == 'new-pacer-2'
+        assert profile.avatar_key == 'yandex/123/image'
+        assert bool(profile.contacts) is publish_email
+        if publish_email:
+            assert profile.contacts[0]['value'] == 'test@example.com'
+        page = client.get(created.headers['location'])
+        assert 'https://avatars.yandex.net/get-yapic/123/image/islands-200' in page.text
+        assert ('test@example.com' in page.text) is publish_email

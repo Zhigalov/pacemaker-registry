@@ -86,7 +86,7 @@ def test_login_logout_and_cross_origin_rejection(client, monkeypatch):
     assert 'href="/auth/yandex"' in client.get("/").text
     result = client.get(auth.CALLBACK_PATH, params={"state": state, "code": "sample-code"})
     assert result.status_code == 303
-    assert result.headers["location"] == "/"
+    assert result.headers["location"] == "/account/profile"
     assert "upstream-token" not in str(result.headers)
     assert client.cookies.get(auth.FLOW_COOKIE) is None
     assert client.cookies[auth.SESSION_COOKIE] == token
@@ -145,3 +145,9 @@ def test_account_without_photo_has_initial(client, monkeypatch):
     assert "\n          S\n" in page
     assert "sample.login" in page
     assert "avatars.yandex.net" not in page
+
+
+def test_optional_email_scope_is_requested_only_when_enabled(client, monkeypatch):
+    monkeypatch.setenv("YANDEX_OAUTH_EMAIL_ENABLED", "1")
+    location = client.get("/auth/yandex").headers["location"]
+    assert parse_qs(urlsplit(location).query)["optional_scope"] == ["login:avatar login:email"]

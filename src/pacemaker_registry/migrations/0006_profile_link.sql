@@ -1,0 +1,2 @@
+ALTER TABLE pacemakers ADD COLUMN account_id BIGINT UNIQUE REFERENCES accounts(id) ON DELETE SET NULL;
+ALTER TABLE accounts ADD COLUMN yandex_email TEXT;

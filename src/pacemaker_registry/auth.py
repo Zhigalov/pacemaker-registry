@@ -13,6 +13,7 @@ from fastapi.responses import RedirectResponse
 from psycopg import Error as PsycopgError
 
 from pacemaker_registry import db
+from pacemaker_registry.avatars import yandex_avatar_url
 
 
 router = APIRouter(prefix="/auth")
@@ -21,7 +22,6 @@ FLOW_COOKIE = "__Host-pacers-oauth"
 SESSION_COOKIE = "__Host-pacers-session"
 FLOW_SECONDS = 600
 SESSION_SECONDS = 7 * 24 * 60 * 60
-AVATAR_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}(?:/[A-Za-z0-9_-]{1,128})?")
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}")
 COOKIE_OPTIONS = {"secure": True, "httponly": True, "samesite": "lax", "path": "/"}
 
@@ -49,6 +49,7 @@ class YandexIdentity:
     user_id: str
     login: str | None = None
     avatar_id: str | None = None
+    email: str | None = None
 
 
 @dataclass(frozen=True)
@@ -56,12 +57,11 @@ class SignedInAccount:
     id: int
     login: str | None
     avatar_id: str | None
+    email: str | None = None
 
     @property
     def avatar_url(self) -> str | None:
-        if self.avatar_id:
-            return f"https://avatars.yandex.net/get-yapic/{self.avatar_id}/islands-retina-middle"
-        return None
+        return yandex_avatar_url(self.avatar_id)
 
 
 def auth_context(request: Request) -> dict:
@@ -84,7 +84,7 @@ def current_account(request: Request) -> SignedInAccount | None:
         return None
     with db.connect_database() as connection:
         row = connection.execute(
-            """SELECT a.id, a.yandex_login, a.yandex_avatar_id
+            """SELECT a.id, a.yandex_login, a.yandex_avatar_id, a.yandex_email
                FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
                WHERE s.token_hash = %s AND s.expires_at > now()""",
             (token_hash,),
@@ -96,12 +96,13 @@ def create_session(identity: YandexIdentity, previous_hash: bytes | None) -> str
     token = token_urlsafe(32)
     with db.connect_database() as connection:
         account_id, = connection.execute(
-            """INSERT INTO accounts (yandex_user_id, yandex_login, yandex_avatar_id)
-               VALUES (%s, %s, %s)
+            """INSERT INTO accounts (yandex_user_id, yandex_login, yandex_avatar_id, yandex_email)
+               VALUES (%s, %s, %s, %s)
                ON CONFLICT (yandex_user_id) DO UPDATE
-               SET yandex_login = EXCLUDED.yandex_login, yandex_avatar_id = EXCLUDED.yandex_avatar_id
+               SET yandex_login = EXCLUDED.yandex_login, yandex_avatar_id = EXCLUDED.yandex_avatar_id,
+                   yandex_email = EXCLUDED.yandex_email
                RETURNING id""",
-            (identity.user_id, identity.login, identity.avatar_id),
+            (identity.user_id, identity.login, identity.avatar_id, identity.email),
         ).fetchone()
         connection.execute("DELETE FROM account_sessions WHERE expires_at <= now()")
         if previous_hash is not None:
@@ -141,7 +142,7 @@ def login() -> RedirectResponse:
         "client_id": client_id,
         "redirect_uri": origin + CALLBACK_PATH,
         "scope": "login:info",
-        "optional_scope": "login:avatar",
+        "optional_scope": "login:avatar login:email" if os.getenv("YANDEX_OAUTH_EMAIL_ENABLED") == "1" else "login:avatar",
         "state": state,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
@@ -173,9 +174,12 @@ def yandex_identity(client_id: str, code: str, verifier: str) -> YandexIdentity:
     login_name = identity.get("login")
     login_name = login_name.strip() if isinstance(login_name, str) else ""
     avatar_id = identity.get("default_avatar_id")
-    if identity.get("is_avatar_empty") is not False or not isinstance(avatar_id, str) or not AVATAR_ID_PATTERN.fullmatch(avatar_id):
+    if identity.get("is_avatar_empty") is not False or not isinstance(avatar_id, str) or not yandex_avatar_url(avatar_id):
         avatar_id = None
-    return YandexIdentity(subject, login_name[:128] or None, avatar_id)
+    email = identity.get("default_email")
+    if not isinstance(email, str) or not re.fullmatch(r"[^\s@\x00-\x1f]+@[^\s@\x00-\x1f]+", email) or len(email) > 254:
+        email = None
+    return YandexIdentity(subject, login_name[:128] or None, avatar_id, email)
 
 
 @router.get("/yandex/callback")
@@ -200,7 +204,7 @@ def callback(request: Request) -> RedirectResponse:
         try:
             identity = yandex_identity(client_id, code, verifier)
             session = create_session(identity, _session_hash(request))
-            location = "/"
+            location = "/account/profile"
         except (httpx.HTTPError, ValueError, KeyError, TypeError, PsycopgError, RuntimeError):
             location = "/?auth_error=unavailable"
     response = _redirect(location)

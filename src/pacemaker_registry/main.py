@@ -96,7 +96,9 @@ templates.env.filters["rating_color"] = rating_color_style
 templates.env.filters["avatar_url"] = avatar_url
 
 from pacemaker_registry.profile_routes import create_profile_router
+from pacemaker_registry.profile_linking import create_profile_link_router
 app.include_router(create_profile_router(templates))
+app.include_router(create_profile_link_router(templates))
 app.include_router(auth.router)
 
 
