@@ -82,14 +82,48 @@ def test_social_handles_build_canonical_urls_and_prefill_as_handles(kind, nick, 
 
 
 @pytest.mark.parametrize('kind,value', [
-    ('telegram', 'https://t.me/pacer_one'), ('instagram', 'instagram.com/pacer'),
-    ('vk', 'https://vk.com/id123'), ('facebook', 'pacer?redirect=bad'),
-    ('max', 'https://max.ru/u/pacer'), ('whatsapp', 'https://wa.me/79991234567'),
+    ('telegram', 'https://t.me/+invite'), ('instagram', 'instagram.com/pacer/post'),
+    ('vk', 'https://vk.com/'), ('facebook', 'pacer?redirect=bad'),
+    ('max', 'https://max.ru/u/pacer/extra'), ('whatsapp', 'https://wa.me/message/invite'),
     ('telegram', '@@pacer_one'), ('instagram', 'name with spaces'),
+    ('facebook', 'https://facebook.com/profile.php'),
+    ('facebook', 'https://facebook.com/profile.php?id=123&id=456'),
+    ('whatsapp', 'https://api.whatsapp.com/send'),
+    ('telegram', 'https://t.me.evil.example/pacer_one'),
+    ('instagram', 'https://evil.example/pacer'),
+    ('max', 'javascript:alert(1)'), ('telegram', 'https://t.me/pacer\n_one'),
 ])
-def test_social_inputs_reject_urls_or_non_handles(kind, value):
+def test_social_inputs_reject_invalid_or_wrong_service_links(kind, value):
     with pytest.raises(ValueError):
         normalize_contacts([{'type': kind, 'value': value}])
+
+
+@pytest.mark.parametrize('kind,value,expected', [
+    ('telegram', ' https://t.me/pacer_one ', 'https://t.me/pacer_one'),
+    ('telegram', 't.me/pacer_one/', 'https://t.me/pacer_one'),
+    ('telegram', 'https://telegram.me/pacer_one?utm_source=app', 'https://t.me/pacer_one'),
+    ('instagram', 'www.instagram.com/pacer.one/?igsh=tracking', 'https://instagram.com/pacer.one'),
+    ('vk', 'https://vk.ru/id123?from=profile', 'https://vk.com/id123'),
+    ('vk', 'VK.COM/pacer_one/', 'https://vk.com/pacer_one'),
+    ('facebook', 'https://www.facebook.com/pacer.one/', 'https://facebook.com/pacer.one'),
+    ('facebook', 'https://facebook.com/profile.php?id=123456&tracking=yes', 'https://www.facebook.com/profile.php?id=123456'),
+    ('max', 'max.ru/u/profile_code', 'https://max.ru/u/profile_code'),
+    ('whatsapp', 'https://wa.me/79991234567', 'https://wa.me/79991234567'),
+    ('whatsapp', 'wa.me/79991234567?text=Hello', 'https://wa.me/79991234567'),
+    ('whatsapp', 'https://api.whatsapp.com/send?phone=79991234567&text=Hello', 'https://wa.me/79991234567'),
+    ('strava', 'strava.com/athletes/123456', 'https://www.strava.com/athletes/123456'),
+])
+def test_social_links_and_handles_roundtrip(kind, value, expected):
+    clean = normalize_contacts([{'type': kind, 'value': value}])
+    assert clean == [{'type': kind, 'value': expected}]
+    assert normalize_contacts(profile_form_values(profile(contacts=tuple(clean)))['contacts']) == clean
+
+
+def test_link_and_handle_for_same_profile_are_deduplicated():
+    assert normalize_contacts([
+        {'type': 'telegram', 'value': '@pacer_one'},
+        {'type': 'telegram', 'value': 'https://t.me/pacer_one?source=app'},
+    ]) == [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}]
 
 
 def test_existing_whatsapp_and_facebook_links_remain_editable_without_migration():
@@ -99,10 +133,10 @@ def test_existing_whatsapp_and_facebook_links_remain_editable_without_migration(
     )))
     nonempty = [c for c in values['contacts'] if c['value']]
     assert nonempty == [{'type': 'whatsapp', 'value': '+79991234567'},
-                        {'type': 'facebook', 'value': '123456'}]
+                        {'type': 'facebook', 'value': 'https://www.facebook.com/profile.php?id=123456'}]
     assert normalize_contacts(values['contacts']) == [
         {'type': 'whatsapp', 'value': 'https://wa.me/79991234567'},
-        {'type': 'facebook', 'value': 'https://facebook.com/123456'},
+        {'type': 'facebook', 'value': 'https://www.facebook.com/profile.php?id=123456'},
     ]
 
 
@@ -111,6 +145,7 @@ def test_existing_whatsapp_and_facebook_links_remain_editable_without_migration(
     ('instagram', 'https://instagram.com/pacer.one', '@pacer.one'),
     ('vk', 'https://vk.com/id123', '@id123'),
     ('facebook', 'https://facebook.com/pacer.one', '@pacer.one'),
+    ('facebook', 'https://www.facebook.com/profile.php?id=123456', '@123456'),
     ('max', 'https://max.ru/pacer_one', '@pacer_one'),
     ('whatsapp', 'https://wa.me/79991234567', '+79991234567'),
     ('phone', '+79991234567', '+79991234567'),
@@ -159,14 +194,15 @@ async def test_profile_cards_contacts_achievements_and_no_empty_motto(monkeypatc
 
 
 @pytest.mark.anyio
-async def test_edit_ignores_tampered_name_and_saves_only_profile(monkeypatch):
+@pytest.mark.parametrize('contact_value', ['@pacer_one', 'https://t.me/pacer_one?source=app'])
+async def test_edit_ignores_tampered_name_and_saves_only_profile(monkeypatch, contact_value):
     monkeypatch.setattr(db, 'get_pacemaker_profile', lambda *a, **k: profile())
     save = Mock(return_value=True)
     monkeypatch.setattr(db, 'save_pacemaker_profile', save)
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
         response = await client.post('/pacemakers/7/edit', data={'profile_version': '0',
             'first_name': 'Fake', 'motto': 'Ведём вместе', 'contact_type': 'telegram',
-            'contact_value': '@pacer_one', 'contact_label': '', 'achievements': 'pshp_graduate'})
+            'contact_value': contact_value, 'contact_label': '', 'achievements': 'pshp_graduate'})
         edit = await client.get('/pacemakers/7/edit')
     assert response.status_code == 303
     save.assert_called_once_with(7, 0, 'Ведём вместе',
@@ -175,6 +211,8 @@ async def test_edit_ignores_tampered_name_and_saves_only_profile(monkeypatch):
     assert 'Выбрать фото</label>' in edit.text
     assert 'Файл не выбран' in edit.text
     assert 'class="visually-hidden" id="profile-photo"' in edit.text
+    assert 'Вставьте ссылку на профиль или укажите ник' in edit.text
+    assert '>t.me/</span>' not in edit.text
 
 
 @pytest.mark.anyio

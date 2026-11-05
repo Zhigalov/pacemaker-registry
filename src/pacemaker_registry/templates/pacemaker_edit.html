@@ -67,7 +67,7 @@
         </section>
         <section class="profile-form-section" aria-labelledby="contacts-heading">
           <h2 id="contacts-heading">Контакты</h2>
-          <p class="event-note">В соцсетях укажите только ник, можно с @ — ссылку соберём сами. Для Strava подойдёт и ссылка из приложения, для WhatsApp — номер телефона. Контакты видны всем посетителям.</p>
+          <p class="event-note">Вставьте ссылку на профиль или укажите ник — можно с @. Для WhatsApp подойдёт номер телефона или ссылка. Контакты видны всем посетителям.</p>
           <div class="profile-contact-fields" data-contact-fields>
             {% for contact in values.contacts %}
               <div class="profile-contact-row{% if contact.type == 'other' %} profile-contact-row--other{% endif %}">
@@ -76,9 +76,7 @@
                   <label>Название<input type="text" name="contact_label" maxlength="60" value="{{ contact.label|default('') }}" placeholder="Например, сайт команды"></label>
                 {% else %}<input type="hidden" name="contact_label" value=""><label>{{ contact_types[contact.type][0] if contact.type in contact_types else 'Контакт' }}{% endif %}
                 {% if contact.type == 'other' %}<label>Ссылка или текст{% endif %}
-                  {% if contact.type in contact_prefixes and contact.type != 'strava' %}<span class="profile-handle-input"><span class="profile-handle-prefix" aria-hidden="true">{{ contact_prefixes[contact.type]|replace('https://', '') }}</span>{% endif %}
-                  <input type="text" name="contact_value" maxlength="{{ 201 if contact.type in contact_prefixes and contact.type != 'strava' else 500 }}" value="{{ contact.value }}" placeholder="{{ contact_types[contact.type][1] if contact.type in contact_types else '' }}"{% if contact.type in contact_prefixes and contact.type != 'strava' %} autocapitalize="none" spellcheck="false"{% elif contact.type in ['phone', 'whatsapp'] %} inputmode="tel"{% endif %}>
-                  {% if contact.type in contact_prefixes and contact.type != 'strava' %}</span>{% endif %}
+                  <input type="text" name="contact_value" maxlength="500" value="{{ contact.value }}" placeholder="{{ contact_types[contact.type][1] if contact.type in contact_types else '' }}"{% if contact.type in contact_prefixes and contact.type != 'strava' %} autocapitalize="none" spellcheck="false"{% elif contact.type in ['phone', 'whatsapp'] %} inputmode="tel"{% endif %}>
                   {% if contact.type == 'strava' %}<small class="contact-field-hint">ID, ник или ссылка из «Поделиться профилем». Можно вставить весь текст из приложения.</small>{% endif %}
                 </label>
                 {% if contact.type == 'other' %}<button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>{% endif %}
