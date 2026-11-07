@@ -8,6 +8,8 @@ from uuid import UUID
 
 import httpx
 
+from pacemaker_registry.times import elapsed_seconds
+
 
 RUSSIA_RUNNING_ORIGIN = "https://results.russiarunning.com"
 SLUG_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -245,20 +247,10 @@ def _pace_value(value: str) -> str:
 
 def guess_target_time(chip_time: str, target_time_type: str | None = None) -> str:
     """Guess the flag time from the nearest common pacemaker target."""
-    parts = chip_time.strip().split(":")
-    if len(parts) not in (2, 3) or not all(part.isdigit() for part in parts):
-        raise RussiaRunningError("Не удалось определить время на флаге.")
-
-    if len(parts) == 2:
-        hours = 0
-        minutes, seconds = map(int, parts)
-    else:
-        hours, minutes, seconds = map(int, parts)
-
-    if minutes >= 60 or seconds >= 60:
-        raise RussiaRunningError("Не удалось определить время на флаге.")
-
-    chip_seconds = hours * 3600 + minutes * 60 + seconds
+    try:
+        chip_seconds = elapsed_seconds(chip_time)
+    except ValueError as error:
+        raise RussiaRunningError("Не удалось определить время на флаге.") from error
     center_minute = chip_seconds // 60
     candidate_minutes = range(max(0, center_minute - 5), center_minute + 7)
     allowed_remainders = {

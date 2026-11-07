@@ -19,14 +19,14 @@ def target_seconds(value: str) -> int:
 
 
 def elapsed_seconds(value: str) -> int:
-    parts = list(map(int, value.split(":")))
-    if len(parts) == 2:
-        minutes, seconds = parts
-        return minutes * 60 + seconds
-    if len(parts) == 3:
-        hours, minutes, seconds = parts
-        return hours * 3600 + minutes * 60 + seconds
-    raise ValueError("Unsupported elapsed time format")
+    """Read elapsed time at whole-second precision for the rating."""
+    match = re.fullmatch(r"(?:(\d+):)?(\d+):(\d+)(?:\.\d+)?", value.strip())
+    if match is None:
+        raise ValueError("Unsupported elapsed time format")
+    hours, minutes, seconds = (int(part or 0) for part in match.groups())
+    if seconds >= 60:
+        raise ValueError("Unsupported elapsed time format")
+    return hours * 3600 + minutes * 60 + seconds
 
 
 def time_difference_seconds(target_time: str, chip_time: str) -> int:

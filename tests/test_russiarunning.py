@@ -170,6 +170,10 @@ def test_parse_result_falls_back_to_individual_checkpoint_time() -> None:
         ("01:57:30", "01:59"),
         ("01:30:02", "01:30"),
         ("29:45", "00:30"),
+        ("39:39.1", "00:40"),
+        ("24:50.156", "00:25"),
+        ("65:07.1", "01:05"),
+        ("01:05:07.1", "01:05"),
     ],
 )
 def test_guess_target_time_uses_nearest_common_flag_time(
