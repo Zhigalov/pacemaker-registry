@@ -15,20 +15,20 @@ MIN_SPLITS_COVERAGE = Decimal("0.8")
 
 
 def _build_registry_result(result_id, event, distance, target_time, chip_time,
-                           actual_pace, checkpoints, include_splits=True, *, details=True) -> RegistryCard | RegistryResult:
+                           actual_pace, checkpoints, *, details=True) -> RegistryCard | RegistryResult:
     """The registry and detail page must use the very same scoring pipeline."""
     finish_rating = calculate_pacemaker_rating(target_time, chip_time, event.formula)
-    segments = _rated_segments(target_time, distance, checkpoints, event.pace_formula)
+    segments = _rated_segments(target_time, distance, checkpoints, event.pace_formula) if event.splits_enabled else ()
     if details:
         segments = tuple(segments)  # Detail charts reuse the exact scored segments.
     splits_rating = _weighted_splits_rating(distance, segments)
-    rating = calculate_combined_rating(finish_rating, splits_rating, include_splits)
+    rating = calculate_combined_rating(finish_rating, splits_rating)
     card = dict(
         id=result_id, event_id=event.id, event_name=event.name,
         distance_km=_format_registry_distance(distance), target_time=target_time,
         chip_time=chip_time,
         finish_rating=finish_rating, splits_rating=splits_rating,
-        rating=rating,
+        rating=rating, splits_enabled=event.splits_enabled,
     )
     if not details:
         return RegistryCard(**card)

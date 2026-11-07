@@ -54,13 +54,8 @@
           <h2 id="performances-title">Выступления <span>{{ profile.results|length }}</span></h2>
           {% if profile.rating is not none %}<span class="profile-average" style="{{ profile.rating | rating_color }}">Рейтинг <strong>{{ '%.1f'|format(profile.rating)|replace('.', ',') }}</strong><small>/10</small></span>{% endif %}
         </div>
-        <form class="profile-score-toggle" method="get">
-          <input type="hidden" name="include_splits" value="false">
-          <label><input type="checkbox" name="include_splits" value="true" data-profile-filter{% if include_splits %} checked{% endif %}> Учитывать темп в рейтинге</label>
-          <noscript><button class="button" type="submit">Показать</button></noscript>
-        </form>
         {% if profile.results %}<div class="profile-results-grid">
-          {% for result in profile.results %}{{ result_card(result, include_splits) }}{% endfor %}
+          {% for result in profile.results %}{{ result_card(result) }}{% endfor %}
         </div>{% else %}<p class="event-note">В реестре пока нет выступлений этого пейсмейкера.</p>{% endif %}
       </section>
         </div>

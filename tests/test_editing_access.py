@@ -19,6 +19,7 @@ def client(monkeypatch):
 @pytest.mark.parametrize("path,payload,save_name", [
     ("/events/1/rating", asdict(EventRatingConfig()), "save_event_rating"),
     ("/events/1/pace-rating", asdict(PaceRatingConfig()), "save_event_pace_rating"),
+    ("/events/1/pace-rating", {"splits_enabled": "false"}, "save_event_pace_rating"),
 ])
 @pytest.mark.parametrize("account,status", [
     (None, 401),

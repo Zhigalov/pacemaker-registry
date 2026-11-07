@@ -19,11 +19,11 @@
       {% include '_navigation.html' %}
       <section class="event-heading">
         <a class="button result-back" href="{{ back_url }}">← Обратно к списку</a>
-        <h1><a class="result-athlete-link" href="/pacemakers/{{ details.pacemaker_id }}?include_splits={{ 'true' if include_splits else 'false' }}">{{ details.athlete_name }} <span class="result-profile-arrow" aria-hidden="true">→</span></a></h1>
+        <h1><a class="result-athlete-link" href="/pacemakers/{{ details.pacemaker_id }}">{{ details.athlete_name }} <span class="result-profile-arrow" aria-hidden="true">→</span></a></h1>
         <h2><a href="/events/{{ event.id }}">{{ event.name }}</a> · {{ result.distance_km }} км</h2>
         <p>Время на флаге: {% if event.target_time_type == 'sub_minute' %}саб-минута{% elif event.target_time_type == 'round' %}ровное{% else %}тип ещё не определён{% endif %}</p>
         <nav class="result-links" aria-label="Ссылки на соревнование">
-          <a class="button result-link-button" href="/?event_id={{ event.id }}&amp;include_splits={{ 'true' if include_splits else 'false' }}">Все пейсеры соревнования</a>
+          <a class="button result-link-button" href="/?event_id={{ event.id }}">Все пейсеры соревнования</a>
           {% if source_event_url or source_url %}
           <details class="result-sources">
             <summary class="result-link-button">На сайте организатора</summary>
@@ -70,7 +70,7 @@
           <div {% if result.splits_rating is not none %}style="{{ result.splits_rating | rating_color }}"{% endif %}><span>Темп на отрезках</span><strong>{% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating)|replace('.', ',') }}<small> / 10</small>{% else %}—{% endif %}</strong></div>
           <div style="{{ result.rating | rating_color }}"><span>Итог</span><strong>{{ '%.1f'|format(result.rating)|replace('.', ',') }}<small> / 10</small></strong></div>
         </div>
-        <p class="event-note">{% if not include_splits %}Учёт темпа выключен: итог равен оценке за финиш.{% elif result.splits_rating is none %}Недостаточно данных по отсечкам для оценки темпа: итог равен оценке за финиш.{% else %}Итог: 60% финиш + 40% темп. Оценки темпа взвешены по длине отрезков.{% endif %}</p>
+        <p class="event-note">{% if not event.splits_enabled %}Учёт отсечек выключен для этого соревнования: итог равен оценке за финиш.{% elif result.splits_rating is none %}Недостаточно данных по отсечкам для оценки темпа: итог равен оценке за финиш.{% else %}Итог: 60% финиш + 40% темп. Оценки темпа взвешены по длине отрезков.{% endif %}</p>
       </section>
       <section class="event-editor result-checkpoints" aria-labelledby="checkpoints-title">
         <h2 id="checkpoints-title">Все контрольные точки <span class="event-note">· {{ result.checkpoints|length }}</span></h2>
@@ -93,6 +93,7 @@
         <script type="application/json" data-rating-config>{{ finish_config | tojson }}</script>
         <script type="application/json" data-result-markers>{{ [{'label': 'Финиш', 'deviation': result.finish_deviation, 'score': result.finish_rating}] | tojson }}</script>
       </section>
+      {% if event.splits_enabled %}
       <section class="event-editor result-rating-preview" data-pace-widget aria-labelledby="pace-chart-title">
         <h2 id="pace-chart-title">Оценка за темп на отрезках</h2>
         <p class="event-note">Действующая шкала этого соревнования · только просмотр. Допуск ±{{ '%g'|format(event.pace_formula.tolerance) }} с/км, экспонента после ±{{ '%g'|format(event.pace_formula.bad) }} с/км.</p>
@@ -102,6 +103,7 @@
         {% if result.pace_markers %}<p class="event-note">Метки подписаны километром окончания отрезка. Наведите, нажмите или выберите подпись клавишей Tab, чтобы увидеть отклонение и балл. Минус — быстрее целевого темпа, плюс — медленнее.</p>{% endif %}
         {% if result.pace_markers|length < result.checkpoints|length %}<p class="event-note">Отсечки без корректного темпа или длины отрезка не нанесены на график.</p>{% endif %}
       </section>
+      {% endif %}
       <a class="button result-back" href="{{ back_url }}">← Обратно к списку</a>
     </main>
   </body>

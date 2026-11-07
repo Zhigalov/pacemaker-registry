@@ -167,7 +167,7 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
     monkeypatch,
 ) -> None:
     calls: list[tuple[str, tuple[int, ...]]] = []
-    event_rows = [(1, "Когалымский полумарафон", "sub_minute", None, None), (2, "Московский марафон", "round", None, None)]
+    event_rows = [(1, "Когалымский полумарафон", "sub_minute", None, None, True), (2, "Московский марафон", "round", None, None, False)]
     result_rows = [
         (
             7,
@@ -208,13 +208,12 @@ def test_load_registry_filters_results_and_keeps_all_event_options(
 
     registry = load_registry(
         event_id=2,
-        include_splits=False,
     )
 
     assert [(event.id, event.name) for event in registry.events] == [(row[0], row[1]) for row in event_rows]
     assert registry.selected_event_id == 2
     assert registry.pacemakers[0].results[0].finish_rating == 10
-    assert registry.include_splits is False
+    assert registry.pacemakers[0].results[0].splits_enabled is False
     assert calls[2][1] == (1, 2)
     assert "HAVING count(*) >= %s" in calls[2][0]
     assert "rr.pace," not in calls[2][0]

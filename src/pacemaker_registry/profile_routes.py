@@ -14,9 +14,9 @@ from pacemaker_registry.profiles import (
 )
 
 
-def _load(pacemaker_id, include_splits=True, *, with_results=True):
+def _load(pacemaker_id, *, with_results=True):
     try:
-        profile = db.get_pacemaker_profile(pacemaker_id, include_splits, with_results=with_results)
+        profile = db.get_pacemaker_profile(pacemaker_id, with_results=with_results)
     except (PsycopgError, RuntimeError):
         raise HTTPException(503, 'Не удалось загрузить пейсмейкера. Попробуйте позже.') from None
     if profile is None:
@@ -66,23 +66,23 @@ def create_profile_router(templates):
             status_code=status_code)
 
     @router.get('/p/{login}')
-    def public_profile(request: Request, login: str, include_splits: bool = True, saved: bool = False):
+    def public_profile(request: Request, login: str, saved: bool = False):
         try:
             pacemaker_id = db.find_pacemaker_login(login)
         except (PsycopgError, RuntimeError):
             raise HTTPException(503, 'Не удалось загрузить профиль. Попробуйте позже.') from None
         if pacemaker_id is None:
             raise HTTPException(404, 'Пейсмейкер не найден.')
-        return profile_page(request, pacemaker_id, include_splits, saved)
+        return profile_page(request, pacemaker_id, saved)
 
     @router.get('/pacemakers/{pacemaker_id}')
-    def profile_page(request: Request, pacemaker_id: int, include_splits: bool = True, saved: bool = False):
-        profile = _load(pacemaker_id, include_splits)
+    def profile_page(request: Request, pacemaker_id: int, saved: bool = False):
+        profile = _load(pacemaker_id)
         account = auth.request_account(request)
         return templates.TemplateResponse(request=request, name='pacemaker.html', context={
             'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
             'contacts': [contact_view(c) for c in profile.contacts], 'achievement_types': ACHIEVEMENTS,
-            'include_splits': include_splits, 'saved': saved, 'record_distances': RECORD_DISTANCES,
+            'saved': saved, 'record_distances': RECORD_DISTANCES,
             'can_edit_profile': account is not None and account.can_edit_profile(pacemaker_id),
         })
 

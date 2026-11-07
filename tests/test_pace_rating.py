@@ -71,8 +71,10 @@ async def test_save_reload_event_and_finish_isolation(monkeypatch):
     finish = EventRatingConfig(left_bad=-90, left_score=6)
     events = {1: db.RegistryEvent(1, "Первое", "round", finish), 2: db.RegistryEvent(2, "Второе", "sub_minute")}
     monkeypatch.setattr(main, "get_event", events.get)
-    def save(event_id, config):
-        events[event_id] = replace(events[event_id], pace_rating_config=config)
+    def save(event_id, config, *, splits_enabled):
+        event = events[event_id]
+        events[event_id] = replace(event, pace_rating_config=config or event.pace_formula,
+                                   splits_enabled=event.splits_enabled if splits_enabled is None else splits_enabled)
         return True
     monkeypatch.setattr(main, "save_event_pace_rating", save)
     values = asdict(PaceRatingConfig(tolerance=8, checkpoint=15, bad=45))
@@ -91,13 +93,23 @@ async def test_save_reload_event_and_finish_isolation(monkeypatch):
         assert invalid.status_code == 422
         assert 'value="90"' in invalid.text
         assert events[1].pace_formula.tolerance == 8
+        disabled = await client.post("/events/1/pace-rating", data={"splits_enabled": "false"}, follow_redirects=True)
+        assert disabled.status_code == 200
+        assert 'aria-label="Шкала оценки темпа" disabled inert' in disabled.text
+        assert events[1].splits_enabled is False
+        assert events[2].splits_enabled is True
+        assert events[1].pace_formula == PaceRatingConfig(**values)
+        enabled = await client.post("/events/1/pace-rating", data={"splits_enabled": "true"})
+        assert enabled.status_code == 303
+        assert events[1].splits_enabled is True
+        assert events[1].pace_formula == PaceRatingConfig(**values)
         assert (await client.post("/events/999/pace-rating", data=values)).status_code == 404
 
 
 @pytest.mark.anyio
 async def test_db_error_keeps_pace_edits_and_deleted_event_404(monkeypatch):
     monkeypatch.setattr(main, "get_event", lambda _: db.RegistryEvent(1, "Тест"))
-    def unavailable(*_):
+    def unavailable(*_, **kwargs):
         raise RuntimeError("DB unavailable")
     monkeypatch.setattr(main, "save_event_pace_rating", unavailable)
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
@@ -105,7 +117,7 @@ async def test_db_error_keeps_pace_edits_and_deleted_event_404(monkeypatch):
         page = await client.post("/events/1/pace-rating", data=values)
         assert page.status_code == 503
         assert 'value="55"' in page.text
-        monkeypatch.setattr(main, "save_event_pace_rating", lambda *_: False)
+        monkeypatch.setattr(main, "save_event_pace_rating", lambda *_, **kwargs: False)
         assert (await client.post("/events/1/pace-rating", data=values)).status_code == 404
 
 
@@ -123,7 +135,7 @@ def test_database_roundtrip_only_updates_pace_and_scopes_event_id(monkeypatch):
                 stored = parameters[0].obj
                 self.row = (7,)
             else:
-                self.row = (7, "Тест", "round", finish, stored, None)
+                self.row = (7, "Тест", "round", finish, stored, True, None)
             return self
         def fetchone(self): return self.row
     monkeypatch.setattr(db, "connect_database", Connection)
@@ -132,13 +144,13 @@ def test_database_roundtrip_only_updates_pace_and_scopes_event_id(monkeypatch):
     event = db.get_event(7)
     assert event.pace_formula == config
     assert asdict(event.formula) == finish
-    assert calls[0][0] == "UPDATE events SET pace_rating_config = %s WHERE id = %s RETURNING id"
-    assert calls[0][1][1] == 7
+    assert "WHERE id = %s RETURNING id" in calls[0][0]
+    assert calls[0][1][-1] == 7
 
 
 def test_registry_uses_each_events_pace_config_before_sorting(monkeypatch):
-    events = [(1, "Первое", "round", None, None),
-              (2, "Второе", "round", None, asdict(PaceRatingConfig(tolerance=20, checkpoint=25, bad=40)))]
+    events = [(1, "Первое", "round", None, None, True),
+              (2, "Второе", "round", None, asdict(PaceRatingConfig(tolerance=20, checkpoint=25, bad=40)), True)]
     rows = [(i, "Тестов", str(i), i, i, Decimal("10"), "00:50", "00:50:00",
              [{"segment_distance_km": "10", "pace_per_km": "05:20 /км"}], 1, None) for i in (1, 2)]
     class Connection:
@@ -154,4 +166,8 @@ def test_registry_uses_each_events_pace_config_before_sorting(monkeypatch):
     assert [p.rating for p in registry.pacemakers] == pytest.approx([10, 9.2])
     assert registry.pacemakers[0].results[0].splits_rating == 10
     assert registry.pacemakers[1].results[0].splits_rating == 8
-    assert all(p.rating == 10 for p in db.load_registry(include_splits=False).pacemakers)
+    events[0] = (*events[0][:5], False)
+    disabled = db.load_registry()
+    card = next(p.results[0] for p in disabled.pacemakers if p.id == 1)
+    assert card.splits_rating is None and card.rating == card.finish_rating
+    assert next(p.results[0] for p in disabled.pacemakers if p.id == 2).splits_rating == 10

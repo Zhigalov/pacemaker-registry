@@ -7,6 +7,9 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
   const observations = window.resultChartMarkers?.read(form) || [];
   const state = form.querySelector('[data-save-state]');
   const slider = form.querySelector('[data-pace-curve]');
+  const toggle = form.querySelector('[data-splits-toggle]');
+  const settings = form.querySelector('#pace-settings');
+  const splitsStatus = form.querySelector('[data-splits-status]');
   const submit = form.querySelector('[type=submit]');
   const clamp = window.ratingChart.clamp;
   const round = (v, digits = 0) => Number(v.toFixed(digits));
@@ -142,14 +145,26 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
   readFields(); render();
   window.ratingChart.observe(chart, () => { if (!drag) render(); });
   if (!editable) return;
+  function syncToggle() {
+    settings.disabled = !toggle.checked;
+    settings.inert = !toggle.checked;
+    splitsStatus.textContent = toggle.checked
+      ? 'При достаточных данных темп даёт 40% итоговой оценки.'
+      : 'Итоговая оценка считается только по финишу.';
+  }
+  toggle.addEventListener('change', () => {
+    syncToggle();
+    state.textContent = 'Есть несохранённые изменения учёта отсечек.';
+  });
+  syncToggle();
   Object.values(fields).forEach(input => input.addEventListener('input', () => {
     if (readFields()) { state.textContent = 'Есть несохранённые изменения оценки темпа.'; render(); }
   }));
   slider.addEventListener('input', () => { fields.curve.value = slider.value; fields.curve.dispatchEvent(new Event('input')); });
   form.querySelector('[data-reset-pace]').addEventListener('click', () => { config = {...defaults}; syncFields(); render(); });
   form.addEventListener('submit', event => {
-    if (!readFields() || !form.reportValidity()) { event.preventDefault(); return; }
+    if (toggle.checked && (!readFields() || !form.reportValidity())) { event.preventDefault(); return; }
     submit.disabled = true; submit.textContent = 'Сохраняем…';
   });
-  window.addEventListener('pageshow', () => { submit.disabled = false; submit.textContent = 'Сохранить темп'; });
+  window.addEventListener('pageshow', () => { syncToggle(); submit.disabled = false; submit.textContent = 'Сохранить темп'; });
 });

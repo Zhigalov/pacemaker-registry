@@ -1,5 +1,5 @@
 """Immutable view models, independent of SQL and HTTP."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from pacemaker_registry.rating import EventRatingConfig, PaceRatingConfig, default_event_rating
 from pacemaker_registry.times import elapsed_seconds, format_duration, format_target_time
@@ -17,6 +17,7 @@ class RegistryCard:
     finish_rating: float
     splits_rating: float | None
     rating: float
+    splits_enabled: bool = field(default=True, kw_only=True)
 
     @property
     def target_time_display(self) -> str:
@@ -105,6 +106,7 @@ class RegistryEvent:
     rating_config: EventRatingConfig | None = None
     pace_rating_config: PaceRatingConfig | None = None
     captain_account_id: int | None = None
+    splits_enabled: bool = True
 
     @property
     def formula(self) -> EventRatingConfig:
@@ -122,7 +124,6 @@ class Registry:
     result_count: int
     events: tuple[RegistryEvent, ...] = ()
     selected_event_id: int | None = None
-    include_splits: bool = True
     min_events: int = 1
     distances: tuple[str, ...] = ()
     selected_distance: str | None = None

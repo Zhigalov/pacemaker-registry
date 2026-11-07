@@ -33,7 +33,7 @@ def test_sort_uses_displayed_rating_then_performances_then_absolute_mean_then_na
 
 
 def test_min_events_uses_history_and_keeps_event_options(monkeypatch):
-    events = [(1, "Первое", "round", None, None), (2, "Второе", "round", None, None)]
+    events = [(1, "Первое", "round", None, None, True), (2, "Второе", "round", None, None, True)]
     rows = [(i, "Тестов", str(i), i, 1, Decimal(10), "01:00", "00:59:59", [], count, None)
             for i, count in [(1, 1), (2, 3)]]
     class Connection:
@@ -71,17 +71,17 @@ def test_two_distances_outrank_one_when_displayed_rating_is_equal():
 @pytest.mark.anyio
 async def test_min_events_parameter_validation_and_empty_state(monkeypatch):
     calls = []
-    def load(event_id=None, include_splits=True, min_events=1, distance_km=None, search=""):
-        calls.append((event_id, include_splits, min_events))
-        return Registry((), 0, 0, (RegistryEvent(1, "Первое"),), event_id, include_splits, min_events)
+    def load(event_id=None, min_events=1, distance_km=None, search=""):
+        calls.append((event_id, min_events))
+        return Registry((), 0, 0, (RegistryEvent(1, "Первое"),), event_id, min_events)
     monkeypatch.setattr("pacemaker_registry.main.load_registry", load)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         await client.get("/")
         r = await client.get("/?event_id=1&include_splits=false&min_events=3")
         assert r.status_code == 200
         assert 'value="3" data-registry-filter' in r.text
-        assert 'include_splits=false&amp;min_events=3' in r.text
+        assert 'include_splits' not in r.text
         assert "Нет пейсеров по выбранным условиям" in r.text
         for value in ['0', '-1', '1.5', 'abc', '10001']:
             assert (await client.get('/?min_events=' + value)).status_code == 422
-    assert calls == [(None, True, 1), (1, False, 3)]
+    assert calls == [(None, 1), (1, 3)]

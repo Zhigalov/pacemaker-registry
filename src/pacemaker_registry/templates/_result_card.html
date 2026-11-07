@@ -1,8 +1,8 @@
 {% from '_icons.html' import icon %}
-{% macro result_card(result, include_splits=true, event_id=0, min_events=1, distance_km=none, search="") -%}
+{% macro result_card(result, event_id=0, min_events=1, distance_km=none, search="") -%}
 <a
   class="result-summary"
-  href="/results/{{ result.id }}?event_id={{ event_id }}&amp;include_splits={{ 'true' if include_splits else 'false' }}&amp;min_events={{ min_events }}{% if distance_km %}&amp;distance_km={{ distance_km }}{% endif %}{% if search %}&amp;q={{ search|urlencode }}{% endif %}"
+  href="/results/{{ result.id }}?event_id={{ event_id }}&amp;min_events={{ min_events }}{% if distance_km %}&amp;distance_km={{ distance_km }}{% endif %}{% if search %}&amp;q={{ search|urlencode }}{% endif %}"
   aria-label="{{ result.event_name }}: {{ result.distance_km }} км, цель {{ result.target_time_display }}, факт {{ result.chip_time_display }}, отклонение {{ result.finish_difference_display }}, финиш {{ '%.1f'|format(result.finish_rating) }}, темп {% if result.splits_rating is not none %}{{ '%.1f'|format(result.splits_rating) }}{% else %}нет данных{% endif %}, итог {{ '%.1f'|format(result.rating) }} из 10"
 >
   <span class="result-summary-data">
@@ -16,8 +16,8 @@
     </span>
     <span class="result-summary-ratings">
       <span class="result-score" style="{{ result.finish_rating | rating_color }}" title="Оценка за финиш">{{ icon('finish') }}<span class="visually-hidden">Финиш </span><strong>{{ "%.1f"|format(result.finish_rating)|replace(".", ",") }}</strong></span>
-      <span class="result-score{% if result.splits_rating is none %} result-score--missing{% endif %}" {% if result.splits_rating is not none %}style="{{ result.splits_rating | rating_color }}"{% endif %} title="{% if result.splits_rating is none %}Недостаточно данных по отсечкам — это не нулевая оценка{% else %}Оценка за темп на отсечках{% if not include_splits %} · не учитывается в итоге{% endif %}{% endif %}">{{ icon('pace') }}<span class="visually-hidden">Темп {% if result.splits_rating is none %}— нет данных{% endif %}</span><strong>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }}{% else %}—{% endif %}</strong></span>
-      <span class="result-score result-score--total" style="{{ result.rating | rating_color }}" title="Итоговая оценка{% if not include_splits %} · только финиш: учёт темпа выключен{% elif result.splits_rating is none %} · только финиш: недостаточно отсечек{% endif %}"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
+      <span class="result-score{% if result.splits_rating is none %} result-score--missing{% endif %}" {% if result.splits_rating is not none %}style="{{ result.splits_rating | rating_color }}"{% endif %} title="{% if not result.splits_enabled %}Учёт отсечек отключён для соревнования{% elif result.splits_rating is none %}Недостаточно данных по отсечкам — это не нулевая оценка{% else %}Оценка за темп на отсечках{% endif %}">{{ icon('pace') }}<span class="visually-hidden">Темп {% if not result.splits_enabled %}— учёт отключён{% elif result.splits_rating is none %}— нет данных{% endif %}</span><strong>{% if result.splits_rating is not none %}{{ "%.1f"|format(result.splits_rating)|replace(".", ",") }}{% else %}—{% endif %}</strong></span>
+      <span class="result-score result-score--total" style="{{ result.rating | rating_color }}" title="Итоговая оценка{% if not result.splits_enabled %} · только финиш: учёт темпа выключен{% elif result.splits_rating is none %} · только финиш: недостаточно отсечек{% endif %}"><small>Итог</small><strong>{{ "%.1f"|format(result.rating)|replace(".", ",") }}</strong></span>
     </span>
   </span>
 </a>

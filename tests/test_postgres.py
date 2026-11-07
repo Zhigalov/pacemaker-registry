@@ -56,7 +56,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
     assert migrate.migrate() == [
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
         '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql', '0008_roles.sql',
-        '0009_flag_time_seconds.sql',
+        '0009_flag_time_seconds.sql', '0010_event_splits_enabled.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -120,17 +120,17 @@ def test_flag_seconds_survive_database_save_and_edit(database):
     assert db.get_result_details(card.id).result.target_time_display == '01:12:30'
 
 
-@pytest.mark.parametrize('include_splits', [True, False])
-def test_compact_cards_preserve_detail_scores_and_full_checkpoints(database, include_splits):
+@pytest.mark.parametrize('splits_enabled', [True, False])
+def test_compact_cards_preserve_detail_scores_and_full_checkpoints(database, splits_enabled):
     migrate.migrate()
     assert db.save_race_result(sample(), '00:50')
     assert db.save_race_result(sample(source_event_id='other', checkpoints=()), '00:50')
-    registry = db.load_registry(include_splits=include_splits)
+    registry = db.load_registry()
     event = registry.events[0]
     assert db.save_event_rating(event.id, EventRatingConfig(left_score=6, right_good=10, right_bad=45))
-    assert db.save_event_pace_rating(event.id, PaceRatingConfig(tolerance=2))
-    for card in db.load_registry(include_splits=include_splits).pacemakers[0].results:
-        detail = db.get_result_details(card.id, include_splits).result
+    assert db.save_event_pace_rating(event.id, PaceRatingConfig(tolerance=2), splits_enabled=splits_enabled)
+    for card in db.load_registry().pacemakers[0].results:
+        detail = db.get_result_details(card.id).result
         assert (card.rating, card.finish_rating, card.splits_rating) == (
             detail.rating, detail.finish_rating, detail.splits_rating)
         assert card.finish_difference_display == detail.finish_difference_display
@@ -139,7 +139,7 @@ def test_compact_cards_preserve_detail_scores_and_full_checkpoints(database, inc
         assert not hasattr(card, 'actual_pace')
         if card.event_id == event.id:
             assert detail.checkpoints == tuple(map(asdict, sample().checkpoints))
-            assert len(detail.pace_markers) == 2
+            assert len(detail.pace_markers) == (2 if splits_enabled else 0)
         else:
             assert card.splits_rating is None
 
@@ -271,17 +271,17 @@ def test_distance_filter_combines_with_event_history_and_recalculates_rating(dat
     assert db.save_race_result(sample(athlete_name='First Pacer', source_event_id='half', distance_km='21.100', chip_time='01:45:00'), '01:40')
     assert db.save_race_result(sample(athlete_name='Other Pacer', distance_km='10.000', chip_time='00:49:50'), '00:50')
     assert db.save_race_result(sample(athlete_name='Third Pacer', source_event_id='marathon', distance_km='42.2', chip_time='03:59:00'), '04:00')
-    all_results = db.load_registry(include_splits=False)
+    all_results = db.load_registry()
     first = next(p for p in all_results.pacemakers if p.full_name == 'First Pacer')
     assert first.rating < 10
-    ten = db.load_registry(distance_km=Decimal('10.000'), include_splits=False)
+    ten = db.load_registry(distance_km=Decimal('10.000'))
     assert ten.distances == ('10', '21.1', '42.2') and ten.selected_distance == '10'
     assert len(ten.pacemakers) == 2 and ten.result_count == 2
     selected = next(p for p in ten.pacemakers if p.id == first.id)
     assert selected.rating == 10 and selected.performance_count == 2
     assert selected.mean_finish_deviation == 0
     assert all(card.distance_km == '10' for p in ten.pacemakers for card in p.results)
-    half = db.load_registry(distance_km=Decimal('21.1'), include_splits=False, min_events=2)
+    half = db.load_registry(distance_km=Decimal('21.1'), min_events=2)
     assert [p.id for p in half.pacemakers] == [first.id]
     half_event = half.pacemakers[0].results[0].event_id
     combined = db.load_registry(half_event, distance_km=Decimal('21.100'), min_events=2)
@@ -290,7 +290,7 @@ def test_distance_filter_combines_with_event_history_and_recalculates_rating(dat
     assert not empty.pacemakers and empty.result_count == empty.event_count == 0
     assert empty.distances == ten.distances and len(empty.events) == 3
     assert db.load_registry(distance_km=Decimal('7.777')).result_count == 0
-    restored = db.load_registry(include_splits=False)
+    restored = db.load_registry()
     assert restored == all_results
 
 

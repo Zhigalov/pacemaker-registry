@@ -9,7 +9,7 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=account-spacing">
+    <link rel="stylesheet" href="/static/styles.css?v=event-splits">
     <link rel="stylesheet" href="/static/profiles.css?v=3">
     <script src="/static/registry.js?v=name-search" defer></script>
   </head>
@@ -60,11 +60,6 @@
               </div>
               <input id="min-events-filter" name="min_events" type="number" min="1" max="10000" step="1" value="{{ registry.min_events }}" data-registry-filter aria-describedby="min-events-hint">
             </div>
-            <input type="hidden" name="include_splits" value="false">
-            <label class="splits-toggle">
-              <input type="checkbox" name="include_splits" value="true" data-registry-filter {% if registry.include_splits %}checked{% endif %}>
-              Учитывать темп в рейтинге
-            </label>
             <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
           </form>
           <p class="registry-rating-note">Рейтинг рассчитан по показанным выступлениям{% if registry.selected_distance %} на дистанции {{ registry.selected_distance|replace('.', ',') }} км{% endif %}.</p>
@@ -84,7 +79,7 @@
           {% if registry.selected_event_id is not none %}
             <div class="registry-summary-links">
               <a class="quiet-link" href="/events/{{ registry.selected_event_id }}">Настройки соревнования →</a>
-              <a class="quiet-link registry-filter-reset" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}&amp;min_events={{ registry.min_events }}{% if registry.selected_distance %}&amp;distance_km={{ registry.selected_distance }}{% endif %}{% if registry.search %}&amp;q={{ registry.search|urlencode }}{% endif %}">Все соревнования</a>
+              <a class="quiet-link registry-filter-reset" href="/?min_events={{ registry.min_events }}{% if registry.selected_distance %}&amp;distance_km={{ registry.selected_distance }}{% endif %}{% if registry.search %}&amp;q={{ registry.search|urlencode }}{% endif %}">Все соревнования</a>
             </div>
           {% endif %}
         </div>
@@ -102,13 +97,13 @@
           {% for pacemaker in registry.pacemakers %}
             <article class="pacemaker-row">
               <header class="pacemaker-profile">
-                <a class="pacemaker-avatar" href="/pacemakers/{{ pacemaker.id }}?include_splits={{ 'true' if registry.include_splits else 'false' }}" aria-label="Профиль: {{ pacemaker.full_name }}">
+                <a class="pacemaker-avatar" href="/pacemakers/{{ pacemaker.id }}" aria-label="Профиль: {{ pacemaker.full_name }}">
                   <span aria-hidden="true">{{ pacemaker.initials }}</span>
                   {% set photo_url = pacemaker.avatar_key | avatar_url %}
                   {% if photo_url %}<img src="{{ photo_url }}" alt="" width="45" height="45" loading="lazy" decoding="async" data-avatar-image>{% endif %}
                 </a>
                 <div>
-                  <h2><a class="pacemaker-name-link" href="/pacemakers/{{ pacemaker.id }}?include_splits={{ 'true' if registry.include_splits else 'false' }}">{{ pacemaker.full_name }}</a></h2>
+                  <h2><a class="pacemaker-name-link" href="/pacemakers/{{ pacemaker.id }}">{{ pacemaker.full_name }}</a></h2>
                   <span class="pacemaker-event-count" title="Количество выступлений за всю историю, включая разные дистанции одного соревнования">Выступлений: {{ pacemaker.performance_count }}</span>
                   <div
                     class="pacemaker-rating"
@@ -126,7 +121,7 @@
 
               <div class="results-strip">
                 {% for result in pacemaker.results %}
-                  {{ result_card(result, registry.include_splits, registry.selected_event_id or 0, registry.min_events, registry.selected_distance, registry.search) }}
+                  {{ result_card(result, registry.selected_event_id or 0, registry.min_events, registry.selected_distance, registry.search) }}
 
                 {% endfor %}
               </div>
@@ -140,14 +135,14 @@
             <span class="rating-methodology-hint">Финиш + ровность темпа</span>
           </summary>
           <div class="rating-methodology-content">
-            <p>Итог учитывает не только финиш, но и то, насколько ровно пейсмейкер вёл группу по дистанции.</p>
+            <p>Каждое выступление оценивается по настройкам его соревнования. Капитан или администратор решает, учитывать ли темп по отсечкам.</p>
             <section class="rating-composition" aria-labelledby="rating-composition-title">
               <div class="rating-composition-heading">
                 <div>
                   <span class="eyebrow">Итоговая оценка</span>
                   <h3 id="rating-composition-title">60% финиш + 40% темп</h3>
                 </div>
-                <span class="rating-composition-state">{% if registry.include_splits %}Отсечки включены{% else %}Отсечки выключены{% endif %}</span>
+                <span class="rating-composition-state">Если учитываются отсечки</span>
               </div>
               <div class="rating-composition-bar" aria-label="60 процентов оценки за финиш и 40 процентов за темп">
                 <span class="rating-composition-finish"><strong>60%</strong> финиш</span>
@@ -185,7 +180,7 @@
         <section class="empty-state">
           <h2>Нет пейсеров по выбранным условиям</h2>
           <p>Уменьшите минимальное число выступлений или выберите другое соревнование либо дистанцию.</p>
-          <a class="button registry-filter-submit" href="/?include_splits={{ 'true' if registry.include_splits else 'false' }}">Сбросить фильтры</a>
+          <a class="button registry-filter-submit" href="/">Сбросить фильтры</a>
         </section>
       {% else %}
         <section class="empty-state" aria-labelledby="empty-title">

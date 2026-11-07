@@ -7,11 +7,11 @@
     <title>{{ event.name }} — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=account-spacing">
+    <link rel="stylesheet" href="/static/styles.css?v=event-splits">
     <script src="/static/rating-models.js?v=1" defer></script>
     <script src="/static/chart-utils.js?v=1" defer></script>
     <script src="/static/event-rating.js?v=shared-models" defer></script>
-    <script src="/static/pace-rating.js?v=shared-models" defer></script>
+    <script src="/static/pace-rating.js?v=event-splits" defer></script>
   </head>
   <body>
     <main class="app-shell event-shell">
@@ -64,17 +64,21 @@
         {% include '_rating_chart.html' %}
         <script type="application/json" data-rating-config>{{ values | tojson }}</script>
       </section>
-      <section class="event-editor pace-editor" id="pace-rating" data-pace-widget>
+      <section class="event-editor pace-editor" id="pace-rating"{% if event.splits_enabled %} data-pace-widget{% endif %}>
         <h2>Оценка за темп на отрезках</h2>
-        {% include '_pace_chart.html' %}
-        <script type="application/json" data-pace-defaults>{{ pace_values | tojson }}</script>
+        {% if event.splits_enabled %}
+          {% include '_pace_chart.html' %}
+          <script type="application/json" data-pace-defaults>{{ pace_values | tojson }}</script>
+        {% else %}<p class="event-note">Учёт отсечек отключён. Итог считается только по финишу.</p>{% endif %}
       </section>
       {% endif %}
       <details class="rating-methodology">
         <summary>Как получается итоговая оценка</summary>
         <div class="rating-methodology-content">
           <p>{% if can_edit_event %}На этой странице можно настроить оценки за финиш и темп. Сохраняйте каждый блок отдельно. {% endif %}Когда включён учёт темпа, итог состоит из 60% оценки за финиш и 40% оценки за темп на отрезках.</p>
+          {% if event.splits_enabled %}
           <div class="rating-composition-bar"><span class="rating-composition-finish"><strong>60%</strong> финиш</span><span class="rating-composition-splits"><strong>40%</strong> темп</span></div>
+          {% else %}<p><strong>Сейчас 100% оценки составляет финиш. Учёт отсечек выключен.</strong></p>{% endif %}
           <p>Оценки за темп взвешиваются по длине отрезков. Без достаточных отсечек или с выключенным учётом темпа итог равен оценке за финиш.</p>
         </div>
       </details>

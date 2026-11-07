@@ -286,7 +286,7 @@ async def test_registry_uses_saved_avatar_or_initials_and_links_profile(monkeypa
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
         response = await client.get('/')
     assert response.status_code == 200
-    assert 'ПП</span>' in response.text and 'href="/pacemakers/7?include_splits=true"' in response.text
+    assert 'ПП</span>' in response.text and 'href="/pacemakers/7"' in response.text
     assert ('loading="lazy"' in response.text) == has_photo
     if has_photo:
         assert 'https://storage.yandexcloud.net/test-avatars/' + key in response.text

@@ -22,10 +22,10 @@ from pacemaker_registry.registry import _build_registry_result, _sort_pacemakers
 from pacemaker_registry.times import normalize_target_time, target_seconds
 
 
-def get_result_details(result_id: int, include_splits: bool = True) -> ResultDetails | None:
+def get_result_details(result_id: int) -> ResultDetails | None:
     with connect_database() as connection:
         row = connection.execute(
-            """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config,
+            """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config, e.splits_enabled,
                       p.last_name, p.first_name, rr.source_url, rr.id, rr.distance_km,
                       rr.target_time, rr.chip_time, rr.pace, rr.checkpoints, p.id, e.captain_account_id
                FROM race_results AS rr
@@ -35,11 +35,11 @@ def get_result_details(result_id: int, include_splits: bool = True) -> ResultDet
         ).fetchone()
     if row is None:
         return None
-    event = _event_from_row(row[:5], captain_account_id=row[15])
+    event = _event_from_row(row[:6], captain_account_id=row[16])
     return ResultDetails(
-        athlete_name=f"{row[5]} {row[6]}", source_url=row[7], event=event,
-        result=_build_registry_result(row[8], event, *row[9:14], include_splits=include_splits),
-        pacemaker_id=row[14],
+        athlete_name=f"{row[6]} {row[7]}", source_url=row[8], event=event,
+        result=_build_registry_result(row[9], event, *row[10:15]),
+        pacemaker_id=row[15],
     )
 
 
@@ -82,7 +82,7 @@ def connect_database() -> Connection[Any]:
 def check_database() -> None:
     """A reachable server without the application's schema is not ready."""
     with connect_database() as connection:
-        connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, p.last_name,
+        connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, e.splits_enabled, p.last_name,
             p.motto, p.avatar_key, p.contacts, p.achievements, p.profile_version, p.profile_updated_at,
             p.login, p.city_id, p.club_id, p.personal_records, p.account_id, e.captain_account_id
             FROM race_results AS rr
@@ -95,7 +95,7 @@ def check_database() -> None:
             LIMIT 0""")
 
 
-def get_pacemaker_profile(pacemaker_id: int, include_splits: bool = True, *,
+def get_pacemaker_profile(pacemaker_id: int, *,
                           with_results: bool = True) -> PacemakerProfile | None:
     with connect_database() as connection:
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
@@ -110,7 +110,7 @@ def get_pacemaker_profile(pacemaker_id: int, include_splits: bool = True, *,
         results = []
         if with_results:
             rows = connection.execute(
-                """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config,
+                """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config, e.splits_enabled,
                           rr.id, rr.distance_km, rr.target_time, rr.chip_time,
                           COALESCE((SELECT jsonb_agg(jsonb_build_object(
                               'segment_distance_km', point->'segment_distance_km',
@@ -121,8 +121,8 @@ def get_pacemaker_profile(pacemaker_id: int, include_splits: bool = True, *,
                 (pacemaker_id,),
             ).fetchall()
             for result in rows:
-                results.append(_build_registry_result(result[5], _event_from_row(result[:5]),
-                    *result[6:9], None, result[9], include_splits, details=False))
+                results.append(_build_registry_result(result[6], _event_from_row(result[:6]),
+                    *result[7:10], None, result[10], details=False))
     return PacemakerProfile(*row[:5], tuple(row[5]), tuple(row[6]), row[7], tuple(results), *row[8:])
 
 
@@ -184,7 +184,6 @@ def get_event_target_time_type(source_event_id: str) -> str | None:
 
 def load_registry(
     event_id: int | None = None,
-    include_splits: bool = True,
     min_events: int = 1,
     distance_km: Decimal | None = None,
     search: str = "",
@@ -194,7 +193,7 @@ def load_registry(
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         event_rows = connection.execute(
             """
-            SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config
+            SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config, e.splits_enabled
             FROM events AS e
             WHERE EXISTS (
                 SELECT 1
@@ -300,7 +299,7 @@ def load_registry(
         )
         pacemaker["results"].append(
             _build_registry_result(result_id, events_by_id[event_id], distance,
-                                   target_time, chip_time, None, checkpoints, include_splits, details=False)
+                                   target_time, chip_time, None, checkpoints, details=False)
         )
 
     pacemakers = []
@@ -324,7 +323,6 @@ def load_registry(
         result_count=sum(len(pacemaker.results) for pacemaker in pacemakers),
         events=events,
         selected_event_id=selected_event_id,
-        include_splits=include_splits,
         min_events=min_events,
         distances=distances,
         selected_distance=selected_distance,
@@ -436,23 +434,23 @@ def _event_from_row(row: tuple, *, captain_account_id: int | None = None) -> Reg
         id=row[0], name=row[1], target_time_type=row[2],
         rating_config=parse_event_rating(row[3], allow_legacy=True) if row[3] is not None else None,
         pace_rating_config=parse_pace_rating(row[4]) if row[4] is not None else None,
-        captain_account_id=captain_account_id,
+        captain_account_id=captain_account_id, splits_enabled=row[5],
     )
 
 
 def get_event(event_id: int) -> RegistryEvent | None:
     with connect_database() as connection:
         row = connection.execute(
-            "SELECT id, name, target_time_type, rating_config, pace_rating_config, captain_account_id FROM events WHERE id = %s",
+            "SELECT id, name, target_time_type, rating_config, pace_rating_config, splits_enabled, captain_account_id FROM events WHERE id = %s",
             (event_id,),
         ).fetchone()
-    return _event_from_row(row, captain_account_id=row[5]) if row else None
+    return _event_from_row(row, captain_account_id=row[6]) if row else None
 
 
 def list_events() -> tuple[RegistryEvent, ...]:
     with connect_database() as connection:
         rows = connection.execute(
-            "SELECT id, name, target_time_type, rating_config, pace_rating_config FROM events ORDER BY lower(name), id"
+            "SELECT id, name, target_time_type, rating_config, pace_rating_config, splits_enabled FROM events ORDER BY lower(name), id"
         ).fetchall()
     return tuple(_event_from_row(row) for row in rows)
 
@@ -466,10 +464,13 @@ def save_event_rating(event_id: int, config: EventRatingConfig) -> bool:
     return row is not None
 
 
-def save_event_pace_rating(event_id: int, config: PaceRatingConfig) -> bool:
+def save_event_pace_rating(event_id: int, config: PaceRatingConfig | None, *,
+                           splits_enabled: bool | None = None) -> bool:
     with connect_database() as connection:
         row = connection.execute(
-            "UPDATE events SET pace_rating_config = %s WHERE id = %s RETURNING id",
-            (Jsonb(asdict(config)), event_id),
+            """UPDATE events SET pace_rating_config = COALESCE(%s, pace_rating_config),
+                                  splits_enabled = COALESCE(%s, splits_enabled)
+               WHERE id = %s RETURNING id""",
+            (Jsonb(asdict(config)) if config is not None else None, splits_enabled, event_id),
         ).fetchone()
     return row is not None

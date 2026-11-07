@@ -1,6 +1,5 @@
 (() => {
   'use strict';
-  document.querySelector('[data-profile-filter]')?.addEventListener('change', event => event.target.form.requestSubmit());
   const fields = document.querySelector('[data-contact-fields]');
   document.querySelector('[data-add-contact]')?.addEventListener('click', () => {
     if (fields.querySelectorAll('[name="contact_type"]').length >= 20) return;

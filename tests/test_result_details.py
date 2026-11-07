@@ -17,20 +17,20 @@ def anyio_backend():
     return "asyncio"
 
 
-def details(checkpoints=None, include_splits=True):
+def details(checkpoints=None, splits_enabled=True):
     event = db.RegistryEvent(1, 'Марафон <тест>', 'sub_minute',
-                             EventRatingConfig(left_score=6), PaceRatingConfig(tolerance=8))
+                             EventRatingConfig(left_score=6), PaceRatingConfig(tolerance=8), splits_enabled=splits_enabled)
     if checkpoints is None:
         checkpoints = tuple({'distance_km': str(i), 'segment_distance_km': '1',
                              'time': f'{i * 5}:00', 'pace_per_km': '05:00'} for i in range(1, 43))
-    result = db._build_registry_result(12, event, Decimal('42.2'), '03:30', '03:29:55', '04:58 /км', checkpoints, include_splits)
+    result = db._build_registry_result(12, event, Decimal('42.2'), '03:30', '03:29:55', '04:58 /км', checkpoints)
     return db.ResultDetails('Тестов <Первый>', 'https://results.runc.run/event/marathon/result/123/', event, result, pacemaker_id=7)
 
 
 @pytest.mark.anyio
 async def test_detail_renders_every_split_readonly_graphs_and_context(monkeypatch):
     sample = details()
-    monkeypatch.setattr(main, 'get_result_details', lambda result_id, include_splits: sample)
+    monkeypatch.setattr(main, 'get_result_details', lambda result_id: sample)
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
         response = await client.get('/results/12?event_id=1&include_splits=true&min_events=3')
     assert response.status_code == 200
@@ -40,7 +40,7 @@ async def test_detail_renders_every_split_readonly_graphs_and_context(monkeypatc
     assert 'data-rating-widget' in response.text and 'data-pace-widget' in response.text
     assert 'Изменить время на флаге' in response.text
     assert 'name="previous_target_time" value="03:30"' in response.text
-    assert 'action="/results/12/target-time?event_id=1&amp;include_splits=true&amp;min_events=3"' in response.text
+    assert 'action="/results/12/target-time?event_id=1&amp;min_events=3"' in response.text
     assert 'data-event-rating' not in response.text and 'data-pace-rating' not in response.text
     assert '"left_score": 6' in response.text and '"tolerance": 8' in response.text
     marker_sets = [json.loads(value) for value in re.findall(
@@ -49,9 +49,9 @@ async def test_detail_renders_every_split_readonly_graphs_and_context(monkeypatc
     assert len(marker_sets[1]) == 42
     assert marker_sets[1][-1]['label'] == '42 км'
     assert marker_sets[1][0]['deviation'] == pytest.approx(300 - 12600 / 42.2)
-    assert 'href="/?event_id=1&amp;include_splits=true&amp;min_events=3"' in response.text
+    assert 'href="/?event_id=1&amp;min_events=3"' in response.text
     assert 'href="/events/1"' in response.text
-    assert 'href="/pacemakers/7?include_splits=true"' in response.text
+    assert 'href="/pacemakers/7"' in response.text
     assert 'class="result-athlete-link"' in response.text
     assert 'href="https://results.runc.run/event/marathon/"' in response.text
     assert 'href="https://results.runc.run/event/marathon/result/123/"' in response.text
@@ -59,15 +59,14 @@ async def test_detail_renders_every_split_readonly_graphs_and_context(monkeypatc
 
 @pytest.mark.anyio
 async def test_detail_finish_only_and_missing_splits(monkeypatch):
-    def get(result_id, include_splits):
-        return details(checkpoints=(), include_splits=include_splits)
-    monkeypatch.setattr(main, 'get_result_details', get)
+    monkeypatch.setattr(main, 'get_result_details', lambda _: details(splits_enabled=False))
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
         response = await client.get('/results/12?include_splits=false')
-        assert 'Учёт темпа выключен' in response.text
-        assert 'В источнике нет сохранённых контрольных точек' in response.text
-        assert 'data-result-markers>[]</script>' in response.text
-        response = await client.get('/results/12')
+        assert 'Учёт отсечек выключен' in response.text
+        assert response.text.count('<tr><td>') == 42
+        assert 'data-pace-widget' not in response.text
+        monkeypatch.setattr(main, 'get_result_details', lambda _: details(checkpoints=()))
+        response = await client.get('/results/12?include_splits=false')
         assert 'Недостаточно данных по отсечкам' in response.text
 
 
@@ -103,7 +102,7 @@ def test_source_links_safe_and_event_specific(source, expected):
 def test_single_result_query_matches_registry_scoring(monkeypatch):
     sample = details()
     event, result = sample.event, sample.result
-    row = (event.id, event.name, event.target_time_type, asdict(event.formula), asdict(event.pace_formula),
+    row = (event.id, event.name, event.target_time_type, asdict(event.formula), asdict(event.pace_formula), event.splits_enabled,
            'Тестов', '<Первый>', sample.source_url, result.id, Decimal('42.2'), result.target_time,
            result.chip_time, result.actual_pace, list(result.checkpoints), sample.pacemaker_id, None)
     calls = []
@@ -119,7 +118,6 @@ def test_single_result_query_matches_registry_scoring(monkeypatch):
     assert loaded == sample
     assert calls[0][1] == (12,)
     assert 'WHERE rr.id = %s' in calls[0][0]
-    assert db.get_result_details(12, include_splits=False).result.rating == result.finish_rating
 
 
 def test_chart_markers_match_weighted_score_and_custom_pace_formula():
@@ -164,10 +162,10 @@ async def test_edit_flag_redirects_preserves_filters_and_recalculates(monkeypatc
     sample = details(checkpoints=tuple(dict(point, pace_per_km='05:15') for point in sample.result.checkpoints))
     target = sample.result.target_time
     calls = []
-    def get(result_id, include_splits):
+    def get(result_id):
         result = db._build_registry_result(result_id, sample.event, Decimal('42.2'), target,
                                           sample.result.chip_time, sample.result.actual_pace,
-                                          sample.result.checkpoints, include_splits)
+                                          sample.result.checkpoints)
         return db.ResultDetails(sample.athlete_name, sample.source_url, sample.event, result, sample.pacemaker_id)
     def save(result_id, value, previous):
         nonlocal target
@@ -182,20 +180,19 @@ async def test_edit_flag_redirects_preserves_filters_and_recalculates(monkeypatc
                                            'previous_target_time': '03:30'})
         assert response.status_code == 303
         assert calls == [(12, '03:29:30', '03:30')]
-        assert response.headers['location'] == '/results/12?event_id=1&include_splits=false&min_events=3&saved=true'
+        assert response.headers['location'] == '/results/12?event_id=1&min_events=3&saved=true'
         page = await client.get(response.headers['location'])
     assert page.status_code == 200
     assert 'Время на флаге сохранено' in page.text
-    assert 'Учёт темпа выключен' in page.text
+    assert 'Итог: 60% финиш + 40% темп' in page.text
     assert 'name="previous_target_time" value="03:29:30"' in page.text
     markers = [json.loads(value) for value in re.findall(
         r'<script type="application/json" data-result-markers>(.*?)</script>', page.text)]
     assert markers[0][0]['deviation'] == 25
     assert markers[0][0]['score'] != sample.result.finish_rating
     assert markers[1][0]['deviation'] == pytest.approx(315 - 12570 / 42.2)
-    assert get(12, False).result.target_pace != sample.result.target_pace
-    assert get(12, False).result.rating == get(12, False).result.finish_rating
-    assert get(12, True).result.splits_rating != sample.result.splits_rating
+    assert get(12).result.target_pace != sample.result.target_pace
+    assert get(12).result.splits_rating != sample.result.splits_rating
 
 
 @pytest.mark.anyio
@@ -256,8 +253,8 @@ async def test_result_back_links_and_flag_edit_keep_distance_filter(monkeypatch)
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
         page = await client.get('/results/12?' + query)
         assert page.status_code == 200
-        assert 'href="/?event_id=1&amp;include_splits=false&amp;min_events=3&amp;distance_km=42.2"' in page.text
-        assert '/results/12/target-time?event_id=1&amp;include_splits=false&amp;min_events=3&amp;distance_km=42.2' in page.text
+        assert 'href="/?event_id=1&amp;min_events=3&amp;distance_km=42.2"' in page.text
+        assert '/results/12/target-time?event_id=1&amp;min_events=3&amp;distance_km=42.2' in page.text
         invalid = await client.post('/results/12/target-time?' + query,
             data={'target_time': 'oops', 'previous_target_time': '03:30'})
         assert invalid.status_code == 422 and 'distance_km=42.2' in invalid.text
@@ -277,7 +274,7 @@ async def test_result_navigation_and_flag_edit_preserve_name_search(monkeypatch)
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
         page = await client.get('/results/12', params=params)
         back = html.unescape(re.search(r'class="button result-back" href="([^"]+)"',page.text).group(1))
-        assert parse_qs(urlsplit(back).query) == {k:[str(v)] for k,v in params.items()}
+        assert parse_qs(urlsplit(back).query) == {k:[str(v)] for k,v in params.items() if k != 'include_splits'}
         invalid = await client.post('/results/12/target-time', params=params,
             data={'target_time':'oops','previous_target_time':'03:30'})
         assert invalid.status_code==422 and 'q=%D0' in invalid.text

@@ -32,9 +32,8 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .profile-average { color: var(--rating-color); background: var(--rating-bg); padding: .5rem .8rem; border-radius: .7rem; font-size: .85rem; }
 .profile-average strong { margin-left: .5rem; font-size: 1.2rem; }
 .profile-average small { margin-left: .2rem; }
-.profile-score-toggle { margin: 1rem 0; font-size: .85rem; }
-.profile-score-toggle label, .profile-checkbox { display: flex; align-items: center; gap: .5rem; }
-.profile-score-toggle input, .profile-checkbox input { width: 1.1rem; height: 1.1rem; min-height: 0; padding: 0; margin: 0; accent-color: #176f59; flex: 0 0 1.1rem; }
+.profile-checkbox { display: flex; align-items: center; gap: .5rem; }
+.profile-checkbox input { width: 1.1rem; height: 1.1rem; min-height: 0; padding: 0; margin: 0; accent-color: #176f59; flex: 0 0 1.1rem; }
 .profile-results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr)); gap: .9rem; }
 .profile-results-grid .result-summary { width: 100%; }
 .profile-edit-heading { margin-bottom: 1.5rem; }
