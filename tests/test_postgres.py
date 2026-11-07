@@ -243,7 +243,7 @@ def test_previous_mottos_survive_profile_extension(database, tmp_path, monkeypat
         pacer = connection.execute("INSERT INTO pacemakers(last_name,first_name,motto) VALUES ('Old','Pacer','Старый девиз') RETURNING id").fetchone()[0]
     (tmp_path / '0003_profile_details.sql').write_text((original / '0003_profile_details.sql').read_text())
     migrate.migrate()
-    assert db.get_pacemaker_profile(pacer).about == 'Старый девиз'
+    assert db.get_pacemaker_profile(pacer, with_results=False).about == 'Старый девиз'
 
 
 def test_concurrent_login_claim_only_one_profile_and_one_city(database):
