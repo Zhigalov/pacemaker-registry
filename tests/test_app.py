@@ -214,7 +214,7 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
     assert "Жигалов Сергей" in response.text
     assert "01:53:53" in response.text
-    assert 'value="01:54"' in response.text
+    assert 'value="01:54:00"' in response.text
     assert "27:29" in response.text
     assert "Отрезок" in response.text
     assert "Проверьте полученные данные" in response.text
@@ -224,7 +224,7 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     assert "Сохранить в реестр" in response.text
     assert "Ожидаемый темп" in response.text
     assert 'data-distance="21,1"' in response.text
-    assert 'src="/static/add.js"' in response.text
+    assert 'src="/static/add.js?v=flag-seconds"' in response.text
     assert "пока ничего не сохраняется" not in response.text
     assert response.text.index("Сохранить в реестр") < response.text.index(
         "Контрольные точки"
@@ -276,7 +276,7 @@ async def test_add_form_parses_result_url_from_query_without_saving(monkeypatch)
     assert loaded_urls == [result_url]
     assert "Андреев Артем" in response.text
     assert "01:19:53" in response.text
-    assert 'value="01:20"' in response.text
+    assert 'value="01:20:00"' in response.text
     assert "Проверьте полученные данные" in response.text
     assert "Сохранить в реестр" in response.text
 
@@ -318,12 +318,19 @@ async def test_add_form_uses_saved_event_target_time_type(monkeypatch) -> None:
         )
 
     assert response.status_code == 200
-    assert 'value="01:05"' in response.text
-    assert 'value="01:04"' not in response.text
+    assert 'value="01:05:00"' in response.text
+    assert 'value="01:04:00"' not in response.text
 
 
 @pytest.mark.anyio
-async def test_result_can_be_saved_after_review(monkeypatch) -> None:
+@pytest.mark.parametrize('submitted, format_fields, expected', [
+    ('01:55', {}, '01:55'),
+    ('22:30', {'target_time_format': 'duration'}, '00:22:30'),
+    ('27:30', {'target_time_format': 'duration'}, '00:27:30'),
+    ('36:15', {'target_time_format': 'duration'}, '00:36:15'),
+    ('1:12:30', {'target_time_format': 'duration'}, '01:12:30'),
+])
+async def test_result_can_be_saved_after_review(monkeypatch, submitted, format_fields, expected) -> None:
     result = RaceResult(
         athlete_name="Жигалов Сергей",
         source_event_id="490b438c-8b18-4162-8382-4f1b480960cd",
@@ -368,11 +375,11 @@ async def test_result_can_be_saved_after_review(monkeypatch) -> None:
     ) as client:
         response = await client.post(
             "/results",
-            data={"result_url": result.source_url, "target_time": "01:55"},
+            data={"result_url": result.source_url, "target_time": submitted, **format_fields},
         )
 
     assert response.status_code == 200
-    assert saved == ["01:55"]
+    assert saved == [expected]
     assert "Результат сохранён в реестр" in response.text
     assert "Жигалов Сергей" not in response.text
     assert 'value="01:55"' not in response.text

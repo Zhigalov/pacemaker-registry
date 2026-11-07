@@ -19,7 +19,7 @@ from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, Eve
 from pacemaker_registry.names import matches_name
 from pacemaker_registry.models import Registry, RegistryEvent, RegistryPacemaker, ResultDetails, PacemakerProfile
 from pacemaker_registry.registry import _build_registry_result, _sort_pacemakers
-from pacemaker_registry.times import normalize_target_time
+from pacemaker_registry.times import normalize_target_time, target_seconds
 
 
 def get_result_details(result_id: int, include_splits: bool = True) -> ResultDetails | None:
@@ -415,8 +415,10 @@ def save_race_result(result: RaceResult, target_time: str, account_id: int | Non
             return inserted is not None
 
 
-def _target_time_type_from_target_time(target_time: str) -> str:
-    _, minutes = map(int, target_time.split(":"))
+def _target_time_type_from_target_time(target_time: str) -> str | None:
+    minutes, seconds = divmod(target_seconds(target_time), 60)
+    if seconds:
+        return None
     if minutes % 5 == 4:
         return TARGET_TIME_TYPE_SUB_MINUTE
     return TARGET_TIME_TYPE_ROUND

@@ -13,14 +13,18 @@ function setFetchLoading(isLoading) {
 function calculateTargetPace() {
   if (!targetTimeInput || !targetPaceOutput) return;
 
-  const match = targetTimeInput.value.trim().match(/^(\d{1,2}):([0-5]\d)$/);
+  const match = targetTimeInput.value.trim().match(/^(?:(\d{1,2}):)?([0-5]?\d):([0-5]\d)$/);
   const distance = Number(targetPaceOutput.dataset.distance.replace(",", "."));
   if (!match || !Number.isFinite(distance) || distance <= 0) {
     targetPaceOutput.value = "—";
     return;
   }
 
-  const totalSeconds = (Number(match[1]) * 60 + Number(match[2])) * 60;
+  const totalSeconds = Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+  if (totalSeconds === 0) {
+    targetPaceOutput.value = "—";
+    return;
+  }
   const secondsPerKm = Math.round(totalSeconds / distance);
   const minutes = Math.floor(secondsPerKm / 60);
   const seconds = String(secondsPerKm % 60).padStart(2, "0");

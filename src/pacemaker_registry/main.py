@@ -3,7 +3,7 @@ import re
 from dataclasses import asdict, replace
 from decimal import Decimal
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
@@ -38,7 +38,7 @@ from pacemaker_registry.russiarunning import (
     guess_target_time,
 )
 from pacemaker_registry.sources import load_race_result, result_source_links as _result_source_links
-from pacemaker_registry.times import normalize_target_time
+from pacemaker_registry.times import format_target_time, normalize_target_time
 from pacemaker_registry.avatars import avatar_url
 
 
@@ -94,6 +94,7 @@ templates = Jinja2Templates(
 )
 templates.env.filters["rating_color"] = rating_color_style
 templates.env.filters["avatar_url"] = avatar_url
+templates.env.filters["flag_time"] = format_target_time
 
 from pacemaker_registry.admin import create_admin_router
 from pacemaker_registry.profile_routes import create_profile_router
@@ -271,7 +272,7 @@ def _result_response(request, details, include_splits, event_id, min_events, *,
             "pace_config": asdict(details.event.pace_formula), "include_splits": include_splits,
             "back_url": "/?" + query,
             "edit_url": f"/results/{details.result.id}/target-time?" + query,
-            "target_time_value": details.result.target_time if target_time is None else target_time,
+            "target_time_value": details.result.target_time_display if target_time is None else target_time,
             "error": error, "saved": saved,
         },
         status_code=status_code,
@@ -301,13 +302,14 @@ def edit_result_target_time(
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
     distance_km: DistanceFilter = None,
     q: NameSearch = "",
+    target_time_format: Annotated[Literal["duration"] | None, Form()] = None,
 ):
     account = auth.require_write(request)
     details = _load_result_or_404(result_id, include_splits)
     _require_event_editor(account, details.event)
     target_time = target_time.strip()
     try:
-        target_time = normalize_target_time(target_time)
+        target_time = normalize_target_time(target_time, minutes_seconds=target_time_format == "duration")
     except ValueError as error:
         return _result_response(
             request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km, q=q,
@@ -317,13 +319,13 @@ def edit_result_target_time(
         updated = update_result_target_time(result_id, target_time, previous_target_time)
     except (PsycopgError, RuntimeError):
         return _result_response(
-            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km, q=q,
+            request, details, include_splits, event_id, min_events, target_time=format_target_time(target_time), distance_km=distance_km, q=q,
             error="Не удалось сохранить время. Проверьте текущее значение и попробуйте ещё раз.", status_code=503,
         )
     if not updated:
         details = _load_result_or_404(result_id, include_splits)
         return _result_response(
-            request, details, include_splits, event_id, min_events, target_time=target_time, distance_km=distance_km, q=q,
+            request, details, include_splits, event_id, min_events, target_time=format_target_time(target_time), distance_km=distance_km, q=q,
             error="Время уже изменено в другой вкладке. Сравните с текущей целью и подтвердите сохранение ещё раз.",
             status_code=409,
         )
@@ -383,7 +385,8 @@ async def add_result(
 async def save_result(
     request: Request,
     result_url: Annotated[str, Form(min_length=1, max_length=500)],
-    target_time: Annotated[str, Form(min_length=4, max_length=5)],
+    target_time: Annotated[str, Form(max_length=20)],
+    target_time_format: Annotated[Literal["duration"] | None, Form()] = None,
 ) -> HTMLResponse:
     account = auth.require_write(request)
     result = None
@@ -393,7 +396,7 @@ async def save_result(
     status_code = 200
 
     try:
-        target_time = normalize_target_time(target_time)
+        target_time = normalize_target_time(target_time, minutes_seconds=target_time_format == "duration")
     except ValueError as exception:
         error = str(exception)
         status_code = 422

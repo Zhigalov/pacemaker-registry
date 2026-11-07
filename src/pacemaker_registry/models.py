@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Any
 from pacemaker_registry.rating import EventRatingConfig, PaceRatingConfig, default_event_rating
-from pacemaker_registry.times import elapsed_seconds
+from pacemaker_registry.times import elapsed_seconds, format_duration, format_target_time
 from pacemaker_registry.times import time_difference_seconds as _time_difference_seconds
 
 
@@ -20,14 +20,11 @@ class RegistryCard:
 
     @property
     def target_time_display(self) -> str:
-        hours, minutes = map(int, self.target_time.split(":"))
-        return f"{hours:02d}:{minutes:02d}:00"
+        return format_target_time(self.target_time)
 
     @property
     def chip_time_display(self) -> str:
-        hours, remainder = divmod(elapsed_seconds(self.chip_time), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return format_duration(elapsed_seconds(self.chip_time))
 
     @property
     def finish_difference_display(self) -> str:

@@ -45,10 +45,8 @@ def _build_registry_result(result_id, event, distance, target_time, chip_time,
 
 
 def _calculate_target_pace(target_time: str, distance_km: Decimal) -> str:
-    hours, minutes = map(int, target_time.split(":"))
-    total_seconds = hours * 3600 + minutes * 60
     seconds_per_km = int(
-        (Decimal(total_seconds) / distance_km).quantize(
+        (Decimal(_target_time_seconds(target_time)) / distance_km).quantize(
             Decimal("1"), rounding=ROUND_HALF_UP
         )
     )

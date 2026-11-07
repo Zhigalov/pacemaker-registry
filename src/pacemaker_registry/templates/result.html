@@ -42,23 +42,24 @@
           <summary>Изменить время на флаге</summary>
           <form method="post" action="{{ edit_url }}">
             <input type="hidden" name="previous_target_time" value="{{ result.target_time }}">
+            <input type="hidden" name="target_time_format" value="duration">
             <div class="flag-editor-controls">
               <div>
-                <label for="flag-time">Время на флаге · ЧЧ:ММ</label>
+                <label for="flag-time">Время на флаге</label>
                 <input id="flag-time" name="target_time" type="text" value="{{ target_time_value }}"
-                       required minlength="4" maxlength="5" pattern="[0-9]{1,2}:[0-5][0-9]"
-                       placeholder="01:54" autocomplete="off" aria-describedby="flag-hint{% if error %} flag-error{% endif %}"
+                       required maxlength="8" pattern="[0-5]?[0-9]:[0-5][0-9]|[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]"
+                       placeholder="27:30" autocomplete="off" aria-describedby="flag-hint{% if error %} flag-error{% endif %}"
                        {% if error %}aria-invalid="true"{% endif %}>
               </div>
               <button type="submit" class="button button--primary">Сохранить</button>
             </div>
-            <p class="event-note" id="flag-hint">Только для этого выступления. Чип-тайм и отсечки не изменятся; настройки соревнования сохранятся.</p>
+            <p class="event-note" id="flag-hint">ММ:СС (27:30) или ЧЧ:ММ:СС (1:12:30). Только для этого выступления.</p>
             {% if error %}<p class="error-message" id="flag-error" role="alert">{{ error }}</p>{% endif %}
           </form>
         </details>
         {% endif %}
         <dl class="result-facts">
-          <div><dt>Цель · время на флаге</dt><dd>{{ result.target_time }}</dd></div>
+          <div><dt>Цель · время на флаге</dt><dd>{{ result.target_time_display }}</dd></div>
           <div><dt>Факт · чип-тайм</dt><dd>{{ result.chip_time }}</dd></div>
           <div><dt>Отклонение финиша</dt><dd>{{ result.time_difference }}</dd></div>
           <div><dt>Целевой темп</dt><dd>{{ result.target_pace }}</dd></div>

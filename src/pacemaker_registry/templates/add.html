@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
     <link rel="stylesheet" href="/static/styles.css?v=account-spacing">
-    <script src="/static/add.js" defer></script>
+    <script src="/static/add.js?v=flag-seconds" defer></script>
   </head>
   <body>
     {% if result_created %}<span hidden data-analytics-goal="result_saved"></span>
@@ -78,6 +78,7 @@
 
           <form class="save-result-form" method="post" action="/results">
             <input type="hidden" name="result_url" value="{{ result.source_url }}">
+            <input type="hidden" name="target_time_format" value="duration">
 
             <div class="result-heading">
               <div>
@@ -112,14 +113,15 @@
                     id="target-time"
                     name="target_time"
                     type="text"
-                    inputmode="numeric"
-                    pattern="[0-9]{1,2}:[0-5][0-9]"
-                    maxlength="5"
-                    value="{{ result.target_time }}"
+                    pattern="[0-5]?[0-9]:[0-5][0-9]|[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]"
+                    maxlength="8"
+                    value="{{ result.target_time | flag_time }}"
+                    placeholder="27:30"
+                    required
                     aria-describedby="target-time-hint"
                   >
                 </dd>
-                <p id="target-time-hint">Предположили по чип-тайму. Можно исправить.</p>
+                <p id="target-time-hint">Можно исправить: ММ:СС (27:30) или ЧЧ:ММ:СС (1:12:30).</p>
               </div>
               <div>
                 <dt>Фактический темп</dt>

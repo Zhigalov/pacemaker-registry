@@ -56,6 +56,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
     assert migrate.migrate() == [
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
         '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql', '0008_roles.sql',
+        '0009_flag_time_seconds.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -103,6 +104,20 @@ def test_edit_conflict_and_filter_history(database):
     assert len(filtered.pacemakers[0].results) == 1
     assert filtered.pacemakers[0].performance_count == 2
     assert not db.load_registry(min_events=3).pacemakers
+
+
+def test_flag_seconds_survive_database_save_and_edit(database):
+    migrate.migrate()
+    assert db.save_race_result(sample(distance_km='5', chip_time='22:27.4', checkpoints=()), '00:22:30')
+    assert db.get_event_target_time_type('test-event') is None
+    card = db.load_registry().pacemakers[0].results[0]
+    result = db.get_result_details(card.id).result
+    assert card.target_time_display == result.target_time_display == '00:22:30'
+    assert result.target_pace == '04:30 /км'
+    assert result.finish_deviation == -3
+    assert db.update_result_target_time(card.id, '01:12:30', '00:22:30')
+    assert not db.update_result_target_time(card.id, '00:22:45', '00:22:30')
+    assert db.get_result_details(card.id).result.target_time_display == '01:12:30'
 
 
 @pytest.mark.parametrize('include_splits', [True, False])

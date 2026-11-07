@@ -178,27 +178,28 @@ async def test_edit_flag_redirects_preserves_filters_and_recalculates(monkeypatc
     monkeypatch.setattr(main, 'update_result_target_time', save)
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
         response = await client.post('/results/12/target-time?event_id=1&include_splits=false&min_events=3',
-                                     data={'target_time': '3:29', 'previous_target_time': '03:30'})
+                                     data={'target_time': '3:29:30', 'target_time_format': 'duration',
+                                           'previous_target_time': '03:30'})
         assert response.status_code == 303
-        assert calls == [(12, '03:29', '03:30')]
+        assert calls == [(12, '03:29:30', '03:30')]
         assert response.headers['location'] == '/results/12?event_id=1&include_splits=false&min_events=3&saved=true'
         page = await client.get(response.headers['location'])
     assert page.status_code == 200
     assert 'Время на флаге сохранено' in page.text
     assert 'Учёт темпа выключен' in page.text
-    assert 'name="previous_target_time" value="03:29"' in page.text
+    assert 'name="previous_target_time" value="03:29:30"' in page.text
     markers = [json.loads(value) for value in re.findall(
         r'<script type="application/json" data-result-markers>(.*?)</script>', page.text)]
-    assert markers[0][0]['deviation'] == 55
+    assert markers[0][0]['deviation'] == 25
     assert markers[0][0]['score'] != sample.result.finish_rating
-    assert markers[1][0]['deviation'] == pytest.approx(315 - 12540 / 42.2)
+    assert markers[1][0]['deviation'] == pytest.approx(315 - 12570 / 42.2)
     assert get(12, False).result.target_pace != sample.result.target_pace
     assert get(12, False).result.rating == get(12, False).result.finish_rating
     assert get(12, True).result.splits_rating != sample.result.splits_rating
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize('value', ['00:00', '0:00', '-1:20', '01:60', '100:00', '01:20:00', 'oops', '<script>'])
+@pytest.mark.parametrize('value', ['00:00', '0:00', '-1:20', '01:60', '100:00', '01:20:60', 'oops', '<script>'])
 async def test_edit_flag_rejects_invalid_values_without_saving(monkeypatch, value):
     monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: details())
     def never_save(*args): pytest.fail('Invalid input must not reach UPDATE')
@@ -221,7 +222,7 @@ async def test_edit_flag_handles_missing_conflict_and_database_error(monkeypatch
         monkeypatch.setattr(main, 'update_result_target_time', fail)
         response = await client.post('/results/12/target-time', data=payload)
         assert response.status_code == 503
-        assert 'value="03:29"' in response.text
+        assert 'value="03:29:00"' in response.text
         assert 'secret database error' not in response.text
         monkeypatch.setattr(main, 'update_result_target_time', lambda *args: False)
         response = await client.post('/results/12/target-time', data=payload)

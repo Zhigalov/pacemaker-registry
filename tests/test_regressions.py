@@ -25,7 +25,7 @@ def sample_result():
                       'https://results.runc.run/event/test/result/1/')
 
 
-@pytest.mark.parametrize('value', ['00:00', '0:00', '01:60', '-1:00', '01:00:00', 'abc'])
+@pytest.mark.parametrize('value', ['00:00', '0:00', '01:60', '-1:00', '00:00:00', '01:00:60', 'abc'])
 def test_target_time_rejects_invalid_or_zero(value):
     with pytest.raises(ValueError):
         normalize_target_time(value)
