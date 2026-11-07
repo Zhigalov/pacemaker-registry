@@ -1,14 +1,18 @@
 <form class="event-editor pace-editor" id="pace-rating" action="/events/{{ event.id }}/pace-rating" method="post" data-pace-rating>
-  <div class="event-editor-heading">
-    <div><h2>Оценка за темп на отрезках</h2><p>Своя шкала для этого соревнования. Отклонение от целевого темпа измеряется в секундах на километр, а не в секундах финиша.</p></div>
-    <button class="button button--primary" type="submit">Сохранить темп</button>
+  <div class="pace-editor-heading">
+    <div>
+      <h2>Оценка за темп на отрезках</h2>
+      <p class="event-note" id="splits-status" data-splits-status aria-live="polite">{% if splits_enabled %}При достаточных данных темп даёт 40% итоговой оценки.{% else %}Итоговая оценка считается только по финишу.{% endif %}</p>
+    </div>
+    <div class="pace-editor-controls">
+      <input type="hidden" name="splits_enabled" value="false">
+      <label class="splits-toggle">
+        <input type="checkbox" name="splits_enabled" value="true" data-splits-toggle aria-controls="pace-settings" aria-describedby="splits-status"{% if splits_enabled %} checked{% endif %}>
+        Учитывать отсечки
+      </label>
+      <button class="button button--primary" type="submit">Сохранить темп</button>
+    </div>
   </div>
-  <input type="hidden" name="splits_enabled" value="false">
-  <label class="splits-toggle">
-    <input type="checkbox" name="splits_enabled" value="true" data-splits-toggle aria-controls="pace-settings"{% if splits_enabled %} checked{% endif %}>
-    Учитывать темп по отсечкам
-  </label>
-  <p class="event-note" data-splits-status aria-live="polite">{% if splits_enabled %}При достаточных данных темп даёт 40% итоговой оценки.{% else %}Итоговая оценка считается только по финишу.{% endif %}</p>
   <fieldset id="pace-settings" class="pace-settings" aria-label="Шкала оценки темпа"{% if not splits_enabled %} disabled inert{% endif %}>
   {% with pace_editable=true %}{% include '_pace_chart.html' %}{% endwith %}
   <div class="event-zones pace-zones">
@@ -40,7 +44,6 @@
   </div>
   <div class="event-editor-actions">
     <button class="button" type="button" data-reset-pace>Вернуть значения по умолчанию</button>
-
   </div>
   </fieldset>
   <p class="event-note" data-save-state role="status">Изменения применятся после сохранения.</p>
