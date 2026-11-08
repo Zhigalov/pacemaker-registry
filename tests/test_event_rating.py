@@ -187,9 +187,8 @@ async def test_events_list_links_to_settings_participants_and_public_captain(mon
         assert 'href="/events/1"' in response.text
         assert 'href="/?event_id=1"' in response.text
         assert 'href="/?event_id=3"' not in response.text
-        assert 'href="/pacemakers/42">Иванов Иван</a>' in response.text
-        assert 'Капитан назначен' in response.text
-        assert 'Капитан не назначен' in response.text
+        assert 'Результат добавлял: <a href="/pacemakers/42">Иванов Иван</a>' in response.text
+        assert response.text.count('Результат добавлял: не определён') == 2
         assert 'Результатов: 12' in response.text
         assert 'Результатов: 0' in response.text
         assert 'Отсечки отключены' in response.text
