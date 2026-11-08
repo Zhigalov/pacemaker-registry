@@ -429,12 +429,13 @@ def _split_athlete_name(full_name: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def _event_from_row(row: tuple, *, captain_account_id: int | None = None) -> RegistryEvent:
+def _event_from_row(row: tuple, *, captain_account_id: int | None = None,
+                    result_count: int = 0) -> RegistryEvent:
     return RegistryEvent(
         id=row[0], name=row[1], target_time_type=row[2],
         rating_config=parse_event_rating(row[3], allow_legacy=True) if row[3] is not None else None,
         pace_rating_config=parse_pace_rating(row[4]) if row[4] is not None else None,
-        captain_account_id=captain_account_id, splits_enabled=row[5],
+        captain_account_id=captain_account_id, splits_enabled=row[5], result_count=result_count,
     )
 
 
@@ -450,9 +451,12 @@ def get_event(event_id: int) -> RegistryEvent | None:
 def list_events() -> tuple[RegistryEvent, ...]:
     with connect_database() as connection:
         rows = connection.execute(
-            "SELECT id, name, target_time_type, rating_config, pace_rating_config, splits_enabled FROM events ORDER BY lower(name), id"
+            """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config,
+                      e.splits_enabled,
+                      (SELECT count(*) FROM race_results AS r WHERE r.event_id = e.id)
+               FROM events AS e ORDER BY lower(e.name), e.id"""
         ).fetchall()
-    return tuple(_event_from_row(row) for row in rows)
+    return tuple(_event_from_row(row, result_count=row[6]) for row in rows)
 
 
 def save_event_rating(event_id: int, config: EventRatingConfig) -> bool:

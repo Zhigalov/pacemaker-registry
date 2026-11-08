@@ -107,6 +107,7 @@ class RegistryEvent:
     pace_rating_config: PaceRatingConfig | None = None
     captain_account_id: int | None = None
     splits_enabled: bool = True
+    result_count: int = 0
 
     @property
     def formula(self) -> EventRatingConfig:

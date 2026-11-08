@@ -6,32 +6,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Соревнования — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=account-spacing">
+    <link rel="stylesheet" href="/static/styles.css?v=event-directory">
     <script src="/static/rating-models.js?v=1" defer></script>
     <script src="/static/chart-utils.js?v=1" defer></script>
     <script src="/static/event-rating.js?v=shared-models" defer></script>
+    <script src="/static/events.js?v=1" defer></script>
   </head>
   <body>
     <main class="app-shell event-shell">
       {% include '_navigation.html' %}
-      <section class="event-heading">
+      <section class="event-heading event-directory-heading">
         <h1>Соревнования</h1>
-        <p>Графики оценки финиша. Откройте соревнование, чтобы отдельно настроить финиш и темп на отрезках.</p>
       </section>
-      <div class="events-list">
+      {% if events %}
+      <div class="events-search" data-events-search hidden>
+        <label for="event-search">Поиск по названию</label>
+        <input id="event-search" type="search" placeholder="Введите часть названия" autocomplete="off" aria-controls="events-list">
+        <p class="visually-hidden" data-events-status role="status"></p>
+      </div>
+      {% endif %}
+      <div class="events-list" id="events-list">
         {% for event in events %}
-          <article class="event-preview" data-rating-widget>
-            <h2><a href="/events/{{ event.id }}">{{ event.name }}</a></h2>
-            <p class="event-note">{% if event.target_time_type == 'sub_minute' %}Саб-минута{% elif event.target_time_type == 'round' %}Ровное время{% else %}Тип времени ещё не определён{% endif %}</p>
-            {% include '_rating_chart.html' %}
-            <p class="event-note">Темп: допуск ±{{ '%g'|format(event.pace_formula.tolerance) }} с/км · экспонента после ±{{ '%g'|format(event.pace_formula.bad) }} с/км. <a href="/events/{{ event.id }}#pace-rating">Настроить темп →</a></p>
-            <a class="quiet-link" href="/events/{{ event.id }}">Настроить рейтинг →</a>
+          <article class="event-preview" data-event-row data-rating-widget>
+            <header class="event-preview-heading">
+              <div>
+                <h2><a href="/events/{{ event.id }}" data-event-name>{{ event.name }}</a></h2>
+                <p class="event-note">{% if event.target_time_type == 'sub_minute' %}Саб-минута · {% elif event.target_time_type == 'round' %}Ровное время · {% endif %}{% if event.splits_enabled %}Отсечки учитываются{% else %}Отсечки отключены{% endif %}</p>
+              </div>
+              <span class="event-preview-count">Результатов <strong>{{ event.result_count }}</strong></span>
+            </header>
+            <details class="event-preview-chart">
+              <summary>График оценки финиша</summary>
+              {% include '_rating_chart.html' %}
+              {% if event.splits_enabled %}<p class="event-note">Темп: допуск ±{{ '%g'|format(event.pace_formula.tolerance) }} с/км · экспонента после ±{{ '%g'|format(event.pace_formula.bad) }} с/км.</p>{% endif %}
+              <a class="quiet-link" href="/events/{{ event.id }}#pace-rating">Оценка темпа на отрезках →</a>
+            </details>
             <script type="application/json" data-rating-config>{{ configs[event.id] | tojson }}</script>
           </article>
         {% else %}
           <p>Пока нет соревнований. Они появятся после добавления первого результата.</p>
         {% endfor %}
       </div>
+      {% if events %}<p class="event-note events-no-matches" data-events-empty hidden>По этому запросу соревнований нет.</p>{% endif %}
     </main>
   </body>
 </html>

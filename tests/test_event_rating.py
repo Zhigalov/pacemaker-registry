@@ -173,7 +173,10 @@ def test_editable_scores_are_continuous_and_independent():
 
 @pytest.mark.anyio
 async def test_events_list_is_readonly_and_links_to_editors(monkeypatch):
-    events = (RegistryEvent(1, "Первое", "round"), RegistryEvent(2, "Второе", "sub_minute", EventRatingConfig(left_score=6)))
+    events = (
+        RegistryEvent(1, "Первое", "round", result_count=12),
+        RegistryEvent(2, "Второе", "sub_minute", EventRatingConfig(left_score=6), result_count=3),
+    )
     monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/events")
@@ -184,6 +187,9 @@ async def test_events_list_is_readonly_and_links_to_editors(monkeypatch):
         assert 'href="/events/1"' in response.text
         assert 'href="/events/2"' in response.text
         assert '"left_score": 6' in response.text
+        assert 'Результатов <strong>12</strong>' in response.text
+        assert 'Результатов <strong>3</strong>' in response.text
+        assert response.text.count('<details class="event-preview-chart">') == 2
         monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: ())
         response = await client.get("/events")
         assert "Пока нет соревнований" in response.text

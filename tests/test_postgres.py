@@ -76,6 +76,7 @@ def test_duplicates_names_event_type_and_json_round_trip(database):
     first = sample()
     assert db.save_race_result(first, '00:49')
     assert not db.save_race_result(first, '00:49')
+    assert db.list_events()[0].result_count == 1
     assert db.save_race_result(sample(athlete_name=' testov first '), '00:50')
     registry = db.load_registry()
     assert len(registry.pacemakers) == registry.event_count == 1
@@ -89,6 +90,8 @@ def test_duplicates_names_event_type_and_json_round_trip(database):
     detail = db.get_result_details(registry.pacemakers[0].results[0].id)
     assert detail.result.checkpoints == tuple(map(asdict, first.checkpoints))
     assert detail.result.pace_markers
+    assert db.save_race_result(sample(source_event_id='other-event'), '00:50')
+    assert sorted(e.result_count for e in db.list_events()) == [1, 2]
 
 
 def test_edit_conflict_and_filter_history(database):
