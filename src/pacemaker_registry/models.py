@@ -108,6 +108,8 @@ class RegistryEvent:
     captain_account_id: int | None = None
     splits_enabled: bool = True
     result_count: int = 0
+    captain_name: str | None = None
+    captain_profile_id: int | None = None
 
     @property
     def formula(self) -> EventRatingConfig:

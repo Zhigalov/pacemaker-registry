@@ -172,24 +172,28 @@ def test_editable_scores_are_continuous_and_independent():
 
 
 @pytest.mark.anyio
-async def test_events_list_is_readonly_and_links_to_editors(monkeypatch):
+async def test_events_list_links_to_settings_participants_and_public_captain(monkeypatch):
     events = (
-        RegistryEvent(1, "Первое", "round", result_count=12),
-        RegistryEvent(2, "Второе", "sub_minute", EventRatingConfig(left_score=6), result_count=3),
+        RegistryEvent(1, "Первое", "round", captain_account_id=11, result_count=12,
+                      captain_name="Иванов Иван", captain_profile_id=42),
+        RegistryEvent(2, "Второе", "sub_minute", captain_account_id=12, result_count=3),
+        RegistryEvent(3, "Третье", splits_enabled=False),
     )
     monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/events")
         assert response.status_code == 200
-        assert response.text.count('data-rating-widget') == 2
-        assert 'data-event-rating' not in response.text
-        assert 'action="/events/' not in response.text
+        assert 'data-rating-widget' not in response.text
         assert 'href="/events/1"' in response.text
-        assert 'href="/events/2"' in response.text
-        assert '"left_score": 6' in response.text
-        assert 'Результатов <strong>12</strong>' in response.text
-        assert 'Результатов <strong>3</strong>' in response.text
-        assert response.text.count('<details class="event-preview-chart">') == 2
+        assert 'href="/?event_id=1"' in response.text
+        assert 'href="/?event_id=3"' not in response.text
+        assert 'href="/pacemakers/42">Иванов Иван</a>' in response.text
+        assert 'Капитан назначен' in response.text
+        assert 'Капитан не назначен' in response.text
+        assert 'Результатов: 12' in response.text
+        assert 'Результатов: 0' in response.text
+        assert 'Отсечки отключены' in response.text
+        assert 'placeholder="Поиск"' in response.text
         monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: ())
         response = await client.get("/events")
         assert "Пока нет соревнований" in response.text

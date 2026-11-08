@@ -190,7 +190,7 @@ def events_page(request: Request):
         raise HTTPException(503, "Не удалось загрузить соревнования. Попробуйте позже.") from error
     return templates.TemplateResponse(
         request=request, name="events.html",
-        context={"events": events, "configs": {event.id: asdict(event.formula) for event in events}},
+        context={"events": events},
     )
 
 

@@ -465,6 +465,15 @@ def test_first_successful_import_assigns_only_one_captain(database):
     expected = {first_result.source_participant_id: account_ids[0], second_result.source_participant_id: account_ids[1]}
     assert first_insert[0] == expected[first_insert[1]]
     assert not db.save_race_result(first_result, '00:50', account_ids[1])
+    with database() as connection:
+        captain_profile_id, = connection.execute(
+            "INSERT INTO pacemakers (first_name, last_name, account_id) VALUES ('Иван', 'Иванов', %s) RETURNING id",
+            (first_insert[0],),
+        ).fetchone()
+    listed = next(e for e in db.list_events() if e.id != existing.id)
+    assert listed.result_count == 2
+    assert listed.captain_profile_id == captain_profile_id
+    assert listed.captain_name == 'Иванов Иван'
 
 
 def test_admin_role_management_and_protected_achievement(database, monkeypatch):

@@ -6,10 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Соревнования — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-directory">
-    <script src="/static/rating-models.js?v=1" defer></script>
-    <script src="/static/chart-utils.js?v=1" defer></script>
-    <script src="/static/event-rating.js?v=shared-models" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=event-directory-summary">
     <script src="/static/events.js?v=1" defer></script>
   </head>
   <body>
@@ -17,31 +14,41 @@
       {% include '_navigation.html' %}
       <section class="event-heading event-directory-heading">
         <h1>Соревнования</h1>
+        {% if events %}
+        <div class="events-search" data-events-search hidden>
+          <label class="visually-hidden" for="event-search">Поиск соревнований</label>
+          <input id="event-search" type="search" placeholder="Поиск" autocomplete="off" aria-controls="events-list">
+          <p class="visually-hidden" data-events-status role="status"></p>
+        </div>
+        {% endif %}
       </section>
-      {% if events %}
-      <div class="events-search" data-events-search hidden>
-        <label for="event-search">Поиск по названию</label>
-        <input id="event-search" type="search" placeholder="Введите часть названия" autocomplete="off" aria-controls="events-list">
-        <p class="visually-hidden" data-events-status role="status"></p>
-      </div>
-      {% endif %}
       <div class="events-list" id="events-list">
         {% for event in events %}
-          <article class="event-preview" data-event-row data-rating-widget>
+          <article class="event-preview" data-event-row>
             <header class="event-preview-heading">
               <div>
                 <h2><a href="/events/{{ event.id }}" data-event-name>{{ event.name }}</a></h2>
-                <p class="event-note">{% if event.target_time_type == 'sub_minute' %}Саб-минута · {% elif event.target_time_type == 'round' %}Ровное время · {% endif %}{% if event.splits_enabled %}Отсечки учитываются{% else %}Отсечки отключены{% endif %}</p>
+                <p class="event-note event-preview-meta">
+                  {% if event.captain_name %}
+                    <span>Капитан: <a href="/pacemakers/{{ event.captain_profile_id }}">{{ event.captain_name }}</a></span>
+                  {% elif event.captain_account_id %}
+                    <span>Капитан назначен</span>
+                  {% else %}
+                    <span>Капитан не назначен</span>
+                  {% endif %}
+                  {% if event.target_time_type == 'sub_minute' %}<span>Саб-минута</span>{% elif event.target_time_type == 'round' %}<span>Ровное время</span>{% endif %}
+                  <span>{% if event.splits_enabled %}Отсечки учитываются{% else %}Отсечки отключены{% endif %}</span>
+                </p>
               </div>
-              <span class="event-preview-count">Результатов <strong>{{ event.result_count }}</strong></span>
+              {% if event.result_count %}
+              <a class="event-preview-count" href="/?event_id={{ event.id }}">
+                <strong>Участники <span aria-hidden="true">→</span></strong>
+                <span>Результатов: {{ event.result_count }}</span>
+              </a>
+              {% else %}
+              <span class="event-preview-count">Результатов: 0</span>
+              {% endif %}
             </header>
-            <details class="event-preview-chart">
-              <summary>График оценки финиша</summary>
-              {% include '_rating_chart.html' %}
-              {% if event.splits_enabled %}<p class="event-note">Темп: допуск ±{{ '%g'|format(event.pace_formula.tolerance) }} с/км · экспонента после ±{{ '%g'|format(event.pace_formula.bad) }} с/км.</p>{% endif %}
-              <a class="quiet-link" href="/events/{{ event.id }}#pace-rating">Оценка темпа на отрезках →</a>
-            </details>
-            <script type="application/json" data-rating-config>{{ configs[event.id] | tojson }}</script>
           </article>
         {% else %}
           <p>Пока нет соревнований. Они появятся после добавления первого результата.</p>
