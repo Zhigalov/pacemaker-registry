@@ -719,6 +719,63 @@ tbody tr:hover { background: #fbfcfc; }
   width: 100%;
 }
 
+.registry-filter-field--event .registry-filter-select[hidden] { display: none; }
+.event-suggest { position: relative; }
+.event-suggest input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 2.85rem;
+  min-height: 0;
+  padding: .65rem 2.8rem .65rem .85rem;
+  border-color: #cfdcd7;
+}
+.event-suggest input::placeholder { color: #52635c; }
+.event-suggest-clear {
+  position: absolute;
+  top: 50%;
+  right: .3rem;
+  transform: translateY(-50%);
+  width: 2.3rem;
+  height: 2.3rem;
+  border: 0;
+  border-radius: .55rem;
+  background: transparent;
+  color: #176f59;
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+.event-suggest-clear:hover { background: #e9f5ef; }
+.event-suggest-popup {
+  position: absolute;
+  top: calc(100% + .3rem);
+  inset-inline: 0;
+  z-index: 10;
+  background: #fff;
+  border: 1px solid #cfdcd7;
+  border-radius: .75rem;
+  box-shadow: 0 .4rem 1rem #17231f20;
+}
+.event-suggest-popup ul {
+  list-style: none;
+  margin: 0;
+  padding: .3rem;
+  max-height: min(16rem, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.event-suggest-popup ul:empty { display: none; }
+.event-suggest-popup li {
+  padding: .65rem .6rem;
+  border-radius: .45rem;
+  font-size: .9rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.event-suggest-popup li[aria-selected="true"] { font-weight: 680; color: #176f59; }
+.event-suggest-popup li:hover, .event-suggest-popup li[data-active] { background: #e9f5ef; }
+.event-suggest-empty { margin: .75rem; color: #52635c; font-size: .9rem; }
+
 .registry-filter-select::after {
   position: absolute;
   top: 50%;
@@ -775,6 +832,8 @@ tbody tr:hover { background: #fbfcfc; }
   .registry-toolbar { padding: .75rem; }
   .registry-filter { gap: .75rem; }
   .registry-filter select { font-size: 1rem; }
+  .event-suggest input { font-size: 1rem; }
+  .filter-hint { left: auto; right: 0; }
   .registry-summary-counts { width: 100%; }
   .registry-summary-counts > span { width: 100%; }
   .registry-stats { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }

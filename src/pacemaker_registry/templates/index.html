@@ -9,9 +9,10 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-splits">
+    <link rel="stylesheet" href="/static/styles.css?v=event-suggest">
     <link rel="stylesheet" href="/static/profiles.css?v=3">
     <script src="/static/registry.js?v=name-search" defer></script>
+    <script src="/static/event-suggest.js?v=1" defer></script>
   </head>
   <body>
     <main class="app-shell app-shell--registry">
@@ -31,8 +32,8 @@
               </div>
             </div>
             <div class="registry-filter-field registry-filter-field--event">
-              <label for="event-filter">Соревнование</label>
-              <span class="registry-filter-select">
+              <label for="event-filter" data-event-filter-label>Соревнование</label>
+              <span class="registry-filter-select" data-event-filter-native>
                 <select id="event-filter" name="event_id" data-registry-filter>
                   <option value="0" {% if registry.selected_event_id is none %}selected{% endif %}>Все соревнования</option>
                   {% for event in registry.events %}
@@ -42,6 +43,15 @@
                   {% endfor %}
                 </select>
               </span>
+              <div class="event-suggest" data-event-suggest hidden>
+                <input id="event-filter-search" type="text" role="combobox" placeholder="Все соревнования"
+                       autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="event-filter-options">
+                <button class="event-suggest-clear" type="button" aria-label="Сбросить соревнование" hidden>×</button>
+                <div class="event-suggest-popup" hidden>
+                  <ul id="event-filter-options" role="listbox" aria-label="Соревнования"></ul>
+                  <p class="event-suggest-empty" role="status" hidden>Соревнования не найдены</p>
+                </div>
+              </div>
             </div>
             <div class="registry-filter-field registry-filter-field--distance">
               <label for="distance-filter">Дистанция</label>

@@ -63,7 +63,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=event-splits"' in response.text
+    assert 'href="/static/styles.css?v=event-suggest"' in response.text
     assert 'src="/static/apple-touch-icon.png?v=equal-flags"' in response.text
     assert 'class="registry-heading"' not in response.text
     assert 'Статистика отфильтрованного списка' in response.text
