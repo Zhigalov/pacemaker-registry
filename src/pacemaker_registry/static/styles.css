@@ -1296,7 +1296,6 @@ tbody tr:hover { background: #fbfcfc; }
 .event-preview h2 a { color: #176f59; text-decoration: none; }
 .event-preview h2 a:hover { text-decoration: underline; }
 .event-preview-meta { display: flex; flex-wrap: wrap; gap: .1rem .85rem; margin: .2rem 0 0; overflow-wrap: anywhere; }
-.event-preview-meta a { color: #176f59; text-underline-offset: .15em; }
 .event-preview-count { display: grid; gap: .06rem; padding: .35rem .55rem; background: #e9f5ef; color: #176f59; border-radius: 8px; font-size: .8rem; line-height: 1.25; text-decoration: none; white-space: nowrap; }
 .event-preview-count span { font-variant-numeric: tabular-nums; }
 a.event-preview-count:hover { background: #dbeee4; }

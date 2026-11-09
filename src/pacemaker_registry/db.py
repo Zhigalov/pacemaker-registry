@@ -450,18 +450,14 @@ def get_event(event_id: int) -> RegistryEvent | None:
 def list_events() -> tuple[RegistryEvent, ...]:
     with connect_database() as connection:
         rows = connection.execute(
-            """SELECT e.id, e.name, e.target_time_type, e.splits_enabled, e.captain_account_id,
-                      (SELECT count(*) FROM race_results AS r WHERE r.event_id = e.id),
-                      p.last_name || ' ' || p.first_name, p.id
+            """SELECT e.id, e.name, e.target_time_type, e.splits_enabled,
+                      (SELECT count(*) FROM race_results AS r WHERE r.event_id = e.id)
                FROM events AS e
-               LEFT JOIN pacemakers AS p ON p.account_id = e.captain_account_id
                ORDER BY lower(e.name), e.id"""
         ).fetchall()
     return tuple(
-        RegistryEvent(event_id, name, time_type, splits_enabled=splits_enabled,
-                      captain_account_id=captain_id, result_count=count,
-                      captain_name=captain_name, captain_profile_id=profile_id)
-        for event_id, name, time_type, splits_enabled, captain_id, count, captain_name, profile_id in rows
+        RegistryEvent(event_id, name, time_type, splits_enabled=splits_enabled, result_count=count)
+        for event_id, name, time_type, splits_enabled, count in rows
     )
 
 

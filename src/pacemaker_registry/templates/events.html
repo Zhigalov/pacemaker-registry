@@ -29,7 +29,6 @@
               <div>
                 <h2><a href="/events/{{ event.id }}" data-event-name>{{ event.name }}</a></h2>
                 <p class="event-note event-preview-meta">
-                  <span>Результат добавлял: {% if event.captain_name %}<a href="/pacemakers/{{ event.captain_profile_id }}">{{ event.captain_name }}</a>{% else %}не определён{% endif %}</span>
                   {% if event.target_time_type == 'sub_minute' %}<span>Саб-минута</span>{% elif event.target_time_type == 'round' %}<span>Ровное время</span>{% endif %}
                   <span>{% if event.splits_enabled %}Отсечки учитываются{% else %}Отсечки отключены{% endif %}</span>
                 </p>

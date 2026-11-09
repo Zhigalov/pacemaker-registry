@@ -172,11 +172,10 @@ def test_editable_scores_are_continuous_and_independent():
 
 
 @pytest.mark.anyio
-async def test_events_list_links_to_settings_participants_and_public_captain(monkeypatch):
+async def test_events_list_links_to_settings_and_participants(monkeypatch):
     events = (
-        RegistryEvent(1, "Первое", "round", captain_account_id=11, result_count=12,
-                      captain_name="Иванов Иван", captain_profile_id=42),
-        RegistryEvent(2, "Второе", "sub_minute", captain_account_id=12, result_count=3),
+        RegistryEvent(1, "Первое", "round", result_count=12),
+        RegistryEvent(2, "Второе", "sub_minute", result_count=3),
         RegistryEvent(3, "Третье", splits_enabled=False),
     )
     monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events)
@@ -187,8 +186,7 @@ async def test_events_list_links_to_settings_participants_and_public_captain(mon
         assert 'href="/events/1"' in response.text
         assert 'href="/?event_id=1"' in response.text
         assert 'href="/?event_id=3"' not in response.text
-        assert 'Результат добавлял: <a href="/pacemakers/42">Иванов Иван</a>' in response.text
-        assert response.text.count('Результат добавлял: не определён') == 2
+        assert 'Результат добавлял' not in response.text
         assert 'Результатов: 12' in response.text
         assert 'Результатов: 0' in response.text
         assert 'Отсечки отключены' in response.text
