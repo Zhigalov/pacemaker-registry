@@ -188,6 +188,8 @@ def events_page(request: Request):
         events = list_events()
     except (PsycopgError, RuntimeError) as error:
         raise HTTPException(503, "Не удалось загрузить соревнования. Попробуйте позже.") from error
+    events = sorted(events, key=lambda event: round(event.team_rating, 1) if event.team_rating is not None else -1,
+                    reverse=True)
     return templates.TemplateResponse(
         request=request, name="events.html",
         context={"events": events},

@@ -1289,9 +1289,18 @@ tbody tr:hover { background: #fbfcfc; }
 .event-heading.event-directory-heading h1 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.75rem); }
 .events-controls:not([hidden]) { display: flex; flex-wrap: wrap; gap: .4rem; }
 .events-controls { flex: 0 1 27rem; min-width: 0; }
-.events-controls input, .events-controls select { box-sizing: border-box; min-height: 2.4rem; padding: .4rem .7rem; font: inherit; font-size: .9rem; }
+.events-controls input, .events-sort summary { box-sizing: border-box; min-height: 2.4rem; padding: .4rem .7rem; font: inherit; font-size: .9rem; }
 .events-controls input { flex: 1; width: 0; min-width: 6rem; }
-.events-controls select { max-width: 100%; border: 1px solid #cfdcd7; border-radius: .75rem; background: #fff; color: #17231f; }
+.events-sort { position: relative; flex: 0 1 12rem; max-width: 100%; }
+.events-sort summary { display: flex; align-items: center; justify-content: space-between; gap: .55rem; list-style: none; border: 1px solid #cfdcd7; border-radius: .75rem; background: #fff; color: #17231f; cursor: pointer; }
+.events-sort summary::-webkit-details-marker { display: none; }
+.events-sort summary::after { content: ""; flex: none; width: .48rem; height: .48rem; border: solid #42524c; border-width: 0 2px 2px 0; transform: translateY(-25%) rotate(45deg); }
+.events-sort[open] summary::after { transform: translateY(25%) rotate(225deg); }
+.events-sort-options { position: absolute; top: calc(100% + .3rem); right: 0; z-index: 10; width: 100%; padding: .25rem; border: 1px solid #cfdcd7; border-radius: .75rem; background: #fff; box-shadow: 0 .4rem 1rem #17231f20; }
+.events-sort-options button { width: 100%; padding: .5rem .45rem; border: 0; border-radius: .45rem; background: transparent; color: #17231f; font: inherit; font-size: .875rem; text-align: left; cursor: pointer; }
+.events-sort-options button:hover, .events-sort-options button[aria-pressed="true"] { background: #e9f5ef; color: #176f59; }
+.events-sort-options button[aria-pressed="true"] { font-weight: 680; }
+.events-sort :is(summary, button):focus-visible { outline: 2px solid #176f59; outline-offset: -2px; }
 .events-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: .55rem; }
 .event-preview { min-width: 0; padding: .75rem 1rem; background: #fff; border: 1px solid #d4e1da; border-radius: 14px; }
 .event-preview-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .65rem; }

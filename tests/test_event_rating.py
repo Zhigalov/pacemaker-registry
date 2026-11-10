@@ -178,7 +178,7 @@ async def test_events_list_links_to_settings_and_participants(monkeypatch):
         RegistryEvent(2, "Второе", "sub_minute", result_count=3, team_rating=0.0, participant_count=3),
         RegistryEvent(3, "Третье", splits_enabled=False),
     )
-    monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events)
+    monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events[::-1])
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/events")
         assert response.status_code == 200
@@ -194,7 +194,8 @@ async def test_events_list_links_to_settings_and_participants(monkeypatch):
         assert '<span>· 12 рез.</span>' in response.text
         assert '<span><strong>8,8</strong> / 10</span>' in response.text
         assert '<span><strong>0,0</strong> / 10</span>' in response.text
-        assert '<select id="event-sort"' in response.text
+        assert 'data-sort-key="rating" aria-pressed="true"' in response.text
+        assert response.text.index('href="/events/1"') < response.text.index('href="/events/2"') < response.text.index('href="/events/3"')
         for rating in (8.75, 0.0):
             assert f'class="event-preview-tile event-preview-rating" style="{rating_color_style(rating)}"' in response.text
         assert 'Балл команды' not in response.text

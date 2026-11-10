@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Соревнования — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-sort">
-    <script src="/static/events.js?v=2" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=event-sort-menu">
+    <script src="/static/events.js?v=3" defer></script>
   </head>
   <body>
     <main class="app-shell event-shell">
@@ -18,12 +18,14 @@
         <div class="events-controls" data-events-controls hidden>
           <label class="visually-hidden" for="event-search">Поиск соревнований</label>
           <input id="event-search" type="search" placeholder="Поиск" autocomplete="off" aria-controls="events-list">
-          <label class="visually-hidden" for="event-sort">Сортировка соревнований</label>
-          <select id="event-sort" aria-controls="events-list">
-            <option value="name">По названию</option>
-            <option value="participants">По числу участников</option>
-            <option value="rating">По баллу</option>
-          </select>
+          <details class="events-sort" data-events-sort>
+            <summary aria-controls="events-list"><span class="visually-hidden">Сортировка: </span><span data-sort-label>По баллу</span></summary>
+            <div class="events-sort-options" role="group" aria-label="Порядок сортировки">
+              <button type="button" data-sort-key="rating" aria-pressed="true">По баллу</button>
+              <button type="button" data-sort-key="name" aria-pressed="false">По названию</button>
+              <button type="button" data-sort-key="participants" aria-pressed="false">По числу участников</button>
+            </div>
+          </details>
           <p class="visually-hidden" data-events-status role="status"></p>
         </div>
         {% endif %}

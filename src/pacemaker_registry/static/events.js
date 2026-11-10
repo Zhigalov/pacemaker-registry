@@ -2,7 +2,10 @@
   const controls = document.querySelector('[data-events-controls]');
   if (!controls) return;
   const input = controls.querySelector('input');
-  const sort = controls.querySelector('select');
+  const sort = controls.querySelector('[data-events-sort]');
+  const summary = sort.querySelector('summary');
+  const sortLabel = sort.querySelector('[data-sort-label]');
+  const options = Array.from(sort.querySelectorAll('[data-sort-key]'));
   const status = controls.querySelector('[data-events-status]');
   const list = document.querySelector('#events-list');
   const empty = document.querySelector('[data-events-empty]');
@@ -16,7 +19,7 @@
   }));
 
   function sortEvents() {
-    const key = sort.value;
+    const key = options.find(option => option.getAttribute('aria-pressed') === 'true').dataset.sortKey;
     rows.sort((a, b) => (key === 'name' ? 0 : b[key] - a[key]) || collator.compare(a.name, b.name));
     list.append(...rows.map(({ row }) => row));
   }
@@ -34,7 +37,28 @@
 
   controls.hidden = false;
   input.addEventListener('input', filterEvents);
-  sort.addEventListener('change', sortEvents);
+  for (const option of options) {
+    option.addEventListener('click', () => {
+      for (const other of options) other.setAttribute('aria-pressed', String(other === option));
+      sortLabel.textContent = option.textContent;
+      sortEvents();
+      sort.open = false;
+      summary.focus();
+    });
+  }
+  sort.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && sort.open) {
+      event.preventDefault();
+      sort.open = false;
+      summary.focus();
+    }
+  });
+  sort.addEventListener('focusout', event => {
+    if (event.relatedTarget && !sort.contains(event.relatedTarget)) sort.open = false;
+  });
+  document.addEventListener('click', event => {
+    if (!sort.contains(event.target)) sort.open = false;
+  });
   window.addEventListener('pageshow', () => {
     sortEvents();
     filterEvents();
