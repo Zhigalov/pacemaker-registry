@@ -1,5 +1,6 @@
 import os
-from dataclasses import asdict
+from collections import defaultdict
+from dataclasses import asdict, replace
 from decimal import Decimal
 from typing import Any
 
@@ -449,15 +450,30 @@ def get_event(event_id: int) -> RegistryEvent | None:
 
 def list_events() -> tuple[RegistryEvent, ...]:
     with connect_database() as connection:
-        rows = connection.execute(
-            """SELECT e.id, e.name, e.target_time_type, e.splits_enabled,
-                      (SELECT count(*) FROM race_results AS r WHERE r.event_id = e.id)
+        connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+        event_rows = connection.execute(
+            """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config, e.splits_enabled
                FROM events AS e
                ORDER BY lower(e.name), e.id"""
         ).fetchall()
+        result_rows = connection.execute(
+            """SELECT r.id, r.event_id, r.distance_km, r.target_time, r.chip_time,
+                      CASE WHEN e.splits_enabled THEN r.checkpoints ELSE '[]'::jsonb END
+               FROM race_results AS r
+               JOIN events AS e ON e.id = r.event_id"""
+        ).fetchall()
+
+    events = {row[0]: _event_from_row(row) for row in event_rows}
+    ratings: dict[int, list[float]] = defaultdict(list)
+    for result_id, event_id, distance, target, chip, checkpoints in result_rows:
+        result = _build_registry_result(
+            result_id, events[event_id], distance, target, chip, None, checkpoints, details=False,
+        )
+        ratings[event_id].append(result.rating)
     return tuple(
-        RegistryEvent(event_id, name, time_type, splits_enabled=splits_enabled, result_count=count)
-        for event_id, name, time_type, splits_enabled, count in rows
+        replace(event, result_count=len(scores), team_rating=sum(scores) / len(scores))
+        if (scores := ratings.get(event.id)) else event
+        for event in events.values()
     )
 
 

@@ -94,6 +94,30 @@ def test_duplicates_names_event_type_and_json_round_trip(database):
     assert sorted(e.result_count for e in db.list_events()) == [1, 2]
 
 
+def test_event_team_rating_uses_each_result_and_current_event_settings(database):
+    migrate.migrate()
+    assert db.save_race_result(sample(chip_time='00:50:00'), '00:50')
+    assert db.save_race_result(sample(
+        athlete_name='Second Runner', chip_time='00:50:00',
+        checkpoints=(Checkpoint('10', '10', '50:00', '06:00'),),
+    ), '00:50')
+    assert db.save_race_result(sample(source_event_id='other-event', chip_time='00:50:00'), '00:50')
+
+    events = {event.id: event for event in db.list_events()}
+    team = next(event for event in events.values() if event.result_count == 2)
+    other = next(event for event in events.values() if event.result_count == 1)
+    results = [result for pacemaker in db.load_registry(event_id=team.id).pacemakers
+               for result in pacemaker.results]
+    assert results[0].rating != results[1].rating
+    assert team.team_rating == pytest.approx(sum(result.rating for result in results) / 2)
+    assert other.team_rating == pytest.approx(10)
+
+    assert db.save_event_pace_rating(team.id, None, splits_enabled=False)
+    updated = {event.id: event for event in db.list_events()}
+    assert updated[team.id].team_rating == pytest.approx(10)
+    assert updated[other.id].team_rating == other.team_rating
+
+
 def test_edit_conflict_and_filter_history(database):
     migrate.migrate()
     assert db.save_race_result(sample(), '00:50')

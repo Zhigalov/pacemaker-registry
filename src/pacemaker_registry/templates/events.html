@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Соревнования — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-directory-summary">
+    <link rel="stylesheet" href="/static/styles.css?v=event-team-rating">
     <script src="/static/events.js?v=1" defer></script>
   </head>
   <body>
@@ -27,7 +27,14 @@
           <article class="event-preview" data-event-row>
             <header class="event-preview-heading">
               <div>
-                <h2><a href="/events/{{ event.id }}" data-event-name>{{ event.name }}</a></h2>
+                <div class="event-preview-title">
+                  <h2><a href="/events/{{ event.id }}" data-event-name>{{ event.name }}</a></h2>
+                  {% if event.team_rating is not none %}
+                  <span class="event-preview-rating" title="Средний итоговый балл по внесённым выступлениям">
+                    Балл команды <strong>{{ '%.1f'|format(event.team_rating)|replace('.', ',') }}</strong> / 10
+                  </span>
+                  {% endif %}
+                </div>
                 <p class="event-note event-preview-meta">
                   {% if event.target_time_type == 'sub_minute' %}<span>Саб-минута</span>{% elif event.target_time_type == 'round' %}<span>Ровное время</span>{% endif %}
                   <span>{% if event.splits_enabled %}Отсечки учитываются{% else %}Отсечки отключены{% endif %}</span>
