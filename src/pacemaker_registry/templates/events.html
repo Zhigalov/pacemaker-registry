@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Соревнования — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-tiles">
-    <script src="/static/events.js?v=1" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=event-sort">
+    <script src="/static/events.js?v=2" defer></script>
   </head>
   <body>
     <main class="app-shell event-shell">
@@ -15,16 +15,23 @@
       <section class="event-heading event-directory-heading">
         <h1>Соревнования</h1>
         {% if events %}
-        <div class="events-search" data-events-search hidden>
+        <div class="events-controls" data-events-controls hidden>
           <label class="visually-hidden" for="event-search">Поиск соревнований</label>
           <input id="event-search" type="search" placeholder="Поиск" autocomplete="off" aria-controls="events-list">
+          <label class="visually-hidden" for="event-sort">Сортировка соревнований</label>
+          <select id="event-sort" aria-controls="events-list">
+            <option value="name">По названию</option>
+            <option value="participants">По числу участников</option>
+            <option value="rating">По баллу</option>
+          </select>
           <p class="visually-hidden" data-events-status role="status"></p>
         </div>
         {% endif %}
       </section>
       <div class="events-list" id="events-list">
         {% for event in events %}
-          <article class="event-preview" data-event-row>
+          {% set rating = '%.1f'|format(event.team_rating) if event.team_rating is not none else '' %}
+          <article class="event-preview" data-event-row data-participants="{{ event.participant_count }}" data-team-rating="{{ rating }}">
             <header class="event-preview-heading">
               <div>
                 <h2><a href="/events/{{ event.id }}" data-event-name>{{ event.name }}</a></h2>
@@ -36,8 +43,11 @@
               <div class="event-preview-tiles">
                 {% if event.result_count %}
                 <a class="event-preview-tile event-preview-count" href="/?event_id={{ event.id }}"
-                   aria-label="Участники. Результатов: {{ event.result_count }}" title="Результатов: {{ event.result_count }}">
-                  <span>Участники</span><strong>{{ event.result_count }}</strong><span aria-hidden="true">→</span>
+                   aria-label="Участники: {{ event.participant_count }}. Результатов: {{ event.result_count }}"
+                   title="Результатов: {{ event.result_count }}">
+                  <span>Участники</span><strong>{{ event.participant_count }}</strong>
+                  {% if event.participant_count != event.result_count %}<span>· {{ event.result_count }} рез.</span>{% endif %}
+                  <span aria-hidden="true">→</span>
                 </a>
                 {% else %}
                 <span class="event-preview-tile event-preview-count">Результатов: 0</span>
@@ -45,7 +55,7 @@
                 {% if event.team_rating is not none %}
                 <span class="event-preview-tile event-preview-rating" style="{{ event.team_rating | rating_color }}"
                       title="Средний итоговый балл по внесённым выступлениям">
-                  <span>Балл команды</span><span><strong>{{ '%.1f'|format(event.team_rating)|replace('.', ',') }}</strong> / 10</span>
+                  <span class="visually-hidden">Средний балл команды </span><span><strong>{{ rating|replace('.', ',') }}</strong> / 10</span>
                 </span>
                 {% endif %}
               </div>

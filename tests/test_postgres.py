@@ -101,15 +101,18 @@ def test_event_team_rating_uses_each_result_and_current_event_settings(database)
         athlete_name='Second Runner', chip_time='00:50:00',
         checkpoints=(Checkpoint('10', '10', '50:00', '06:00'),),
     ), '00:50')
+    assert db.save_race_result(sample(distance_km='5', chip_time='00:25:00', checkpoints=()), '00:25')
     assert db.save_race_result(sample(source_event_id='other-event', chip_time='00:50:00'), '00:50')
 
     events = {event.id: event for event in db.list_events()}
-    team = next(event for event in events.values() if event.result_count == 2)
+    team = next(event for event in events.values() if event.result_count == 3)
     other = next(event for event in events.values() if event.result_count == 1)
     results = [result for pacemaker in db.load_registry(event_id=team.id).pacemakers
                for result in pacemaker.results]
-    assert results[0].rating != results[1].rating
-    assert team.team_rating == pytest.approx(sum(result.rating for result in results) / 2)
+    assert len({result.rating for result in results}) > 1
+    assert team.participant_count == 2
+    assert other.participant_count == 1
+    assert team.team_rating == pytest.approx(sum(result.rating for result in results) / 3)
     assert other.team_rating == pytest.approx(10)
 
     assert db.save_event_pace_rating(team.id, None, splits_enabled=False)

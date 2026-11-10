@@ -174,8 +174,8 @@ def test_editable_scores_are_continuous_and_independent():
 @pytest.mark.anyio
 async def test_events_list_links_to_settings_and_participants(monkeypatch):
     events = (
-        RegistryEvent(1, "Первое", "round", result_count=12, team_rating=8.75),
-        RegistryEvent(2, "Второе", "sub_minute", result_count=3, team_rating=0.0),
+        RegistryEvent(1, "Первое", "round", result_count=12, team_rating=8.75, participant_count=10),
+        RegistryEvent(2, "Второе", "sub_minute", result_count=3, team_rating=0.0, participant_count=3),
         RegistryEvent(3, "Третье", splits_enabled=False),
     )
     monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events)
@@ -189,11 +189,15 @@ async def test_events_list_links_to_settings_and_participants(monkeypatch):
         assert 'Результат добавлял' not in response.text
         assert 'Результатов: 12' in response.text
         assert 'Результатов: 0' in response.text
-        assert '<span>Балл команды</span><span><strong>8,8</strong> / 10</span>' in response.text
-        assert '<span>Балл команды</span><span><strong>0,0</strong> / 10</span>' in response.text
+        assert 'data-participants="10" data-team-rating="8.8"' in response.text
+        assert '<span>Участники</span><strong>10</strong>' in response.text
+        assert '<span>· 12 рез.</span>' in response.text
+        assert '<span><strong>8,8</strong> / 10</span>' in response.text
+        assert '<span><strong>0,0</strong> / 10</span>' in response.text
+        assert '<select id="event-sort"' in response.text
         for rating in (8.75, 0.0):
             assert f'class="event-preview-tile event-preview-rating" style="{rating_color_style(rating)}"' in response.text
-        assert response.text.count('Балл команды') == 2
+        assert 'Балл команды' not in response.text
         assert 'Отсечки отключены' in response.text
         assert 'placeholder="Поиск"' in response.text
         monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: ())
