@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Соревнования — Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-team-rating">
+    <link rel="stylesheet" href="/static/styles.css?v=event-tiles">
     <script src="/static/events.js?v=1" defer></script>
   </head>
   <body>
@@ -27,27 +27,28 @@
           <article class="event-preview" data-event-row>
             <header class="event-preview-heading">
               <div>
-                <div class="event-preview-title">
-                  <h2><a href="/events/{{ event.id }}" data-event-name>{{ event.name }}</a></h2>
-                  {% if event.team_rating is not none %}
-                  <span class="event-preview-rating" title="Средний итоговый балл по внесённым выступлениям">
-                    Балл команды <strong>{{ '%.1f'|format(event.team_rating)|replace('.', ',') }}</strong> / 10
-                  </span>
-                  {% endif %}
-                </div>
+                <h2><a href="/events/{{ event.id }}" data-event-name>{{ event.name }}</a></h2>
                 <p class="event-note event-preview-meta">
                   {% if event.target_time_type == 'sub_minute' %}<span>Саб-минута</span>{% elif event.target_time_type == 'round' %}<span>Ровное время</span>{% endif %}
                   <span>{% if event.splits_enabled %}Отсечки учитываются{% else %}Отсечки отключены{% endif %}</span>
                 </p>
               </div>
-              {% if event.result_count %}
-              <a class="event-preview-count" href="/?event_id={{ event.id }}">
-                <strong>Участники <span aria-hidden="true">→</span></strong>
-                <span>Результатов: {{ event.result_count }}</span>
-              </a>
-              {% else %}
-              <span class="event-preview-count">Результатов: 0</span>
-              {% endif %}
+              <div class="event-preview-tiles">
+                {% if event.result_count %}
+                <a class="event-preview-tile event-preview-count" href="/?event_id={{ event.id }}"
+                   aria-label="Участники. Результатов: {{ event.result_count }}" title="Результатов: {{ event.result_count }}">
+                  <span>Участники</span><strong>{{ event.result_count }}</strong><span aria-hidden="true">→</span>
+                </a>
+                {% else %}
+                <span class="event-preview-tile event-preview-count">Результатов: 0</span>
+                {% endif %}
+                {% if event.team_rating is not none %}
+                <span class="event-preview-tile event-preview-rating" style="{{ event.team_rating | rating_color }}"
+                      title="Средний итоговый балл по внесённым выступлениям">
+                  <span>Балл команды</span><span><strong>{{ '%.1f'|format(event.team_rating)|replace('.', ',') }}</strong> / 10</span>
+                </span>
+                {% endif %}
+              </div>
             </header>
           </article>
         {% else %}

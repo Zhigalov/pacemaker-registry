@@ -9,7 +9,7 @@ from pacemaker_registry.db import RegistryEvent, get_event, save_event_rating, l
 from pacemaker_registry.main import app
 from pacemaker_registry.rating import (
     EventRatingConfig, calculate_rating_for_difference as score,
-    default_event_rating, parse_event_rating,
+    default_event_rating, parse_event_rating, rating_color_style,
 )
 
 pytestmark = pytest.mark.usefixtures("admin_session")
@@ -189,8 +189,10 @@ async def test_events_list_links_to_settings_and_participants(monkeypatch):
         assert 'Результат добавлял' not in response.text
         assert 'Результатов: 12' in response.text
         assert 'Результатов: 0' in response.text
-        assert 'Балл команды <strong>8,8</strong> / 10' in response.text
-        assert 'Балл команды <strong>0,0</strong> / 10' in response.text
+        assert '<span>Балл команды</span><span><strong>8,8</strong> / 10</span>' in response.text
+        assert '<span>Балл команды</span><span><strong>0,0</strong> / 10</span>' in response.text
+        for rating in (8.75, 0.0):
+            assert f'class="event-preview-tile event-preview-rating" style="{rating_color_style(rating)}"' in response.text
         assert response.text.count('Балл команды') == 2
         assert 'Отсечки отключены' in response.text
         assert 'placeholder="Поиск"' in response.text
