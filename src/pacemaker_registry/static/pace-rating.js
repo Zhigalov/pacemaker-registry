@@ -100,21 +100,21 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
     },
     move(point, drag) {
       const t = round(secondsAt(point.x));
-    if (drag) {
-      const value = round(scoreAt(point.y), 1);
-      switch (drag.key) {
-        case 'tolerance': config.tolerance = clamp(t, 0, config.checkpoint - 1); break;
-        case 'checkpoint':
-          config.checkpoint = clamp(t, config.tolerance + 1, config.bad - 1);
-          config.checkpoint_score = clamp(value, config.bad_score, 10); break;
-        case 'bad':
-          config.bad = clamp(t, config.checkpoint + 1, 600);
-          config.bad_score = clamp(value, .1, config.checkpoint_score); break;
-        case 'decay':
-          config.decay = clamp(round((drag.probe - config.bad) / (-Math.log(clamp(scoreAt(point.y) / config.bad_score, .000001, .999999))) ** (1 / config.curve)), 1, 300); break;
+      if (drag) {
+        const value = round(scoreAt(point.y), 1);
+        switch (drag.key) {
+          case 'tolerance': config.tolerance = clamp(t, 0, config.checkpoint - 1); break;
+          case 'checkpoint':
+            config.checkpoint = clamp(t, config.tolerance + 1, config.bad - 1);
+            config.checkpoint_score = clamp(value, config.bad_score, 10); break;
+          case 'bad':
+            config.bad = clamp(t, config.checkpoint + 1, 600);
+            config.bad_score = clamp(value, .1, config.checkpoint_score); break;
+          case 'decay':
+            config.decay = clamp(round((drag.probe - config.bad) / (-Math.log(clamp(scoreAt(point.y) / config.bad_score, .000001, .999999))) ** (1 / config.curve)), 1, 300); break;
+        }
+        syncFields(); render(false);
       }
-      syncFields(); render(false);
-    }
       inspect(t);
     },
     end: () => render(),

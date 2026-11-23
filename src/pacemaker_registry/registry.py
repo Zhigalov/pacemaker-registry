@@ -134,9 +134,8 @@ def _rated_segments(target_seconds, distance_km, checkpoints, config):
 def calculate_combined_rating(
     finish_rating: float,
     splits_rating: float | None,
-    include_splits: bool = True,
 ) -> float:
-    if not include_splits or splits_rating is None:
+    if splits_rating is None:
         return finish_rating
     return (
         finish_rating * FINISH_RATING_WEIGHT

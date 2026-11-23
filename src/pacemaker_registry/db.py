@@ -380,7 +380,7 @@ def _split_athlete_name(full_name: str) -> tuple[str, str]:
 def _event_from_row(row: dict) -> RegistryEvent:
     return RegistryEvent(
         id=row['id'], name=row['name'], target_time_type=row['target_time_type'],
-        rating_config=parse_event_rating(row['rating_config'], allow_legacy=True) if row['rating_config'] is not None else None,
+        rating_config=parse_event_rating(row['rating_config']) if row['rating_config'] is not None else None,
         pace_rating_config=parse_pace_rating(row['pace_rating_config']) if row['pace_rating_config'] is not None else None,
         captain_account_id=row.get('captain_account_id'), splits_enabled=row['splits_enabled'],
     )

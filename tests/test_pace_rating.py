@@ -62,7 +62,7 @@ def test_weighting_coverage_and_finish_only_unchanged():
                    {"segment_distance_km": "8", "pace_per_km": "05:10 /км"}]
     assert registry.calculate_splits_rating("00:50", Decimal("10"), checkpoints, config) == pytest.approx(9.2)
     assert registry.calculate_splits_rating("00:50", Decimal("10"), checkpoints[:1], config) is None
-    assert registry.calculate_combined_rating(8, 4, False) == 8
+    assert registry.calculate_combined_rating(8, None) == 8
     assert registry.calculate_combined_rating(8, 4) == pytest.approx(6.4)
 
 

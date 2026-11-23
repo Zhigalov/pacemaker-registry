@@ -99,10 +99,8 @@ def default_event_rating(target_time_type: str | None) -> EventRatingConfig:
     return EventRatingConfig()
 
 
-def parse_event_rating(values: dict, *, allow_legacy: bool = False) -> EventRatingConfig:
+def parse_event_rating(values: dict) -> EventRatingConfig:
     keys = set(asdict(EventRatingConfig()))
-    if allow_legacy and isinstance(values, dict) and set(values) == keys - {"left_score", "right_score"}:
-        values = values | {"left_score": 8, "right_score": 8}
     if not isinstance(values, dict) or set(values) != keys:
         raise ValueError("Передайте все десять параметров формулы.")
     try:

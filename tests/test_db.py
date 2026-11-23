@@ -77,10 +77,9 @@ def test_splits_rating_requires_eighty_percent_distance_coverage() -> None:
     assert rating is None
 
 
-def test_combined_rating_can_ignore_splits() -> None:
-    assert calculate_combined_rating(9, 7, True) == pytest.approx(8.2)
-    assert calculate_combined_rating(9, 7, False) == 9
-    assert calculate_combined_rating(9, None, True) == 9
+def test_combined_rating_uses_only_available_splits() -> None:
+    assert calculate_combined_rating(9, 7) == pytest.approx(8.2)
+    assert calculate_combined_rating(9, None) == 9
 
 
 @pytest.mark.parametrize(

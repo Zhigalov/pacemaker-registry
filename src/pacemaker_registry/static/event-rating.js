@@ -127,25 +127,25 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
       return editable && handle && valid() ? {key: handle.dataset.handle, second: Number(handle.dataset.second)} : null;
     },
     move(p, drag) {
-    if (drag) {
-      const key = drag.key;
-      if (boundaries.includes(key)) {
-        const limits = {
-          left_bad: [-600, config.left_good], left_good: [config.left_bad, 0],
-          right_good: [0, config.right_bad], right_bad: [config.right_good, 600],
-        };
-        fields[key].value = Math.round(clamp(seconds(clamp(p.x, 52, 752)), ...limits[key]));
-      } else if (key.endsWith("_score")) {
-        fields[key].value = (Math.round(clamp(10 - (p.y - 26) / 23.2, 0.1, 10) * 10) / 10).toFixed(1);
-      } else {
-        const side = key.startsWith("left") ? "left" : "right";
-        const edge = config[side + "_bad"];
-        const base = edge === config[side + "_good"] ? 10 : config[side + "_score"];
-        const ratio = clamp((10 - (p.y - 26) / 23.2) / base, 0.001, 0.999);
-        fields[key].value = Math.round(clamp(Math.abs(drag.second - edge) / (-Math.log(ratio)) ** (1 / config[side + "_curve"]), 1, 300));
+      if (drag) {
+        const key = drag.key;
+        if (boundaries.includes(key)) {
+          const limits = {
+            left_bad: [-600, config.left_good], left_good: [config.left_bad, 0],
+            right_good: [0, config.right_bad], right_bad: [config.right_good, 600],
+          };
+          fields[key].value = Math.round(clamp(seconds(clamp(p.x, 52, 752)), ...limits[key]));
+        } else if (key.endsWith("_score")) {
+          fields[key].value = (Math.round(clamp(10 - (p.y - 26) / 23.2, 0.1, 10) * 10) / 10).toFixed(1);
+        } else {
+          const side = key.startsWith("left") ? "left" : "right";
+          const edge = config[side + "_bad"];
+          const base = edge === config[side + "_good"] ? 10 : config[side + "_score"];
+          const ratio = clamp((10 - (p.y - 26) / 23.2) / base, 0.001, 0.999);
+          fields[key].value = Math.round(clamp(Math.abs(drag.second - edge) / (-Math.log(ratio)) ** (1 / config[side + "_curve"]), 1, 300));
+        }
+        changed(false);
       }
-      changed(false);
-    }
     show(seconds(p.x));
     },
     end: () => render(),

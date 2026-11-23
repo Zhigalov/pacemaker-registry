@@ -124,10 +124,9 @@ async def test_save_failure_keeps_edits(monkeypatch):
     assert "Не удалось сохранить" in response.text
 
 
-def test_legacy_configs_keep_eight_points_only_when_loading_database():
+def test_incomplete_config_is_rejected():
     legacy = asdict(default_event_rating("sub_minute"))
     del legacy["left_score"], legacy["right_score"]
-    assert parse_event_rating(legacy, allow_legacy=True) == default_event_rating("sub_minute")
     with pytest.raises(ValueError):
         parse_event_rating(legacy)
 
