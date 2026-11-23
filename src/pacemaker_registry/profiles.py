@@ -1,6 +1,7 @@
 """Profile values and contact links; imported names are never edited here."""
 import re
 from datetime import date
+from dataclasses import dataclass
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
@@ -241,3 +242,45 @@ def normalize_strava(value: str) -> str:
                     r'/athletes/[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}/?', parsed.path):
                 return CONTACT_PREFIXES['strava'] + parsed.path.strip('/').removeprefix('athletes/')
     raise ValueError('Strava: укажите ID, ник или ссылку из «Поделиться профилем» (strava.app.link или strava.com/athletes/…).')
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileEdit:
+    """Validated profile fields; uploaded files and imported names stay separate."""
+    profile_version: int
+    about: str
+    contacts: list[dict]
+    achievements: list[str]
+    login: str | None = None
+    city: str = ''
+    club: str = ''
+    personal_records: dict | None = None
+
+    @classmethod
+    def validate(cls, values, profile, *, is_admin):
+        clean = normalize_profile_details(values)
+        clean['profile_version'] = int(values['profile_version'])
+        clean['contacts'] = normalize_contacts(values['contacts'])
+        if is_admin:
+            if any(code not in ACHIEVEMENTS for code in clean['achievements']):
+                raise ValueError('Неизвестное достижение. Обновите форму.')
+            clean['achievements'] += [code for code in profile.achievements if code not in ACHIEVEMENTS]
+        return cls(**clean)
+
+
+def read_profile_form(form, profile, *, is_admin):
+    """Keep original input for error responses, before normalization."""
+    types, labels, contacts = (form.getlist(name) for name in ('contact_type', 'contact_label', 'contact_value'))
+    values = {name: str(form.get(name, getattr(profile, name) or '')).strip()
+              for name in ('login', 'city', 'club')}
+    values.update(
+        about=str(form.get('about', form.get('motto', ''))).strip(),
+        personal_records={d: {k: str(form.get(f'record_{d}_{k}', '')).strip()
+                              for k in ('time', 'year', 'url')} for d in RECORD_DISTANCES},
+        contacts=[{'type': str(kind), 'label': str(label), 'value': str(value)}
+                  for kind, label, value in zip(types, labels, contacts)],
+        achievements=(list(dict.fromkeys(str(c) for c in form.getlist('achievements')))
+                      if is_admin else list(profile.achievements)),
+        profile_version=str(form.get('profile_version', '')),
+    )
+    return values, len(types) == len(labels) == len(contacts)

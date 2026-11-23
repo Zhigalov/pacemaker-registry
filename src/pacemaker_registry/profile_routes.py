@@ -10,7 +10,7 @@ from starlette.datastructures import UploadFile
 from pacemaker_registry import auth, avatars, db
 from pacemaker_registry.profiles import (
     ACHIEVEMENTS, CONTACT_TYPES, RECORD_DISTANCES, contact_view,
-    normalize_contacts, normalize_profile_details, profile_form_values,
+    ProfileEdit, read_profile_form, profile_form_values,
 )
 
 
@@ -31,9 +31,10 @@ def _save(profile, values, photo, remove_photo):
         if photo:
             new_key = avatars.upload_avatar(profile.id, photo)
             key = new_key
-        updated = db.save_pacemaker_profile(profile.id, values['profile_version'], values['about'],
-                                            values['contacts'], values['achievements'], key,
-                                            **{k: values.get(k, '' if k in ('city', 'club') else None) for k in ('login', 'city', 'club', 'personal_records')})
+        updated = db.save_pacemaker_profile(
+            profile.id, values.profile_version, values.about, values.contacts, values.achievements, key,
+            login=values.login, city=values.city, club=values.club, personal_records=values.personal_records,
+        )
     except Exception:
         if new_key:
             avatars.delete_avatar(new_key)
@@ -102,31 +103,15 @@ def create_profile_router(templates):
             raise HTTPException(400, 'Некорректный размер запроса.') from None
         profile = await run_in_threadpool(_load, pacemaker_id, with_results=False)
         async with request.form(max_files=1, max_fields=160, max_part_size=64_000) as form:
-            types, labels, contacts = (form.getlist(name) for name in ('contact_type', 'contact_label', 'contact_value'))
-            values = {'about': str(form.get('about', form.get('motto', ''))).strip(),
-                      'login': str(form.get('login', profile.login or '')).strip(),
-                      'city': str(form.get('city', profile.city or '')).strip(),
-                      'club': str(form.get('club', profile.club or '')).strip(),
-                      'personal_records': {d: {k: str(form.get(f'record_{d}_{k}', '')).strip()
-                                              for k in ('time', 'year', 'url')} for d in RECORD_DISTANCES},
-                      'contacts': [{'type': str(kind), 'label': str(label), 'value': str(value)}
-                                   for kind, label, value in zip(types, labels, contacts)],
-                      'achievements': (list(dict.fromkeys(str(c) for c in form.getlist('achievements')))
-                                       if account.is_admin else list(profile.achievements)),
-                      'profile_version': str(form.get('profile_version', ''))}
+            values, complete_contacts = read_profile_form(form, profile, is_admin=account.is_admin)
             try:
-                if not len(types) == len(labels) == len(contacts):
+                if not complete_contacts:
                     raise ValueError('Некорректные поля контактов. Обновите форму.')
                 version = int(values['profile_version'])
                 if version < 0 or version != profile.version:
                     return edit_response(request, profile, values=values, status_code=409,
                         error='Профиль уже изменили. Обновите страницу перед сохранением.')
-                clean = dict(normalize_profile_details(values), profile_version=version, contacts=normalize_contacts(values['contacts']))
-                if account.is_admin and any(code not in ACHIEVEMENTS for code in values['achievements']):
-                    raise ValueError('Неизвестное достижение. Обновите форму.')
-                # Preserve achievements introduced by newer versions of the application.
-                if account.is_admin:
-                    clean['achievements'] += [c for c in profile.achievements if c not in ACHIEVEMENTS]
+                clean = ProfileEdit.validate(values, profile, is_admin=account.is_admin)
                 upload = form.get('photo')
                 photo = await upload.read(avatars.MAX_UPLOAD_BYTES + 1) if isinstance(upload, UploadFile) else b''
                 if len(photo) > avatars.MAX_UPLOAD_BYTES:
@@ -149,6 +134,6 @@ def create_profile_router(templates):
         if not updated:
             return edit_response(request, profile, values=values, status_code=409,
                 error='Профиль уже изменили. Обновите страницу перед сохранением.')
-        return RedirectResponse((f'/p/{clean["login"]}' if clean['login'] else f'/pacemakers/{pacemaker_id}') + '?saved=true', status_code=303)
+        return RedirectResponse((f'/p/{clean.login}' if clean.login else f'/pacemakers/{pacemaker_id}') + '?saved=true', status_code=303)
 
     return router

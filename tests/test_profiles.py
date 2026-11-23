@@ -235,7 +235,8 @@ def test_photo_cleanup_after_save_or_conflict(monkeypatch, success):
     monkeypatch.setattr(avatars, 'upload_avatar', lambda *a: order.append('upload') or 'new-key')
     monkeypatch.setattr(db, 'save_pacemaker_profile', lambda *a, **k: order.append('save') or success)
     monkeypatch.setattr(avatars, 'delete_avatar', lambda key: order.append('delete:' + key))
-    values = dict(profile_version=0, about='', contacts=[], achievements=[])
+    from pacemaker_registry.profiles import ProfileEdit
+    values = ProfileEdit(profile_version=0, about='', contacts=[], achievements=[])
     assert _save(profile(avatar_key='old-key'), values, b'photo', False) == success
     assert order == ['upload', 'save', 'delete:old-key' if success else 'delete:new-key']
 
@@ -247,8 +248,9 @@ def test_failed_database_save_removes_new_upload_only(monkeypatch):
     def fail(*args, **kwargs):
         raise RuntimeError('Database unavailable')
     monkeypatch.setattr(db, 'save_pacemaker_profile', fail)
+    from pacemaker_registry.profiles import ProfileEdit
     with pytest.raises(RuntimeError):
-        _save(profile(avatar_key='old-key'), dict(profile_version=0, about='', contacts=[], achievements=[]), b'image', False)
+        _save(profile(avatar_key='old-key'), ProfileEdit(profile_version=0, about='', contacts=[], achievements=[]), b'image', False)
     delete.assert_called_once_with('new-key')
 
 
