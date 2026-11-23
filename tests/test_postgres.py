@@ -583,3 +583,22 @@ def test_shared_scores_pagination_and_alternative_aggregate(database, monkeypatc
     empty = db.load_registry(min_events=3, page=100)
     assert empty.pacemaker_count == empty.result_count == 0
     assert empty.page == empty.page_count == 1 and calls == []
+
+
+def test_formula_edits_are_scoped_and_preserve_other_settings(database):
+    migrate.migrate()
+    assert db.save_race_result(sample(source_event_id='first'), '00:49')
+    assert db.save_race_result(sample(source_event_id='second'), '00:50')
+    first, second = db.list_events()
+    untouched = db.get_event(second.id)
+    finish = EventRatingConfig(left_bad=-90, right_score=6)
+    pace = PaceRatingConfig(tolerance=8, bad=45)
+    assert db.save_event_rating(first.id, finish)
+    assert db.save_event_pace_rating(first.id, pace, splits_enabled=False)
+    edited = db.get_event(first.id)
+    assert edited.formula == finish and edited.pace_formula == pace
+    assert not edited.splits_enabled
+    assert db.get_event(second.id) == untouched
+    assert not db.save_event_rating(999999, finish)
+    assert not db.save_event_pace_rating(999999, pace)
+    assert db.get_event(999999) is None

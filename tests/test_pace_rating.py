@@ -119,32 +119,3 @@ async def test_db_error_keeps_pace_edits_and_deleted_event_404(monkeypatch):
         assert 'value="55"' in page.text
         monkeypatch.setattr(main, "save_event_pace_rating", lambda *_, **kwargs: False)
         assert (await client.post("/events/1/pace-rating", data=values)).status_code == 404
-
-
-def test_database_roundtrip_only_updates_pace_and_scopes_event_id(monkeypatch):
-    calls = []
-    stored = None
-    finish = asdict(EventRatingConfig(left_bad=-90))
-    class Connection:
-        def __enter__(self): return self
-        def __exit__(self, *_): pass
-        def cursor(self, **kwargs): return self
-        def fetchall(self): return [self.fetchone()]
-        def execute(self, query, parameters):
-            nonlocal stored
-            calls.append((query, parameters))
-            if query.startswith("UPDATE"):
-                stored = parameters[0].obj
-                self.row = (7,)
-            else:
-                self.row = dict(id=7, name="Тест", target_time_type="round", rating_config=finish, pace_rating_config=stored, splits_enabled=True, captain_account_id=None)
-            return self
-        def fetchone(self): return self.row
-    monkeypatch.setattr(db, "connect_database", Connection)
-    config = PaceRatingConfig(tolerance=8, bad=45)
-    assert db.save_event_pace_rating(7, config)
-    event = db.get_event(7)
-    assert event.pace_formula == config
-    assert asdict(event.formula) == finish
-    assert "WHERE id = %s RETURNING id" in calls[0][0]
-    assert calls[0][1][-1] == 7

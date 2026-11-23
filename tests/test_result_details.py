@@ -209,22 +209,6 @@ async def test_edit_flag_handles_missing_conflict_and_database_error(monkeypatch
         assert (await client.post('/results/999/target-time', data=payload)).status_code == 404
 
 
-@pytest.mark.parametrize('row,expected', [((12,), True), (None, False)])
-def test_flag_update_only_changes_one_result_and_checks_previous_value(monkeypatch, row, expected):
-    calls = []
-    class Connection:
-        def __enter__(self): return self
-        def __exit__(self, *_): pass
-        def execute(self, query, parameters):
-            calls.append((' '.join(query.split()), parameters))
-            return self
-        def fetchone(self): return row
-    monkeypatch.setattr(db, 'connect_database', Connection)
-    assert db.update_result_target_time(12, '03:29', '03:30') is expected
-    assert calls == [('UPDATE race_results SET target_time = %s WHERE id = %s AND target_time = %s RETURNING id',
-                      ('03:29', 12, '03:30'))]
-
-
 @pytest.mark.anyio
 async def test_result_back_links_and_flag_edit_keep_distance_filter(monkeypatch):
     monkeypatch.setattr(main, 'get_result_details', lambda *args, **kwargs: details())

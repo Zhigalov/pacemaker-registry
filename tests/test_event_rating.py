@@ -4,7 +4,7 @@ from math import exp
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pacemaker_registry.db import RegistryEvent, get_event, save_event_rating
+from pacemaker_registry.db import RegistryEvent
 from pacemaker_registry.main import app
 from pacemaker_registry.rating import (
     EventRatingConfig, calculate_rating_for_difference as score,
@@ -122,31 +122,6 @@ async def test_save_failure_keeps_edits(monkeypatch):
     assert response.status_code == 503
     assert 'value="-80"' in response.text
     assert "Не удалось сохранить" in response.text
-
-
-def test_database_roundtrip_uses_event_id_and_json(monkeypatch):
-    calls = []
-    stored = None
-    class Connection:
-        def __enter__(self): return self
-        def __exit__(self, *_): pass
-        def cursor(self, **kwargs): return self
-        def fetchall(self): return [self.fetchone()]
-        def execute(self, query, parameters):
-            nonlocal stored
-            calls.append((query, parameters))
-            if query.startswith("UPDATE"):
-                stored = parameters[0].obj
-                self.result = (7,)
-            else:
-                self.result = dict(id=7, name="Марафон", target_time_type="round", rating_config=stored, pace_rating_config=None, splits_enabled=True, captain_account_id=None)
-            return self
-        def fetchone(self): return self.result
-    monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)
-    config = EventRatingConfig(right_bad=25, right_curve=1.5)
-    assert save_event_rating(7, config)
-    assert get_event(7).formula == config
-    assert calls[0][1][1] == 7
 
 
 def test_legacy_configs_keep_eight_points_only_when_loading_database():
