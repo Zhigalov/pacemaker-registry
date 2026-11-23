@@ -14,7 +14,7 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
   const clamp = window.ratingChart.clamp;
   const round = (v, digits = 0) => Number(v.toFixed(digits));
   const format = v => v.toLocaleString('ru-RU', {maximumFractionDigits: 1});
-  let config = {...defaults}, extent = 60, drag = null, inspected = 0;
+  let config = {...defaults}, extent = 60, inspected = 0;
   const x = seconds => 52 + seconds / extent * 700;
   const y = window.ratingChart.y;
   const secondsAt = position => clamp((position - 52) / 700 * extent, 0, extent);
@@ -53,28 +53,18 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
 
   function inspect(seconds) {
     inspected = clamp(seconds, 0, extent);
-    const value = score(inspected), hover = chart.querySelector('[data-hover]');
-    hover.removeAttribute('hidden');
-    hover.querySelector('line').setAttribute('x1', x(inspected));
-    hover.querySelector('line').setAttribute('x2', x(inspected));
-    hover.querySelector('circle').setAttribute('cx', x(inspected));
-    hover.querySelector('circle').setAttribute('cy', y(value));
+    const value = score(inspected);
+    window.ratingChart.hover(chart, x(inspected), value);
     readout.textContent = `Отклонение ±${format(inspected)} с/км → ${value.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} балла`;
   }
 
   function render(rescale = true) {
     if (rescale) extent = Math.max(60, config.bad + 2 * config.decay,
       ...observations.map(point => Math.abs(point.deviation) * 1.1));
-    const zones = chart.querySelector('[data-zones]'), grid = chart.querySelector('[data-grid]');
-    const curves = chart.querySelector('[data-curves]'), handles = chart.querySelector('[data-handles]');
-    [zones, grid, curves, handles].forEach(group => group.replaceChildren());
+    const [zones, grid, curves, handles] = window.ratingChart.grid(chart);
     [[0, config.tolerance, '#e9f5ef'], [config.tolerance, config.bad, '#fff7e2'], [config.bad, extent, '#fbefec']].forEach(([from, to, fill]) => {
       element('rect', {x: x(from), y: 26, width: x(to) - x(from), height: 232, fill}, zones);
     });
-    for (let value = 0; value <= 10; value += 2) {
-      element('line', {x1: 52, x2: 752, y1: y(value), y2: y(value)}, grid);
-      element('text', {x: 36, y: y(value) + 4, 'text-anchor': 'end'}, grid, value);
-    }
     const step = Math.max(5, Math.ceil(extent / (chart.clientWidth < 600 ? 4 : 8) / 5) * 5);
     for (let t = 0; t <= extent; t += step) {
       element('text', {x: x(t), y: 305, 'text-anchor': 'middle'}, grid, t ? `±${format(t)}` : '0');
@@ -98,23 +88,18 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
       const handle = element('circle', {cx: x(config[key]), cy: y(value), r: 8, fill, class: 'event-handle', 'data-pace-handle': key}, handles);
       element('title', {}, handle, `${format(config[key])} с/км: ${format(value)} баллов`);
     });
-    const probe = drag?.key === 'decay' ? drag.probe : config.bad + config.decay;
+    const probe = interaction.drag?.key === 'decay' ? interaction.drag.probe : config.bad + config.decay;
     element('rect', {x: x(probe) - 7, y: y(score(probe)) - 7, width: 14, height: 14, rx: 2, fill: '#bc4c43', class: 'event-handle', 'data-pace-handle': 'decay'}, handles);
     if (!chart.querySelector('[data-hover]').hasAttribute('hidden')) inspect(inspected);
   }
 
-  const position = event => window.ratingChart.position(chart, event);
-  chart.addEventListener('pointerdown', event => {
-    if (!editable) return;
-    const key = event.target.dataset.paceHandle;
-    if (!key || !readFields()) return;
-    drag = {key, probe: config.bad + config.decay};
-    chart.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  });
-  chart.addEventListener('pointermove', event => {
-    if (event.target.closest('[data-result-marker]')) return;
-    const point = position(event), t = round(secondsAt(point.x));
+  const interaction = window.ratingChart.interact(chart, {
+    start(event) {
+      const key = event.target.dataset.paceHandle;
+      return editable && key && readFields() ? {key, probe: config.bad + config.decay} : null;
+    },
+    move(point, drag) {
+      const t = round(secondsAt(point.x));
     if (drag) {
       const value = round(scoreAt(point.y), 1);
       switch (drag.key) {
@@ -130,20 +115,14 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
       }
       syncFields(); render(false);
     }
-    inspect(t);
-  });
-  function release() { if (drag) { drag = null; render(); } }
-  chart.addEventListener('pointerup', release);
-  chart.addEventListener('pointercancel', release);
-  chart.addEventListener('lostpointercapture', release);
-  chart.addEventListener('pointerleave', () => { if (!drag) chart.querySelector('[data-hover]').setAttribute('hidden', ''); });
-  chart.addEventListener('keydown', event => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    inspect(event.key === 'Home' ? 0 : event.key === 'End' ? extent : inspected + (event.key === 'ArrowLeft' ? -1 : 1));
+      inspect(t);
+    },
+    end: () => render(),
+    keys: ['ArrowLeft', 'ArrowRight', 'Home', 'End'],
+    step: key => inspect(key === 'Home' ? 0 : key === 'End' ? extent : inspected + (key === 'ArrowLeft' ? -1 : 1)),
   });
   readFields(); render();
-  window.ratingChart.observe(chart, () => { if (!drag) render(); });
+  window.ratingChart.observe(chart, () => { if (!interaction.drag) render(); });
   if (!editable) return;
   function syncToggle() {
     settings.disabled = !toggle.checked;

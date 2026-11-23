@@ -10,7 +10,6 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
   const boundaries = ["left_bad", "left_good", "right_good", "right_bad"];
   const colors = ["#bc4c43", "#b98216", "#176f59", "#b98216", "#bc4c43"];
   let config = defaults;
-  let drag = null;
   let selectedSecond = 0;
   let extent = 180;
   const clamp = window.ratingChart.clamp;
@@ -49,11 +48,7 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
         config.right_bad + config.right_decay * 2,
         ...observations.map(point => Math.abs(point.deviation) * 1.1));
     }
-    const zones = svg.querySelector("[data-zones]");
-    const grid = svg.querySelector("[data-grid]");
-    const curves = svg.querySelector("[data-curves]");
-    const handles = svg.querySelector("[data-handles]");
-    [zones, grid, curves, handles].forEach(node => node.replaceChildren());
+    const [zones, grid, curves, handles] = window.ratingChart.grid(svg);
     const stops = [-extent, ...boundaries.map(key => config[key]), extent];
     for (let i = 0; i < 5; i++) {
       zones.append(element("rect", {x: x(stops[i]), y: 26, width: Math.max(0, x(stops[i + 1]) - x(stops[i])), height: 232, fill: colors[i], opacity: 0.09}));
@@ -66,10 +61,6 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
       }
       if (stops[i] !== stops[i + 1]) curves.append(element("polyline", {points: points.join(" "), fill: "none", stroke: colors[i], "stroke-width": 3}));
     }
-    [0, 2, 4, 6, 8, 10].forEach(score => {
-      grid.append(element("line", {x1: 52, x2: 752, y1: y(score), y2: y(score)}));
-      grid.append(element("text", {x: 36, y: y(score) + 4, "text-anchor": "end"}, score));
-    });
     const compact = svg.getBoundingClientRect().width < 600;
     const tickStep = compact ? Math.ceil(extent / 3 / 15) * 15
       : extent <= 150 ? 15 : Math.ceil(extent / 6 / 15) * 15;
@@ -98,7 +89,7 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
         scoreHandle.append(element("title", {}, "Баллы на границе: " + config[side + "_score"]));
         handles.append(scoreHandle);
       }
-      const t = drag?.key === side + "_decay" ? drag.second
+      const t = interaction.drag?.key === side + "_decay" ? interaction.drag.second
         : config[side + "_bad"] + (side === "left" ? -1 : 1) * config[side + "_decay"];
       const handle = element("rect", {x: x(t) - 7, y: y(rating(t)) - 7, width: 14, height: 14, rx: 2, fill: colors[0], "data-handle": side + "_decay", "data-second": t, class: "event-handle"});
       handle.append(element("title", {}, "Резкость экспоненты: " + (side === "left" ? "раньше цели" : "позже цели")));
@@ -123,30 +114,19 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
     changed();
   });
   }
-  const position = event => window.ratingChart.position(svg, event);
   function show(t) {
     if (!valid()) return;
     selectedSecond = Math.round(clamp(t, -extent, extent));
     const score = rating(selectedSecond);
     readout.textContent = format(selectedSecond) + " · " + score.toFixed(2).replace(".", ",") + " балла";
-    const hover = svg.querySelector("[data-hover]");
-    hover.removeAttribute("hidden");
-    const px = x(selectedSecond);
-    hover.querySelector("line").setAttribute("x1", px);
-    hover.querySelector("line").setAttribute("x2", px);
-    hover.querySelector("circle").setAttribute("cx", px);
-    hover.querySelector("circle").setAttribute("cy", y(score));
+    window.ratingChart.hover(svg, x(selectedSecond), score);
   }
-  svg.addEventListener("pointerdown", event => {
-    const handle = event.target.closest("[data-handle]");
-    if (!editable || !handle || !valid()) return;
-    event.preventDefault();
-    drag = {key: handle.dataset.handle, second: Number(handle.dataset.second)};
-    svg.setPointerCapture(event.pointerId);
-  });
-  svg.addEventListener("pointermove", event => {
-    if (event.target.closest('[data-result-marker]')) return;
-    const p = position(event);
+  const interaction = window.ratingChart.interact(svg, {
+    start(event) {
+      const handle = event.target.closest('[data-handle]');
+      return editable && handle && valid() ? {key: handle.dataset.handle, second: Number(handle.dataset.second)} : null;
+    },
+    move(p, drag) {
     if (drag) {
       const key = drag.key;
       if (boundaries.includes(key)) {
@@ -167,22 +147,10 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
       changed(false);
     }
     show(seconds(p.x));
-  });
-  const finishDrag = () => {
-    if (!drag) return;
-    drag = null;
-    render();
-  };
-  svg.addEventListener("pointerup", finishDrag);
-  svg.addEventListener("pointercancel", finishDrag);
-  svg.addEventListener("lostpointercapture", finishDrag);
-  svg.addEventListener("keydown", event => {
-    if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
-      event.preventDefault(); show(selectedSecond + (event.key === "ArrowRight" ? 1 : -1));
-    }
-  });
-  svg.addEventListener("pointerleave", () => {
-    if (!drag) svg.querySelector("[data-hover]").setAttribute("hidden", "");
+    },
+    end: () => render(),
+    keys: ['ArrowLeft', 'ArrowRight'],
+    step: key => show(selectedSecond + (key === 'ArrowRight' ? 1 : -1)),
   });
   if (editable) {
   form.addEventListener("submit", event => {
@@ -195,5 +163,5 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
   });
   }
   render();
-  window.ratingChart.observe(svg, () => { if (!drag) render(); });
+  window.ratingChart.observe(svg, () => { if (!interaction.drag) render(); });
 });
