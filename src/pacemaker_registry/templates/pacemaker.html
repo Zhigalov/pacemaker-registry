@@ -1,77 +1,68 @@
-<!doctype html>
+{% extends "base.html" %}
 {% from '_result_card.html' import result_card %}
 {% from '_achievement.html' import achievement_badge %}
-<html lang="ru">
-  <head>
-    {% include '_analytics.html' %}
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ profile.full_name }} — Реестр пейсмейкеров</title>
-    <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=account-spacing">
-    <link rel="stylesheet" href="/static/profiles.css?v=7">
-    <script src="/static/profile.js?v=2" defer></script>
-  </head>
-  <body>
-    <main class="app-shell profile-shell">
-      {% include '_navigation.html' %}
-      <nav class="profile-breadcrumb"><a href="/">← Рейтинг пейсмейкеров</a></nav>
-      {% if saved %}<p class="success-message" role="status">Профиль сохранён.</p>{% endif %}
-      <section class="profile-intro" aria-labelledby="profile-name">
-        <div class="profile-avatar" aria-label="Фотография пейсмейкера">
-          <span>{{ profile.initials }}</span>
-          {% if avatar_url %}<img src="{{ avatar_url }}" alt="{{ profile.full_name }}" width="128" height="128" data-avatar-image>{% endif %}
-        </div>
-        <div class="profile-identity">
-          <h1 id="profile-name">{{ profile.full_name }}</h1>
-          {% if profile.city or profile.club %}<p class="profile-location">{% if profile.city %}<span>⌖ {{ profile.city }}</span>{% endif %}{% if profile.club %}<span>◈ {{ profile.club }}</span>{% endif %}</p>{% endif %}
-          <div class="profile-identity-meta">
-          {% if profile.login %}<a class="profile-public-link" href="{{ profile.public_path }}">pacersreg.ru{{ profile.public_path }}</a>{% endif %}
+{% block title %}{{ profile.full_name }} — Реестр пейсмейкеров{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ asset_url('profiles.css') }}">
+<script src="{{ asset_url('profile.js') }}" defer></script>
+{% endblock %}
+{% block shell_class %}app-shell profile-shell{% endblock %}
+{% block content %}
+<nav class="profile-breadcrumb"><a href="/">← Рейтинг пейсмейкеров</a></nav>
+{% if saved %}<p class="success-message" role="status">Профиль сохранён.</p>{% endif %}
+<section class="profile-intro" aria-labelledby="profile-name">
+  <div class="profile-avatar" aria-label="Фотография пейсмейкера">
+    <span>{{ profile.initials }}</span>
+    {% if avatar_url %}<img src="{{ avatar_url }}" alt="{{ profile.full_name }}" width="128" height="128" data-avatar-image>{% endif %}
+  </div>
+  <div class="profile-identity">
+    <h1 id="profile-name">{{ profile.full_name }}</h1>
+    {% if profile.city or profile.club %}<p class="profile-location">{% if profile.city %}<span>⌖ {{ profile.city }}</span>{% endif %}{% if profile.club %}<span>◈ {{ profile.club }}</span>{% endif %}</p>{% endif %}
+    <div class="profile-identity-meta">
+    {% if profile.login %}<a class="profile-public-link" href="{{ profile.public_path }}">pacersreg.ru{{ profile.public_path }}</a>{% endif %}
 
-          {% if profile.achievements %}<ul class="profile-achievements" aria-label="Достижения">
-            {% for code in profile.achievements %}{% if code in achievement_types %}
-              <li>{{ achievement_badge(code, achievement_types[code], true) }}</li>
-            {% endif %}{% endfor %}
-          </ul>{% endif %}
+    {% if profile.achievements %}<ul class="profile-achievements" aria-label="Достижения">
+      {% for code in profile.achievements %}{% if code in achievement_types %}
+        <li>{{ achievement_badge(code, achievement_types[code], true) }}</li>
+      {% endif %}{% endfor %}
+    </ul>{% endif %}
 
-          </div>
-        </div>
-        {% if can_edit_profile %}<a class="button profile-edit-link" href="/pacemakers/{{ profile.id }}/edit">Редактировать профиль</a>{% endif %}
-      </section>
-      <div class="profile-information">
-        <div class="profile-story">
-          {% if profile.about %}<section class="profile-panel profile-about" aria-labelledby="about-title"><h2 id="about-title">О себе</h2><p>{{ profile.about }}</p></section>{% endif %}
-          {% if profile.personal_records %}<section class="profile-panel profile-records" aria-labelledby="records-title">
-            <h2 id="records-title">Личные рекорды</h2><div class="profile-record-grid">
-            {% for distance in record_distances %}{% set record = profile.personal_records.get(distance) %}{% if record %}
-              <a class="profile-record" href="{{ record.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ distance|replace('.', ',') }} км: {{ record.time }}, {{ record.year }} год — открыть результат">
-                <span>{{ distance|replace('.', ',') }} км <span aria-hidden="true">↗</span></span><strong>{{ record.time }}</strong><small>{{ record.year }}</small>
-              </a>
-            {% endif %}{% endfor %}</div>
-          </section>{% endif %}
-      <section class="profile-performances" aria-labelledby="performances-title">
-        <div class="profile-results-heading">
-          <h2 id="performances-title">Выступления <span>{{ profile.results|length }}</span></h2>
-          {% if profile.rating is not none %}<span class="profile-average" style="{{ profile.rating | rating_color }}">Рейтинг <strong>{{ '%.1f'|format(profile.rating)|replace('.', ',') }}</strong><small>/10</small></span>{% endif %}
-        </div>
-        {% if profile.results %}<div class="profile-results-grid">
-          {% for result in profile.results %}{{ result_card(result) }}{% endfor %}
-        </div>{% else %}<p class="event-note">В реестре пока нет выступлений этого пейсмейкера.</p>{% endif %}
-      </section>
-        </div>
-        {% if contacts %}<aside class="profile-panel profile-contact-panel" aria-labelledby="contact-title"><h2 id="contact-title">Контакты</h2>
-          {% if contacts %}<ul class="profile-contacts" aria-label="Контакты">
-            {% for contact in contacts %}<li>
-              {% if contact.href %}<a class="profile-contact" href="{{ contact.href }}"{% if not contact.href.startswith('tel:') %} target="_blank" rel="noopener noreferrer"{% endif %}>
-              {% else %}<span class="profile-contact">{% endif %}
-                <img class="contact-brand-icon" src="/static/social-{{ contact.icon }}.svg" alt="" width="28" height="28" aria-hidden="true">
-                <span class="profile-contact-text"><strong>{{ contact.display_value }}</strong><small>{{ contact.label }}</small></span>
-                {% if contact.href %}<span class="profile-contact-arrow" aria-hidden="true">↗</span>{% endif %}
-              {% if contact.href %}</a>{% else %}</span>{% endif %}
-            </li>{% endfor %}
-          </ul>{% endif %}
-        </aside>{% endif %}
-      </div>
-    </main>
-  </body>
-</html>
+    </div>
+  </div>
+  {% if can_edit_profile %}<a class="button profile-edit-link" href="/pacemakers/{{ profile.id }}/edit">Редактировать профиль</a>{% endif %}
+</section>
+<div class="profile-information">
+  <div class="profile-story">
+    {% if profile.about %}<section class="profile-panel profile-about" aria-labelledby="about-title"><h2 id="about-title">О себе</h2><p>{{ profile.about }}</p></section>{% endif %}
+    {% if profile.personal_records %}<section class="profile-panel profile-records" aria-labelledby="records-title">
+      <h2 id="records-title">Личные рекорды</h2><div class="profile-record-grid">
+      {% for distance in record_distances %}{% set record = profile.personal_records.get(distance) %}{% if record %}
+        <a class="profile-record" href="{{ record.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ distance|replace('.', ',') }} км: {{ record.time }}, {{ record.year }} год — открыть результат">
+          <span>{{ distance|replace('.', ',') }} км <span aria-hidden="true">↗</span></span><strong>{{ record.time }}</strong><small>{{ record.year }}</small>
+        </a>
+      {% endif %}{% endfor %}</div>
+    </section>{% endif %}
+<section class="profile-performances" aria-labelledby="performances-title">
+  <div class="profile-results-heading">
+    <h2 id="performances-title">Выступления <span>{{ profile.results|length }}</span></h2>
+    {% if profile.rating is not none %}<span class="profile-average" style="{{ profile.rating | rating_color }}">Рейтинг <strong>{{ '%.1f'|format(profile.rating)|replace('.', ',') }}</strong><small>/10</small></span>{% endif %}
+  </div>
+  {% if profile.results %}<div class="profile-results-grid">
+    {% for result in profile.results %}{{ result_card(result) }}{% endfor %}
+  </div>{% else %}<p class="event-note">В реестре пока нет выступлений этого пейсмейкера.</p>{% endif %}
+</section>
+  </div>
+  {% if contacts %}<aside class="profile-panel profile-contact-panel" aria-labelledby="contact-title"><h2 id="contact-title">Контакты</h2>
+    {% if contacts %}<ul class="profile-contacts" aria-label="Контакты">
+      {% for contact in contacts %}<li>
+        {% if contact.href %}<a class="profile-contact" href="{{ contact.href }}"{% if not contact.href.startswith('tel:') %} target="_blank" rel="noopener noreferrer"{% endif %}>
+        {% else %}<span class="profile-contact">{% endif %}
+          <img class="contact-brand-icon" src="/static/social-{{ contact.icon }}.svg" alt="" width="28" height="28" aria-hidden="true">
+          <span class="profile-contact-text"><strong>{{ contact.display_value }}</strong><small>{{ contact.label }}</small></span>
+          {% if contact.href %}<span class="profile-contact-arrow" aria-hidden="true">↗</span>{% endif %}
+        {% if contact.href %}</a>{% else %}</span>{% endif %}
+      </li>{% endfor %}
+    </ul>{% endif %}
+  </aside>{% endif %}
+</div>
+{% endblock %}

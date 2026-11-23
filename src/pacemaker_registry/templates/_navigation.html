@@ -1,6 +1,6 @@
 <header class="site-header">
   <a class="brand" href="/" aria-label="Реестр пейсмейкеров — главная">
-    <img class="brand-mark" src="/static/apple-touch-icon.png?v=equal-flags" width="36" height="36" alt="">
+    <img class="brand-mark" src="{{ asset_url('apple-touch-icon.png') }}" width="36" height="36" alt="">
     <span class="brand-name">Реестр пейсмейкеров</span>
   </a>
   <nav class="site-menu" aria-label="Главное меню">
@@ -41,7 +41,7 @@
           </form>
         </div>
       </div>
-      <script src="/static/account-menu.js" defer></script>
+      <script src="{{ asset_url('account-menu.js') }}" defer></script>
       {% else %}
       <a class="button site-account" href="/auth/yandex">Войти</a>
       {% endif %}

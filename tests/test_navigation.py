@@ -1,7 +1,7 @@
 import pytest
 from starlette.requests import Request
 
-from pacemaker_registry.main import templates
+from pacemaker_registry.main import templates, asset_url
 
 
 @pytest.mark.parametrize('path,active', [
@@ -16,7 +16,7 @@ def test_shared_navigation_has_logo_and_one_active_section(path, active):
     assert html.count('aria-current="page"') == 1
     assert f'href="{active}" aria-current="page"' in html or (
         active == '/add' and 'href="/add" aria-label="Добавить результат" aria-current="page"' in html)
-    assert 'class="brand-mark" src="/static/apple-touch-icon.png?v=equal-flags"' in html
+    assert f'class="brand-mark" src="{asset_url("apple-touch-icon.png")}"' in html
     assert '>P</span>' not in html
     assert 'aria-label="Главное меню"' in html
     assert '>Пейсмейкеры</a>' in html

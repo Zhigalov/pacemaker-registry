@@ -1,109 +1,100 @@
-<!doctype html>
+{% extends "base.html" %}
 {% from '_achievement.html' import achievement_badge %}
-<html lang="ru">
-  <head>
-    {% include '_analytics.html' %}
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Редактировать профиль · {{ profile.full_name }}</title>
-    <link rel="icon" type="image/png" href="/static/favicon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=account-spacing">
-    <link rel="stylesheet" href="/static/profiles.css?v=7">
-    <script src="/static/avatar-upload.js?v=1" defer></script>
-    <script src="/static/profile.js?v=3" defer></script>
-  </head>
-  <body>
-    <main class="app-shell profile-shell">
-      {% include '_navigation.html' %}
-      <nav class="profile-breadcrumb"><a href="/pacemakers/{{ profile.id }}">← Профиль пейсмейкера</a></nav>
-      <div class="profile-edit-heading"><h1>Редактировать профиль</h1><p>{{ profile.full_name }}</p></div>
-      <form class="profile-form" action="/pacemakers/{{ profile.id }}/edit" method="post" enctype="multipart/form-data">
-        <input type="hidden" name="profile_version" value="{{ values.profile_version }}">
-        {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
-        <section class="profile-form-section" aria-labelledby="photo-heading">
-          <h2 id="photo-heading">Фотография и профиль</h2>
-          <div class="profile-photo-controls">
-            <div class="profile-avatar"><span>{{ profile.initials }}</span><img data-avatar-preview{% if avatar_url %} src="{{ avatar_url }}"{% else %} hidden{% endif %} alt="Предпросмотр фотографии" width="128" height="128"></div>
-            <div>
-              <span class="photo-picker">
-                <input class="visually-hidden" id="profile-photo" type="file" name="photo" accept="image/jpeg,image/png,image/webp" data-avatar-input aria-describedby="photo-hint photo-filename" aria-label="Выбрать фотографию">
-                <label class="button photo-picker-button" for="profile-photo"><span aria-hidden="true">＋</span> Выбрать фото</label>
-              </span>
-              <span class="photo-filename" id="photo-filename" data-photo-filename aria-live="polite">Файл не выбран</span>
-              <p class="event-note" id="photo-hint">JPEG, PNG или WebP · до 5 МБ и 16 мегапикселей. Перед отправкой автоматически уменьшим фото и обрежем до квадрата по центру.</p>
-              <p class="error-message" data-photo-error role="alert" hidden></p>
-              <noscript><p class="event-note">Без JavaScript выберите фото до 2 МБ.</p></noscript>
-              {% if avatar_url %}<label class="profile-checkbox"><input type="checkbox" name="remove_photo" value="true" data-avatar-remove> Удалить фотографию</label>{% endif %}
-            </div>
-          </div>
-          <div class="profile-details-fields">
-            <label>Логин<span class="profile-handle-input"><span class="profile-handle-prefix">pacersreg.ru/p/</span><input name="login" value="{{ values.login }}" maxlength="30" pattern="[A-Za-z][A-Za-z0-9_-]{2,29}" placeholder="my_login" autocapitalize="none" spellcheck="false" aria-describedby="login-hint"></span></label>
-            <p class="event-note" id="login-hint">Уникальный адрес профиля. 3–30 латинских букв, цифр, _ или -. Первой должна быть буква.</p>
-            <div class="profile-two-columns">
-              <label>Город<input name="city" list="profile-cities" value="{{ values.city }}" maxlength="120" placeholder="Выберите или впишите свой" autocomplete="address-level2"></label>
-              <label>Беговой клуб / сообщество<input name="club" list="profile-clubs" value="{{ values.club }}" maxlength="120" placeholder="Выберите или впишите свой"></label>
-            </div>
-            <datalist id="profile-cities">{% for name in choices.cities %}<option value="{{ name }}">{% endfor %}</datalist>
-            <datalist id="profile-clubs">{% for name in choices.clubs %}<option value="{{ name }}">{% endfor %}</datalist>
-            <label for="profile-about">О себе</label>
-            <textarea id="profile-about" name="about" maxlength="5000" rows="6" placeholder="Расскажите о себе, своих регалиях и опыте пейсмейкера">{{ values.about }}</textarea>
-            <p class="event-note">До 5000 символов. Имя берём из результатов забегов — здесь оно не редактируется.</p>
-          </div>
-        </section>
-        <section class="profile-form-section" aria-labelledby="records-heading">
-          <h2 id="records-heading">Личные рекорды</h2>
-          <p class="event-note">Время, год и подтверждающая ссылка. Незаполненные дистанции скрыты.</p>
-          <div class="profile-record-fields">
-            <div class="profile-record-column-headings" aria-hidden="true"><span>Км</span><span>Время</span><span>Год</span><span>Результат или трек</span></div>
-            {% for distance in record_distances %}{% set record = values.personal_records.get(distance, {}) %}
-              <div class="profile-record-edit-row" role="group" aria-label="Рекорд на {{ distance|replace('.', ',') }} км">
-                <strong class="record-distance">{{ distance|replace('.', ',') }}<small> км</small></strong>
-                <label><span class="visually-hidden">Время на {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_time" value="{{ record.get('time', '') }}" placeholder="ЧЧ:ММ:СС" maxlength="8"></label>
-                <label><span class="visually-hidden">Год рекорда на {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_year" value="{{ record.get('year', '') }}" placeholder="Год" maxlength="4" inputmode="numeric"></label>
-                <label class="record-source"><span class="visually-hidden">Ссылка на рекорд {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_url" value="{{ record.get('url', '') }}" placeholder="Ссылка https://…" maxlength="1000" inputmode="url"></label>
-              </div>
-            {% endfor %}
-          </div>
-        </section>
-        <section class="profile-form-section" aria-labelledby="contacts-heading">
-          <h2 id="contacts-heading">Контакты</h2>
-          <p class="event-note">Вставьте ссылку на профиль или укажите ник — можно с @. Для WhatsApp подойдёт номер телефона или ссылка. Контакты видны всем посетителям.</p>
-          <div class="profile-contact-fields" data-contact-fields>
-            {% for contact in values.contacts %}
-              <div class="profile-contact-row{% if contact.type == 'other' %} profile-contact-row--other{% endif %}">
-                <input type="hidden" name="contact_type" value="{{ contact.type }}">
-                {% if contact.type == 'other' %}
-                  <label>Название<input type="text" name="contact_label" maxlength="60" value="{{ contact.label|default('') }}" placeholder="Например, сайт команды"></label>
-                {% else %}<input type="hidden" name="contact_label" value=""><label>{{ contact_types[contact.type][0] if contact.type in contact_types else 'Контакт' }}{% endif %}
-                {% if contact.type == 'other' %}<label>Ссылка или текст{% endif %}
-                  <input type="text" name="contact_value" maxlength="500" value="{{ contact.value }}" placeholder="{{ contact_types[contact.type][1] if contact.type in contact_types else '' }}"{% if contact.type in contact_prefixes and contact.type != 'strava' %} autocapitalize="none" spellcheck="false"{% elif contact.type in ['phone', 'whatsapp'] %} inputmode="tel"{% endif %}>
-                  {% if contact.type == 'strava' %}<small class="contact-field-hint">ID, ник или ссылка из «Поделиться профилем». Можно вставить весь текст из приложения.</small>{% endif %}
-                </label>
-                {% if contact.type == 'other' %}<button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>{% endif %}
-              </div>
-            {% endfor %}
-          </div>
-          <button class="button profile-add-contact" type="button" data-add-contact>＋ Другой контакт</button>
-          <template id="other-contact-template"><div class="profile-contact-row profile-contact-row--other">
-            <input type="hidden" name="contact_type" value="other">
-            <label>Название<input name="contact_label" maxlength="60" placeholder="Например, сайт команды"></label>
-            <label>Ссылка или текст<input name="contact_value" maxlength="500" placeholder="https://…"></label>
-            <button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>
-          </div></template>
-        </section>
-        {% if can_edit_achievements %}
-        <section class="profile-form-section" aria-labelledby="achievements-heading">
-          <h2 id="achievements-heading">Достижения</h2>
-          <div class="profile-achievement-choices">{% for code, achievement in achievement_types.items() %}
-            <label class="profile-checkbox achievement-choice">
-              <input type="checkbox" name="achievements" value="{{ code }}" aria-label="{{ achievement.title }}" aria-describedby="achievement-{{ code }}"{% if code in values.achievements %} checked{% endif %}>
-              {{ achievement_badge(code, achievement) }}
-            </label>
-          {% endfor %}</div>
-        </section>
-        {% endif %}
-        <div class="profile-form-actions"><button class="button button--primary" type="submit">Сохранить профиль</button><a class="button" href="/pacemakers/{{ profile.id }}">Отмена</a></div>
-      </form>
-    </main>
-  </body>
-</html>
+{% block title %}Редактировать профиль · {{ profile.full_name }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ asset_url('profiles.css') }}">
+<script src="{{ asset_url('avatar-upload.js') }}" defer></script>
+<script src="{{ asset_url('profile.js') }}" defer></script>
+{% endblock %}
+{% block shell_class %}app-shell profile-shell{% endblock %}
+{% block content %}
+<nav class="profile-breadcrumb"><a href="/pacemakers/{{ profile.id }}">← Профиль пейсмейкера</a></nav>
+<div class="profile-edit-heading"><h1>Редактировать профиль</h1><p>{{ profile.full_name }}</p></div>
+<form class="profile-form" action="/pacemakers/{{ profile.id }}/edit" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="profile_version" value="{{ values.profile_version }}">
+  {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
+  <section class="profile-form-section" aria-labelledby="photo-heading">
+    <h2 id="photo-heading">Фотография и профиль</h2>
+    <div class="profile-photo-controls">
+      <div class="profile-avatar"><span>{{ profile.initials }}</span><img data-avatar-preview{% if avatar_url %} src="{{ avatar_url }}"{% else %} hidden{% endif %} alt="Предпросмотр фотографии" width="128" height="128"></div>
+      <div>
+        <span class="photo-picker">
+          <input class="visually-hidden" id="profile-photo" type="file" name="photo" accept="image/jpeg,image/png,image/webp" data-avatar-input aria-describedby="photo-hint photo-filename" aria-label="Выбрать фотографию">
+          <label class="button photo-picker-button" for="profile-photo"><span aria-hidden="true">＋</span> Выбрать фото</label>
+        </span>
+        <span class="photo-filename" id="photo-filename" data-photo-filename aria-live="polite">Файл не выбран</span>
+        <p class="event-note" id="photo-hint">JPEG, PNG или WebP · до 5 МБ и 16 мегапикселей. Перед отправкой автоматически уменьшим фото и обрежем до квадрата по центру.</p>
+        <p class="error-message" data-photo-error role="alert" hidden></p>
+        <noscript><p class="event-note">Без JavaScript выберите фото до 2 МБ.</p></noscript>
+        {% if avatar_url %}<label class="profile-checkbox"><input type="checkbox" name="remove_photo" value="true" data-avatar-remove> Удалить фотографию</label>{% endif %}
+      </div>
+    </div>
+    <div class="profile-details-fields">
+      <label>Логин<span class="profile-handle-input"><span class="profile-handle-prefix">pacersreg.ru/p/</span><input name="login" value="{{ values.login }}" maxlength="30" pattern="[A-Za-z][A-Za-z0-9_-]{2,29}" placeholder="my_login" autocapitalize="none" spellcheck="false" aria-describedby="login-hint"></span></label>
+      <p class="event-note" id="login-hint">Уникальный адрес профиля. 3–30 латинских букв, цифр, _ или -. Первой должна быть буква.</p>
+      <div class="profile-two-columns">
+        <label>Город<input name="city" list="profile-cities" value="{{ values.city }}" maxlength="120" placeholder="Выберите или впишите свой" autocomplete="address-level2"></label>
+        <label>Беговой клуб / сообщество<input name="club" list="profile-clubs" value="{{ values.club }}" maxlength="120" placeholder="Выберите или впишите свой"></label>
+      </div>
+      <datalist id="profile-cities">{% for name in choices.cities %}<option value="{{ name }}">{% endfor %}</datalist>
+      <datalist id="profile-clubs">{% for name in choices.clubs %}<option value="{{ name }}">{% endfor %}</datalist>
+      <label for="profile-about">О себе</label>
+      <textarea id="profile-about" name="about" maxlength="5000" rows="6" placeholder="Расскажите о себе, своих регалиях и опыте пейсмейкера">{{ values.about }}</textarea>
+      <p class="event-note">До 5000 символов. Имя берём из результатов забегов — здесь оно не редактируется.</p>
+    </div>
+  </section>
+  <section class="profile-form-section" aria-labelledby="records-heading">
+    <h2 id="records-heading">Личные рекорды</h2>
+    <p class="event-note">Время, год и подтверждающая ссылка. Незаполненные дистанции скрыты.</p>
+    <div class="profile-record-fields">
+      <div class="profile-record-column-headings" aria-hidden="true"><span>Км</span><span>Время</span><span>Год</span><span>Результат или трек</span></div>
+      {% for distance in record_distances %}{% set record = values.personal_records.get(distance, {}) %}
+        <div class="profile-record-edit-row" role="group" aria-label="Рекорд на {{ distance|replace('.', ',') }} км">
+          <strong class="record-distance">{{ distance|replace('.', ',') }}<small> км</small></strong>
+          <label><span class="visually-hidden">Время на {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_time" value="{{ record.get('time', '') }}" placeholder="ЧЧ:ММ:СС" maxlength="8"></label>
+          <label><span class="visually-hidden">Год рекорда на {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_year" value="{{ record.get('year', '') }}" placeholder="Год" maxlength="4" inputmode="numeric"></label>
+          <label class="record-source"><span class="visually-hidden">Ссылка на рекорд {{ distance|replace('.', ',') }} км</span><input name="record_{{ distance }}_url" value="{{ record.get('url', '') }}" placeholder="Ссылка https://…" maxlength="1000" inputmode="url"></label>
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="profile-form-section" aria-labelledby="contacts-heading">
+    <h2 id="contacts-heading">Контакты</h2>
+    <p class="event-note">Вставьте ссылку на профиль или укажите ник — можно с @. Для WhatsApp подойдёт номер телефона или ссылка. Контакты видны всем посетителям.</p>
+    <div class="profile-contact-fields" data-contact-fields>
+      {% for contact in values.contacts %}
+        <div class="profile-contact-row{% if contact.type == 'other' %} profile-contact-row--other{% endif %}">
+          <input type="hidden" name="contact_type" value="{{ contact.type }}">
+          {% if contact.type == 'other' %}
+            <label>Название<input type="text" name="contact_label" maxlength="60" value="{{ contact.label|default('') }}" placeholder="Например, сайт команды"></label>
+          {% else %}<input type="hidden" name="contact_label" value=""><label>{{ contact_types[contact.type][0] if contact.type in contact_types else 'Контакт' }}{% endif %}
+          {% if contact.type == 'other' %}<label>Ссылка или текст{% endif %}
+            <input type="text" name="contact_value" maxlength="500" value="{{ contact.value }}" placeholder="{{ contact_types[contact.type][1] if contact.type in contact_types else '' }}"{% if contact.type in contact_prefixes and contact.type != 'strava' %} autocapitalize="none" spellcheck="false"{% elif contact.type in ['phone', 'whatsapp'] %} inputmode="tel"{% endif %}>
+            {% if contact.type == 'strava' %}<small class="contact-field-hint">ID, ник или ссылка из «Поделиться профилем». Можно вставить весь текст из приложения.</small>{% endif %}
+          </label>
+          {% if contact.type == 'other' %}<button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <button class="button profile-add-contact" type="button" data-add-contact>＋ Другой контакт</button>
+    <template id="other-contact-template"><div class="profile-contact-row profile-contact-row--other">
+      <input type="hidden" name="contact_type" value="other">
+      <label>Название<input name="contact_label" maxlength="60" placeholder="Например, сайт команды"></label>
+      <label>Ссылка или текст<input name="contact_value" maxlength="500" placeholder="https://…"></label>
+      <button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>
+    </div></template>
+  </section>
+  {% if can_edit_achievements %}
+  <section class="profile-form-section" aria-labelledby="achievements-heading">
+    <h2 id="achievements-heading">Достижения</h2>
+    <div class="profile-achievement-choices">{% for code, achievement in achievement_types.items() %}
+      <label class="profile-checkbox achievement-choice">
+        <input type="checkbox" name="achievements" value="{{ code }}" aria-label="{{ achievement.title }}" aria-describedby="achievement-{{ code }}"{% if code in values.achievements %} checked{% endif %}>
+        {{ achievement_badge(code, achievement) }}
+      </label>
+    {% endfor %}</div>
+  </section>
+  {% endif %}
+  <div class="profile-form-actions"><button class="button button--primary" type="submit">Сохранить профиль</button><a class="button" href="/pacemakers/{{ profile.id }}">Отмена</a></div>
+</form>
+{% endblock %}

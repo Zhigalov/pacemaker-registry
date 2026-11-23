@@ -1,5 +1,7 @@
 import os
 import re
+from functools import lru_cache
+from hashlib import sha256
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Annotated, Literal
@@ -42,6 +44,12 @@ from pacemaker_registry.avatars import avatar_url
 
 
 PACKAGE_DIR = Path(__file__).resolve().parent
+
+
+@lru_cache
+def asset_url(name: str) -> str:
+    version = sha256((PACKAGE_DIR / 'static' / name).read_bytes()).hexdigest()[:12]
+    return f'/static/{name}?v={version}'
 
 
 def _apply_event_target_time_type(result: RaceResult) -> RaceResult:
@@ -91,6 +99,7 @@ def analytics_context(request: Request) -> dict:
 templates = Jinja2Templates(
     directory=PACKAGE_DIR / "templates", context_processors=[analytics_context, auth.auth_context],
 )
+templates.env.globals["asset_url"] = asset_url
 templates.env.globals["default_filters"] = RegistryFilters()
 templates.env.filters["rating_color"] = rating_color_style
 templates.env.filters["avatar_url"] = avatar_url

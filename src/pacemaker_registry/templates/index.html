@@ -1,181 +1,170 @@
-<!doctype html>
-<html lang="ru">
-  <head>
-    {% include '_analytics.html' %}
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Реестр результатов пейсмейкеров">
-    <title>Реестр пейсмейкеров</title>
-    <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=registry-scroll">
-    <link rel="stylesheet" href="/static/profiles.css?v=3">
-    <script src="/static/registry.js?v=name-search" defer></script>
-    <script src="/static/event-suggest.js?v=1" defer></script>
-    <script src="/static/registry-scroll.js?v=1" defer></script>
-  </head>
-  <body>
-    <main class="app-shell app-shell--registry">
-      {% include '_navigation.html' %}
+{% extends "base.html" %}
+{% block title %}Реестр пейсмейкеров{% endblock %}
+{% block head %}
+<meta name="description" content="Реестр результатов пейсмейкеров">
+<link rel="stylesheet" href="{{ asset_url('profiles.css') }}">
+<script src="{{ asset_url('registry.js') }}" defer></script>
+<script src="{{ asset_url('event-suggest.js') }}" defer></script>
+<script src="{{ asset_url('registry-scroll.js') }}" defer></script>
+{% endblock %}
+{% block shell_class %}app-shell app-shell--registry{% endblock %}
+{% block content %}
+<h1 id="page-title" class="visually-hidden">Пейсмейкеры</h1>
 
-      <h1 id="page-title" class="visually-hidden">Пейсмейкеры</h1>
-
-      {% if registry.events or registry.search %}
-        <section class="registry-toolbar" aria-label="Фильтр реестра">
-          <form class="registry-filter" method="get" action="/">
-            <div class="registry-filter-field registry-filter-field--search">
-              <label for="name-search">Пейсмейкер</label>
-              <div class="registry-search-control">
-                <input id="name-search" type="search" name="q" value="{{ registry.search }}" maxlength="160" placeholder="Фамилия или имя" autocomplete="off" data-registry-search>
-                {% if registry.search %}<a class="registry-search-clear" href="{{ clear_search_url }}" aria-label="Очистить поиск">×</a>{% endif %}
-                <button class="button registry-filter-submit" type="submit">Найти</button>
-              </div>
-            </div>
-            <div class="registry-filter-field registry-filter-field--event">
-              <label for="event-filter" data-event-filter-label>Соревнование</label>
-              <span class="registry-filter-select" data-event-filter-native>
-                <select id="event-filter" name="event_id" data-registry-filter>
-                  <option value="0" {% if registry.selected_event_id is none %}selected{% endif %}>Все соревнования</option>
-                  {% for event in registry.events %}
-                    <option value="{{ event.id }}" {% if event.id == registry.selected_event_id %}selected{% endif %}>
-                      {{ event.name }}
-                    </option>
-                  {% endfor %}
-                </select>
-              </span>
-              <div class="event-suggest" data-event-suggest hidden>
-                <input id="event-filter-search" type="text" role="combobox" placeholder="Все соревнования"
-                       autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="event-filter-options">
-                <button class="event-suggest-clear" type="button" aria-label="Сбросить соревнование" hidden>×</button>
-                <div class="event-suggest-popup" hidden>
-                  <ul id="event-filter-options" role="listbox" aria-label="Соревнования"></ul>
-                  <p class="event-suggest-empty" role="status" hidden>Соревнования не найдены</p>
-                </div>
-              </div>
-            </div>
-            <div class="registry-filter-field registry-filter-field--distance">
-              <label for="distance-filter">Дистанция</label>
-              <span class="registry-filter-select">
-                <select id="distance-filter" name="distance_km" data-registry-filter>
-                  <option value="0" {% if registry.selected_distance is none %}selected{% endif %}>Все</option>
-                  {% for distance in registry.distances %}<option value="{{ distance }}" {% if distance == registry.selected_distance %}selected{% endif %}>{{ distance|replace('.', ',') }} км</option>{% endfor %}
-                  {% if registry.selected_distance and registry.selected_distance not in registry.distances %}<option value="{{ registry.selected_distance }}" selected>{{ registry.selected_distance|replace('.', ',') }} км — нет результатов</option>{% endif %}
-                </select>
-              </span>
-            </div>
-            <div class="registry-filter-field registry-filter-field--count">
-              <div class="filter-label-hint">
-                <label for="min-events-filter" tabindex="0" aria-describedby="min-events-hint">Минимум выступлений</label>
-                <span id="min-events-hint" class="filter-hint" role="tooltip">За всю историю пейсера</span>
-              </div>
-              <input id="min-events-filter" name="min_events" type="number" min="1" max="10000" step="1" value="{{ registry.min_events }}" data-registry-filter aria-describedby="min-events-hint">
-            </div>
-            <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
-          </form>
-          <p class="registry-rating-note">Рейтинг рассчитан по показанным выступлениям{% if registry.selected_distance %} на дистанции {{ registry.selected_distance|replace('.', ',') }} км{% endif %}.</p>
-        </section>
-      {% endif %}
-
-      {% if not registry_error and (registry.events or registry.pacemakers) %}
-        <div class="registry-summary">
-          <div class="registry-summary-counts">
-            <span>Показано</span>
-            <dl class="registry-stats" aria-label="Статистика отфильтрованного списка">
-              <div><dt>Пейсеров</dt><dd>{{ registry.pacemaker_count }}</dd></div>
-              <div><dt>Соревнований</dt><dd>{{ registry.event_count }}</dd></div>
-              <div><dt>Результатов</dt><dd>{{ registry.result_count }}</dd></div>
-            </dl>
-          </div>
-          {% if registry.selected_event_id is not none %}
-            <div class="registry-summary-links">
-              <a class="quiet-link" href="/events/{{ registry.selected_event_id }}">Настройки соревнования →</a>
-              <a class="quiet-link registry-filter-reset" href="/?min_events={{ registry.min_events }}{% if registry.selected_distance %}&amp;distance_km={{ registry.selected_distance }}{% endif %}{% if registry.search %}&amp;q={{ registry.search|urlencode }}{% endif %}">Все соревнования</a>
-            </div>
-          {% endif %}
+{% if registry.events or registry.search %}
+  <section class="registry-toolbar" aria-label="Фильтр реестра">
+    <form class="registry-filter" method="get" action="/">
+      <div class="registry-filter-field registry-filter-field--search">
+        <label for="name-search">Пейсмейкер</label>
+        <div class="registry-search-control">
+          <input id="name-search" type="search" name="q" value="{{ registry.search }}" maxlength="160" placeholder="Фамилия или имя" autocomplete="off" data-registry-search>
+          {% if registry.search %}<a class="registry-search-clear" href="{{ clear_search_url }}" aria-label="Очистить поиск">×</a>{% endif %}
+          <button class="button registry-filter-submit" type="submit">Найти</button>
         </div>
-      {% endif %}
-
-      {% if registry_error %}
-        <div class="error-message registry-load-error" role="alert">{{ registry_error }}</div>
-      {% elif registry.pacemakers %}
-        <section class="registry-list" aria-label="Список пейсмейкеров">
-          <div class="registry-columns" aria-hidden="true">
-            <span>Пэйсмейкер</span>
-            <span>Соревнования</span>
+      </div>
+      <div class="registry-filter-field registry-filter-field--event">
+        <label for="event-filter" data-event-filter-label>Соревнование</label>
+        <span class="registry-filter-select" data-event-filter-native>
+          <select id="event-filter" name="event_id" data-registry-filter>
+            <option value="0" {% if registry.selected_event_id is none %}selected{% endif %}>Все соревнования</option>
+            {% for event in registry.events %}
+              <option value="{{ event.id }}" {% if event.id == registry.selected_event_id %}selected{% endif %}>
+                {{ event.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </span>
+        <div class="event-suggest" data-event-suggest hidden>
+          <input id="event-filter-search" type="text" role="combobox" placeholder="Все соревнования"
+                 autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="event-filter-options">
+          <button class="event-suggest-clear" type="button" aria-label="Сбросить соревнование" hidden>×</button>
+          <div class="event-suggest-popup" hidden>
+            <ul id="event-filter-options" role="listbox" aria-label="Соревнования"></ul>
+            <p class="event-suggest-empty" role="status" hidden>Соревнования не найдены</p>
           </div>
+        </div>
+      </div>
+      <div class="registry-filter-field registry-filter-field--distance">
+        <label for="distance-filter">Дистанция</label>
+        <span class="registry-filter-select">
+          <select id="distance-filter" name="distance_km" data-registry-filter>
+            <option value="0" {% if registry.selected_distance is none %}selected{% endif %}>Все</option>
+            {% for distance in registry.distances %}<option value="{{ distance }}" {% if distance == registry.selected_distance %}selected{% endif %}>{{ distance|replace('.', ',') }} км</option>{% endfor %}
+            {% if registry.selected_distance and registry.selected_distance not in registry.distances %}<option value="{{ registry.selected_distance }}" selected>{{ registry.selected_distance|replace('.', ',') }} км — нет результатов</option>{% endif %}
+          </select>
+        </span>
+      </div>
+      <div class="registry-filter-field registry-filter-field--count">
+        <div class="filter-label-hint">
+          <label for="min-events-filter" tabindex="0" aria-describedby="min-events-hint">Минимум выступлений</label>
+          <span id="min-events-hint" class="filter-hint" role="tooltip">За всю историю пейсера</span>
+        </div>
+        <input id="min-events-filter" name="min_events" type="number" min="1" max="10000" step="1" value="{{ registry.min_events }}" data-registry-filter aria-describedby="min-events-hint">
+      </div>
+      <noscript><button class="button registry-filter-submit" type="submit">Показать</button></noscript>
+    </form>
+    <p class="registry-rating-note">Рейтинг рассчитан по показанным выступлениям{% if registry.selected_distance %} на дистанции {{ registry.selected_distance|replace('.', ',') }} км{% endif %}.</p>
+  </section>
+{% endif %}
 
-          {% include '_registry_rows.html' %}
-        </section>
+{% if not registry_error and (registry.events or registry.pacemakers) %}
+  <div class="registry-summary">
+    <div class="registry-summary-counts">
+      <span>Показано</span>
+      <dl class="registry-stats" aria-label="Статистика отфильтрованного списка">
+        <div><dt>Пейсеров</dt><dd>{{ registry.pacemaker_count }}</dd></div>
+        <div><dt>Соревнований</dt><dd>{{ registry.event_count }}</dd></div>
+        <div><dt>Результатов</dt><dd>{{ registry.result_count }}</dd></div>
+      </dl>
+    </div>
+    {% if registry.selected_event_id is not none %}
+      <div class="registry-summary-links">
+        <a class="quiet-link" href="/events/{{ registry.selected_event_id }}">Настройки соревнования →</a>
+        <a class="quiet-link registry-filter-reset" href="/?min_events={{ registry.min_events }}{% if registry.selected_distance %}&amp;distance_km={{ registry.selected_distance }}{% endif %}{% if registry.search %}&amp;q={{ registry.search|urlencode }}{% endif %}">Все соревнования</a>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
 
-        {% if page_count > 1 %}
-        <nav class="registry-pagination" aria-label="Страницы рейтинга" data-registry-pagination>
-          {% if page > 1 %}<a class="button button-secondary" href="{{ previous_page_url }}">← Назад</a>{% endif %}
-          <span data-page-status role="status">Страница {{ page }} из {{ page_count }}</span>
-          {% if page < page_count %}<a class="button button-secondary" href="{{ next_page_url }}" data-next-page>Далее →</a>{% endif %}
-        </nav>
-        {% endif %}
+{% if registry_error %}
+  <div class="error-message registry-load-error" role="alert">{{ registry_error }}</div>
+{% elif registry.pacemakers %}
+  <section class="registry-list" aria-label="Список пейсмейкеров">
+    <div class="registry-columns" aria-hidden="true">
+      <span>Пэйсмейкер</span>
+      <span>Соревнования</span>
+    </div>
 
-        <details class="rating-methodology" id="rating-methodology">
-          <summary>
-            <span>Как считается рейтинг</span>
-            <span class="rating-methodology-hint">Финиш + ровность темпа</span>
-          </summary>
-          <div class="rating-methodology-content">
-            <p>Каждое выступление оценивается по настройкам его соревнования. Капитан или администратор решает, учитывать ли темп по отсечкам.</p>
-            <section class="rating-composition" aria-labelledby="rating-composition-title">
-              <div class="rating-composition-heading">
-                <div>
-                  <span class="eyebrow">Итоговая оценка</span>
-                  <h3 id="rating-composition-title">60% финиш + 40% темп</h3>
-                </div>
-                <span class="rating-composition-state">Если учитываются отсечки</span>
-              </div>
-              <div class="rating-composition-bar" aria-label="60 процентов оценки за финиш и 40 процентов за темп">
-                <span class="rating-composition-finish"><strong>60%</strong> финиш</span>
-                <span class="rating-composition-splits"><strong>40%</strong> темп</span>
-              </div>
-              <div class="rating-composition-flow" aria-label="Как считается оценка за темп">
-                <span><strong>1</strong> Сравниваем темп каждого отрезка с целевым</span>
-                <b aria-hidden="true">→</b>
-                <span><strong>2</strong> Умножаем оценку на километры отрезка</span>
-                <b aria-hidden="true">→</b>
-                <span><strong>3</strong> Получаем среднюю по дистанции</span>
-              </div>
-              <p><a href="/events">Шкала темпа настраивается отдельно для каждого соревнования.</a> Ниже — значения по умолчанию, до изменения настроек:</p>
-              <div class="splits-score-scale" aria-label="Шкала оценки отклонения темпа по умолчанию">
-                <span><strong>0–5</strong><small>сек/км</small><b>10</b></span>
-                <span><strong>10</strong><small>сек/км</small><b>9</b></span>
-                <span><strong>20</strong><small>сек/км</small><b>8</b></span>
-                <span><strong>30</strong><small>сек/км</small><b>7</b></span>
-                <span class="splits-score-scale-fade"><strong>&gt;30</strong><small>сек/км</small><b>экспонента</b></span>
-              </div>
-              <p>По умолчанию отклонение до 5 секунд на километр не штрафуется. Затем оценка плавно снижается: 9 баллов при отклонении 10 секунд, 8 при 20 и 7 при 30. После 30 секунд начинается экспонента. Границы, баллы и резкость падения можно изменить на странице соревнования. Быстрее или медленнее целевого темпа — штраф одинаковый. Длинный отрезок влияет сильнее короткого. Если отсечки покрывают меньше 80% дистанции или их учёт выключен, итог равен оценке за финиш.</p>
-            </section>
-            <p>Оценка за финиш считается по настройкам соревнования. В зелёной зоне допуска — 10 баллов, в жёлтых зонах оценка линейно снижается до балла, заданного для границы с красной зоной, в красных — убывает по экспоненте.</p>
-            <p>Границы и график доступны на странице каждого соревнования. Рейтинг пейсмейкера — среднее итоговых оценок его выступлений; список отсортирован по убыванию рейтинга.</p>
-            <p>Сравниваем рейтинг, округлённый до десятых, как на карточках. При равенстве выше пейсер с большим числом выступлений за всю историю, включая разные дистанции одного соревнования. Если и оно совпало — с меньшим средним абсолютным отклонением финиша от цели в секундах по показанным выступлениям. Ранний и поздний финиш не компенсируют друг друга.</p>
+    {% include '_registry_rows.html' %}
+  </section>
+
+  {% if page_count > 1 %}
+  <nav class="registry-pagination" aria-label="Страницы рейтинга" data-registry-pagination>
+    {% if page > 1 %}<a class="button button-secondary" href="{{ previous_page_url }}">← Назад</a>{% endif %}
+    <span data-page-status role="status">Страница {{ page }} из {{ page_count }}</span>
+    {% if page < page_count %}<a class="button button-secondary" href="{{ next_page_url }}" data-next-page>Далее →</a>{% endif %}
+  </nav>
+  {% endif %}
+
+  <details class="rating-methodology" id="rating-methodology">
+    <summary>
+      <span>Как считается рейтинг</span>
+      <span class="rating-methodology-hint">Финиш + ровность темпа</span>
+    </summary>
+    <div class="rating-methodology-content">
+      <p>Каждое выступление оценивается по настройкам его соревнования. Капитан или администратор решает, учитывать ли темп по отсечкам.</p>
+      <section class="rating-composition" aria-labelledby="rating-composition-title">
+        <div class="rating-composition-heading">
+          <div>
+            <span class="eyebrow">Итоговая оценка</span>
+            <h3 id="rating-composition-title">60% финиш + 40% темп</h3>
           </div>
-        </details>
-      {% elif registry.search %}
-        <section class="empty-state">
-          <h2>Никого не нашли</h2>
-          <p>По запросу «{{ registry.search }}» нет пейсеров с выбранными фильтрами. Попробуйте другое имя или очистите поиск.</p>
-          <a class="button registry-filter-submit" href="{{ clear_search_url }}">Очистить поиск</a>
-        </section>
-      {% elif registry.events %}
-        <section class="empty-state">
-          <h2>Нет пейсеров по выбранным условиям</h2>
-          <p>Уменьшите минимальное число выступлений или выберите другое соревнование либо дистанцию.</p>
-          <a class="button registry-filter-submit" href="/">Сбросить фильтры</a>
-        </section>
-      {% else %}
-        <section class="empty-state" aria-labelledby="empty-title">
-          <div class="empty-icon" aria-hidden="true">↗</div>
-          <h2 id="empty-title">В реестре пока нет результатов</h2>
-          <p>Добавьте результат по ссылке с RussiaRunning.</p>
-          <a class="button button--primary" href="/add">Добавить результат забега</a>
-        </section>
-      {% endif %}
-    </main>
-  </body>
-</html>
+          <span class="rating-composition-state">Если учитываются отсечки</span>
+        </div>
+        <div class="rating-composition-bar" aria-label="60 процентов оценки за финиш и 40 процентов за темп">
+          <span class="rating-composition-finish"><strong>60%</strong> финиш</span>
+          <span class="rating-composition-splits"><strong>40%</strong> темп</span>
+        </div>
+        <div class="rating-composition-flow" aria-label="Как считается оценка за темп">
+          <span><strong>1</strong> Сравниваем темп каждого отрезка с целевым</span>
+          <b aria-hidden="true">→</b>
+          <span><strong>2</strong> Умножаем оценку на километры отрезка</span>
+          <b aria-hidden="true">→</b>
+          <span><strong>3</strong> Получаем среднюю по дистанции</span>
+        </div>
+        <p><a href="/events">Шкала темпа настраивается отдельно для каждого соревнования.</a> Ниже — значения по умолчанию, до изменения настроек:</p>
+        <div class="splits-score-scale" aria-label="Шкала оценки отклонения темпа по умолчанию">
+          <span><strong>0–5</strong><small>сек/км</small><b>10</b></span>
+          <span><strong>10</strong><small>сек/км</small><b>9</b></span>
+          <span><strong>20</strong><small>сек/км</small><b>8</b></span>
+          <span><strong>30</strong><small>сек/км</small><b>7</b></span>
+          <span class="splits-score-scale-fade"><strong>&gt;30</strong><small>сек/км</small><b>экспонента</b></span>
+        </div>
+        <p>По умолчанию отклонение до 5 секунд на километр не штрафуется. Затем оценка плавно снижается: 9 баллов при отклонении 10 секунд, 8 при 20 и 7 при 30. После 30 секунд начинается экспонента. Границы, баллы и резкость падения можно изменить на странице соревнования. Быстрее или медленнее целевого темпа — штраф одинаковый. Длинный отрезок влияет сильнее короткого. Если отсечки покрывают меньше 80% дистанции или их учёт выключен, итог равен оценке за финиш.</p>
+      </section>
+      <p>Оценка за финиш считается по настройкам соревнования. В зелёной зоне допуска — 10 баллов, в жёлтых зонах оценка линейно снижается до балла, заданного для границы с красной зоной, в красных — убывает по экспоненте.</p>
+      <p>Границы и график доступны на странице каждого соревнования. Рейтинг пейсмейкера — среднее итоговых оценок его выступлений; список отсортирован по убыванию рейтинга.</p>
+      <p>Сравниваем рейтинг, округлённый до десятых, как на карточках. При равенстве выше пейсер с большим числом выступлений за всю историю, включая разные дистанции одного соревнования. Если и оно совпало — с меньшим средним абсолютным отклонением финиша от цели в секундах по показанным выступлениям. Ранний и поздний финиш не компенсируют друг друга.</p>
+    </div>
+  </details>
+{% elif registry.search %}
+  <section class="empty-state">
+    <h2>Никого не нашли</h2>
+    <p>По запросу «{{ registry.search }}» нет пейсеров с выбранными фильтрами. Попробуйте другое имя или очистите поиск.</p>
+    <a class="button registry-filter-submit" href="{{ clear_search_url }}">Очистить поиск</a>
+  </section>
+{% elif registry.events %}
+  <section class="empty-state">
+    <h2>Нет пейсеров по выбранным условиям</h2>
+    <p>Уменьшите минимальное число выступлений или выберите другое соревнование либо дистанцию.</p>
+    <a class="button registry-filter-submit" href="/">Сбросить фильтры</a>
+  </section>
+{% else %}
+  <section class="empty-state" aria-labelledby="empty-title">
+    <div class="empty-icon" aria-hidden="true">↗</div>
+    <h2 id="empty-title">В реестре пока нет результатов</h2>
+    <p>Добавьте результат по ссылке с RussiaRunning.</p>
+    <a class="button button--primary" href="/add">Добавить результат забега</a>
+  </section>
+{% endif %}
+{% endblock %}

@@ -18,11 +18,14 @@ def test_invalid_counter_disables_analytics(monkeypatch, counter):
 def test_configured_counter_and_all_page_templates(monkeypatch):
     monkeypatch.setenv("YANDEX_METRICA_ID", "113525433")
     response = TestClient(main.app).get("/add")
-    assert response.text.count('/static/analytics.js?v=1') == 1
+    assert response.text.count(main.asset_url('analytics.js')) == 1
     assert 'data-metrica-id="113525433"' in response.text
+    base = (main.PACKAGE_DIR / "templates" / "base.html").read_text()
+    assert base.count("include '_analytics.html'") == 1
     for name in ["index", "events", "event", "result", "add"]:
         text = (main.PACKAGE_DIR / "templates" / f"{name}.html").read_text()
-        assert text.count("include '_analytics.html'") == 1
+        assert '{% extends "base.html" %}' in text
+
 
 
 @pytest.mark.parametrize("created", [True, False])

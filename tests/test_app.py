@@ -7,7 +7,7 @@ from pacemaker_registry.db import (
     RegistryPacemaker,
 )
 from pacemaker_registry.models import RegistryCard
-from pacemaker_registry.main import app
+from pacemaker_registry.main import app, asset_url
 from pacemaker_registry.russiarunning import Checkpoint, RaceResult
 
 pytestmark = pytest.mark.usefixtures("admin_session")
@@ -61,10 +61,10 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert "Реестр пейсмейкеров" in response.text
-    assert 'href="/static/favicon.png?v=equal-flags"' in response.text
-    assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=registry-scroll"' in response.text
-    assert 'src="/static/apple-touch-icon.png?v=equal-flags"' in response.text
+    assert f'href="{asset_url("favicon.png")}"' in response.text
+    assert f'href="{asset_url("apple-touch-icon.png")}"' in response.text
+    assert f'href="{asset_url("styles.css")}"' in response.text
+    assert f'src="{asset_url("apple-touch-icon.png")}"' in response.text
     assert 'class="registry-heading"' not in response.text
     assert 'Статистика отфильтрованного списка' in response.text
     assert response.text.index('class="registry-summary"') > response.text.index('class="registry-filter"')
@@ -210,8 +210,8 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
         )
 
     assert response.status_code == 200
-    assert 'href="/static/favicon.png?v=equal-flags"' in response.text
-    assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
+    assert f'href="{asset_url("favicon.png")}"' in response.text
+    assert f'href="{asset_url("apple-touch-icon.png")}"' in response.text
     assert "Жигалов Сергей" in response.text
     assert "01:53:53" in response.text
     assert 'value="01:54:00"' in response.text
@@ -224,7 +224,7 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     assert "Сохранить в реестр" in response.text
     assert "Ожидаемый темп" in response.text
     assert 'data-distance="21,1"' in response.text
-    assert 'src="/static/add.js?v=flag-seconds"' in response.text
+    assert f'src="{asset_url("add.js")}"' in response.text
     assert "пока ничего не сохраняется" not in response.text
     assert response.text.index("Сохранить в реестр") < response.text.index(
         "Контрольные точки"

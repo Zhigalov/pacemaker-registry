@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Реестр пейсмейкеров{% endblock %}</title>
+    {% block analytics %}{% include '_analytics.html' %}{% endblock %}
+    <link rel="icon" type="image/png" sizes="64x64" href="{{ asset_url('favicon.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset_url('apple-touch-icon.png') }}">
+    <link rel="stylesheet" href="{{ asset_url('styles.css') }}">
+    {% block head %}{% endblock %}
+  </head>
+  <body>
+    {% block before_main %}{% endblock %}
+    <main class="{% block shell_class %}app-shell{% endblock %}">
+      {% include '_navigation.html' %}
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
