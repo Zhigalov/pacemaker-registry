@@ -1,10 +1,8 @@
 import os
 import re
 from dataclasses import asdict, replace
-from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Literal
-from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -14,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from psycopg import Error as PsycopgError
 
 from pacemaker_registry import auth
+from pacemaker_registry.filters import Filters, RegistryFilters
 from pacemaker_registry.db import (
     Registry,
     list_events,
@@ -92,6 +91,7 @@ def analytics_context(request: Request) -> dict:
 templates = Jinja2Templates(
     directory=PACKAGE_DIR / "templates", context_processors=[analytics_context, auth.auth_context],
 )
+templates.env.globals["default_filters"] = RegistryFilters()
 templates.env.filters["rating_color"] = rating_color_style
 templates.env.filters["avatar_url"] = avatar_url
 templates.env.filters["flag_time"] = format_target_time
@@ -105,54 +105,34 @@ app.include_router(auth.router)
 app.include_router(create_admin_router(templates))
 
 
-DistanceFilter = Annotated[Decimal | None, Query(ge=0, le=Decimal('99999.999'), decimal_places=3)]
-NameSearch = Annotated[str, Query(max_length=160)]
-
-
-def _registry_parameters(event_id, min_events, distance_km=None, q=''):
-    params = {'event_id': event_id or 0, 'min_events': min_events}
-    if distance_km:
-        params['distance_km'] = format(distance_km.normalize(), 'f')
-    if q.strip():
-        params['q'] = ' '.join(q.split())
-    return params
-
-
 @app.get("/", response_class=HTMLResponse)
 def home(
     request: Request,
-    event_id: int | None = None,
-    min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
-    distance_km: DistanceFilter = None,
-    q: NameSearch = "",
+    filters: Filters,
     page: Annotated[int, Query(ge=1)] = 1,
     fragment: bool = False,
 ) -> HTMLResponse:
-    q = ' '.join(q.split())
     registry_error = None
     try:
         registry = load_registry(
-            event_id if event_id and event_id > 0 else None,
-            min_events=min_events,
-            distance_km=distance_km if distance_km else None,
-            search=q, page=page,
+            filters.event_id or None, min_events=filters.min_events,
+            distance_km=filters.distance_km, search=filters.q, page=page,
         )
     except (PsycopgError, RuntimeError):
         if fragment:
             raise HTTPException(503, "Не удалось загрузить следующую страницу.")
-        registry = Registry((), 0, 0, min_events=min_events, search=q)
+        registry = Registry((), 0, 0, min_events=filters.min_events, search=filters.q)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
     page, page_count = registry.page, registry.page_count
-    parameters = _registry_parameters(registry.selected_event_id, min_events, distance_km, q)
+    filters = replace(filters, event_id=registry.selected_event_id or 0)
     return templates.TemplateResponse(
         request=request, name="registry_fragment.html" if fragment else "index.html",
         context={"registry": registry, "registry_error": registry_error,
-                 "visible_pacemakers": registry.pacemakers,
+                 "visible_pacemakers": registry.pacemakers, "filters": filters,
                  "page": page, "page_count": page_count,
-                 "previous_page_url": '/?' + urlencode(dict(parameters, page=page - 1)),
-                 "next_page_url": '/?' + urlencode(dict(parameters, page=page + 1)),
-                 "clear_search_url": '/?' + urlencode(_registry_parameters(
-                     registry.selected_event_id, min_events, distance_km))},
+                 "previous_page_url": filters.url(page=page - 1),
+                 "next_page_url": filters.url(page=page + 1),
+                 "clear_search_url": filters.without_search().url()},
     )
 
 
@@ -272,11 +252,9 @@ def _load_result_or_404(result_id: int):
     return details
 
 
-def _result_response(request, details, event_id, min_events, *,
-                     target_time=None, error=None, saved=False, status_code=200, distance_km=None, q=''):
+def _result_response(request, details, filters, *,
+                     target_time=None, error=None, saved=False, status_code=200):
     source_url, source_event_url = _result_source_links(details.source_url)
-    params = _registry_parameters(event_id, min_events, distance_km, q)
-    query = urlencode(params)
     return templates.TemplateResponse(
         request=request, name="result.html",
         context={
@@ -285,8 +263,8 @@ def _result_response(request, details, event_id, min_events, *,
             "source_url": source_url, "source_event_url": source_event_url,
             "finish_config": asdict(details.event.formula),
             "pace_config": asdict(details.event.pace_formula),
-            "back_url": "/?" + query,
-            "edit_url": f"/results/{details.result.id}/target-time?" + query,
+            "back_url": filters.url(),
+            "edit_url": filters.url(f"/results/{details.result.id}/target-time"),
             "target_time_value": details.result.target_time_display if target_time is None else target_time,
             "error": error, "saved": saved,
         },
@@ -297,14 +275,11 @@ def _result_response(request, details, event_id, min_events, *,
 @app.get("/results/{result_id}", response_class=HTMLResponse)
 def result_page(
     request: Request, result_id: int,
-    event_id: Annotated[int, Query(ge=0)] = 0,
-    min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
-    distance_km: DistanceFilter = None,
-    q: NameSearch = "",
+    filters: Filters,
     saved: bool = False,
 ):
     return _result_response(request, _load_result_or_404(result_id),
-                            event_id, min_events, saved=saved, distance_km=distance_km, q=q)
+                            filters, saved=saved)
 
 
 @app.post("/results/{result_id}/target-time", response_class=HTMLResponse)
@@ -312,10 +287,7 @@ def edit_result_target_time(
     request: Request, result_id: int,
     target_time: Annotated[str, Form(max_length=20)],
     previous_target_time: Annotated[str, Form(max_length=20)],
-    event_id: Annotated[int, Query(ge=0)] = 0,
-    min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
-    distance_km: DistanceFilter = None,
-    q: NameSearch = "",
+    filters: Filters,
     target_time_format: Annotated[Literal["duration"] | None, Form()] = None,
 ):
     account = auth.require_write(request)
@@ -326,27 +298,24 @@ def edit_result_target_time(
         target_time = normalize_target_time(target_time, minutes_seconds=target_time_format == "duration")
     except ValueError as error:
         return _result_response(
-            request, details, event_id, min_events, target_time=target_time, distance_km=distance_km, q=q,
+            request, details, filters, target_time=target_time,
             error=str(error), status_code=422,
         )
     try:
         updated = update_result_target_time(result_id, target_time, previous_target_time)
     except (PsycopgError, RuntimeError):
         return _result_response(
-            request, details, event_id, min_events, target_time=format_target_time(target_time), distance_km=distance_km, q=q,
+            request, details, filters, target_time=format_target_time(target_time),
             error="Не удалось сохранить время. Проверьте текущее значение и попробуйте ещё раз.", status_code=503,
         )
     if not updated:
         details = _load_result_or_404(result_id)
         return _result_response(
-            request, details, event_id, min_events, target_time=format_target_time(target_time), distance_km=distance_km, q=q,
+            request, details, filters, target_time=format_target_time(target_time),
             error="Время уже изменено в другой вкладке. Сравните с текущей целью и подтвердите сохранение ещё раз.",
             status_code=409,
         )
-    params = _registry_parameters(event_id, min_events, distance_km, q)
-    params['saved'] = 'true'
-    query = urlencode(params)
-    return RedirectResponse(f"/results/{result_id}?{query}", status_code=303)
+    return RedirectResponse(filters.url(f"/results/{result_id}", saved='true'), status_code=303)
 
 
 @app.get("/add", response_class=HTMLResponse)

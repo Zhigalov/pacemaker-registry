@@ -26,7 +26,7 @@
 
               <div class="results-strip">
                 {% for result in pacemaker.results %}
-                  {{ result_card(result, registry.selected_event_id or 0, registry.min_events, registry.selected_distance, registry.search) }}
+                  {{ result_card(result, filters) }}
 
                 {% endfor %}
               </div>

@@ -1,8 +1,8 @@
 {% from '_icons.html' import icon %}
-{% macro result_card(result, event_id=0, min_events=1, distance_km=none, search="") -%}
+{% macro result_card(result, filters=default_filters) -%}
 <a
 class="result-summary"
-href="/results/{{ result.id }}?event_id={{ event_id }}&amp;min_events={{ min_events }}{% if distance_km %}&amp;distance_km={{ distance_km }}{% endif %}{% if search %}&amp;q={{ search|urlencode }}{% endif %}"
+href="{{ filters.url('/results/' ~ result.id) }}"
 >
 <span class="result-summary-data">
 <span class="result-summary-head">
