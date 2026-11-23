@@ -1,7 +1,7 @@
 import pytest
 
 from pacemaker_registry.runc import parse_result_html, parse_result_url
-from pacemaker_registry.russiarunning import Checkpoint, InvalidResultUrl
+from pacemaker_registry.imports import Checkpoint, InvalidResultUrl
 
 
 RESULT_URL = (

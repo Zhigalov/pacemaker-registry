@@ -8,50 +8,19 @@ from uuid import UUID
 
 import httpx
 
-from pacemaker_registry.times import elapsed_seconds, format_distance
+from pacemaker_registry.times import format_distance
+from pacemaker_registry.imports import (
+    InvalidResultUrl, ResultImportError, Checkpoint, RaceResult, guess_target_time,
+)
 
 
 RUSSIA_RUNNING_ORIGIN = "https://results.russiarunning.com"
 SLUG_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
-TARGET_TIME_TYPE_ROUND = "round"
-TARGET_TIME_TYPE_SUB_MINUTE = "sub_minute"
-
-
-class InvalidResultUrl(ValueError):
-    """The submitted URL is not a supported RussiaRunning result URL."""
-
-
-class RussiaRunningError(RuntimeError):
-    """RussiaRunning could not return a usable result."""
-
-
 @dataclass(frozen=True, slots=True)
 class ParticipantLink:
     event_code: str
     race_code: str
     participant_id: str
-    source_url: str
-
-
-@dataclass(frozen=True, slots=True)
-class Checkpoint:
-    distance_km: str
-    segment_distance_km: str
-    time: str
-    pace_per_km: str
-
-
-@dataclass(frozen=True, slots=True)
-class RaceResult:
-    athlete_name: str
-    source_event_id: str
-    source_participant_id: str
-    event_name: str
-    distance_km: str
-    chip_time: str
-    target_time: str
-    pace: str
-    checkpoints: tuple[Checkpoint, ...]
     source_url: str
 
 
@@ -101,11 +70,11 @@ def parse_result_payloads(
         None,
     )
     if race is None:
-        raise RussiaRunningError("Дистанция из ссылки не найдена в мероприятии.")
+        raise ResultImportError("Дистанция из ссылки не найдена в мероприятии.")
 
     results = profile.get("result", {}).get("results", [])
     if not results:
-        raise RussiaRunningError("RussiaRunning не вернул результат участника.")
+        raise ResultImportError("RussiaRunning не вернул результат участника.")
     participant = results[0]
 
     stage_results = {
@@ -148,7 +117,7 @@ def parse_result_payloads(
 
     distance = finish_distance if finish_distance is not None else race.get("distance")
     if distance is None:
-        raise RussiaRunningError("Не удалось определить дистанцию.")
+        raise ResultImportError("Не удалось определить дистанцию.")
 
     required_fields = {
         "athlete_name": participant.get("fullName"),
@@ -158,7 +127,7 @@ def parse_result_payloads(
         "pace": participant.get("pace"),
     }
     if not all(required_fields.values()):
-        raise RussiaRunningError("В ответе RussiaRunning не хватает обязательных полей.")
+        raise ResultImportError("В ответе RussiaRunning не хватает обязательных полей.")
 
     return RaceResult(
         athlete_name=required_fields["athlete_name"],
@@ -204,7 +173,7 @@ async def load_race_result(value: str) -> RaceResult:
                 None,
             )
             if race is None or not race.get("id") or not event.get("id"):
-                raise RussiaRunningError("Мероприятие или дистанция не найдены.")
+                raise ResultImportError("Мероприятие или дистанция не найдены.")
 
             options_response, profile_response = await asyncio.gather(
                 client.get(
@@ -224,10 +193,10 @@ async def load_race_result(value: str) -> RaceResult:
             profile_response.raise_for_status()
             options = options_response.json()
             profile = profile_response.json()
-    except RussiaRunningError:
+    except ResultImportError:
         raise
     except (httpx.HTTPError, ValueError, TypeError) as error:
-        raise RussiaRunningError(
+        raise ResultImportError(
             "Не удалось получить данные от RussiaRunning. Попробуйте ещё раз."
         ) from error
 
@@ -236,31 +205,3 @@ async def load_race_result(value: str) -> RaceResult:
 
 def _pace_value(value: str) -> str:
     return value.split()[0]
-
-
-def guess_target_time(chip_time: str, target_time_type: str | None = None) -> str:
-    """Guess the flag time from the nearest common pacemaker target."""
-    try:
-        chip_seconds = elapsed_seconds(chip_time)
-    except ValueError as error:
-        raise RussiaRunningError("Не удалось определить время на флаге.") from error
-    center_minute = chip_seconds // 60
-    candidate_minutes = range(max(0, center_minute - 5), center_minute + 7)
-    allowed_remainders = {
-        TARGET_TIME_TYPE_ROUND: (0,),
-        TARGET_TIME_TYPE_SUB_MINUTE: (4,),
-    }.get(target_time_type, (0, 4))
-    candidates = [
-        minute * 60
-        for minute in candidate_minutes
-        if minute % 5 in allowed_remainders
-    ]
-    target_seconds = min(
-        candidates,
-        key=lambda candidate: (
-            abs(candidate - chip_seconds),
-            candidate < chip_seconds,
-        ),
-    )
-    target_minutes = target_seconds // 60
-    return f"{target_minutes // 60:02d}:{target_minutes % 60:02d}"

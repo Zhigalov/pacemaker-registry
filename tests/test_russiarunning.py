@@ -1,12 +1,7 @@
 import pytest
 
-from pacemaker_registry.russiarunning import (
-    Checkpoint,
-    InvalidResultUrl,
-    guess_target_time,
-    parse_participant_url,
-    parse_result_payloads,
-)
+from pacemaker_registry.imports import Checkpoint, InvalidResultUrl, guess_target_time
+from pacemaker_registry.russiarunning import parse_participant_url, parse_result_payloads
 
 
 RESULT_URL = (

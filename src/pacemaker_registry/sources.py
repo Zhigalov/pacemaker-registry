@@ -3,13 +3,8 @@ from urllib.parse import urlsplit
 from pacemaker_registry.runc import (
     RUNC_ORIGIN, parse_result_url, load_race_result as load_runc_race_result,
 )
-from pacemaker_registry.russiarunning import (
-    InvalidResultUrl,
-    RaceResult,
-    RUSSIA_RUNNING_ORIGIN,
-    parse_participant_url,
-    load_race_result as load_russia_running_race_result,
-)
+from pacemaker_registry.imports import InvalidResultUrl, RaceResult
+from pacemaker_registry.russiarunning import RUSSIA_RUNNING_ORIGIN, parse_participant_url, load_race_result as load_russia_running_race_result
 
 
 def _hostname(value: str) -> str | None:

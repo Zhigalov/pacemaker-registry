@@ -11,7 +11,7 @@ import pytest
 
 from pacemaker_registry import auth, db, migrate
 from pacemaker_registry.rating import EventRatingConfig, PaceRatingConfig
-from pacemaker_registry.russiarunning import Checkpoint, RaceResult
+from pacemaker_registry.imports import Checkpoint, RaceResult
 
 
 @pytest.fixture

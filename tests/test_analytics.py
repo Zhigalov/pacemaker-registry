@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from pacemaker_registry import main
-from pacemaker_registry.russiarunning import RaceResult, RussiaRunningError
+from pacemaker_registry.imports import RaceResult, ResultImportError
 
 pytestmark = pytest.mark.usefixtures("admin_session")
 
@@ -48,7 +48,7 @@ def test_save_goal_only_for_new_successful_result(monkeypatch, created):
 
 
 def test_parse_error_is_not_a_success_goal(monkeypatch):
-    async def fail(_): raise RussiaRunningError("Источник недоступен")
+    async def fail(_): raise ResultImportError("Источник недоступен")
     monkeypatch.setattr(main, "load_race_result", fail)
     response = TestClient(main.app).post("/add", data={"result_url": "https://example.com"})
     assert response.status_code == 502

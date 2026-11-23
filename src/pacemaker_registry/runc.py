@@ -7,13 +7,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 import httpx
 
-from pacemaker_registry.russiarunning import (
-    Checkpoint,
-    InvalidResultUrl,
-    RaceResult,
-    RussiaRunningError,
-    guess_target_time,
-)
+from pacemaker_registry.imports import Checkpoint, InvalidResultUrl, RaceResult, ResultImportError, guess_target_time
 
 from pacemaker_registry.times import (
     elapsed_seconds, format_duration, format_elapsed_time, format_pace,
@@ -72,15 +66,15 @@ def parse_result_html(link: RuncResultLink, document: str) -> RaceResult:
     pace = indicators.get("Средний темп")
     distance_text = indicators.get("Дистанция (км)")
     if not all((event_name, athlete_name, chip_time, pace, distance_text)):
-        raise RussiaRunningError("В ответе RUNC не хватает обязательных полей.")
+        raise ResultImportError("В ответе RUNC не хватает обязательных полей.")
 
     try:
         distance = parse_distance(distance_text)
         chip_seconds = elapsed_seconds(chip_time)
     except (ArithmeticError, ValueError) as error:
-        raise RussiaRunningError("RUNC вернул некорректное время или дистанцию.") from error
+        raise ResultImportError("RUNC вернул некорректное время или дистанцию.") from error
     if distance <= 0:
-        raise RussiaRunningError("RUNC вернул некорректную дистанцию.")
+        raise ResultImportError("RUNC вернул некорректную дистанцию.")
 
     checkpoint_values = _parse_checkpoint_values(document)
     checkpoints: list[Checkpoint] = []
@@ -154,7 +148,7 @@ async def load_race_result(value: str) -> RaceResult:
             response.raise_for_status()
             document = response.text
     except httpx.HTTPError as error:
-        raise RussiaRunningError(
+        raise ResultImportError(
             "Не удалось получить данные от RUNC. Попробуйте ещё раз."
         ) from error
 
@@ -227,6 +221,6 @@ def _clean_html(value: str) -> str:
 def _pace_value(value: str) -> str:
     match = re.search(r"[0-9]+:[0-5][0-9]", value)
     if not match:
-        raise RussiaRunningError("RUNC вернул некорректный средний темп.")
+        raise ResultImportError("RUNC вернул некорректный средний темп.")
     minutes, seconds = map(int, match.group().split(":"))
     return f"{minutes:02d}:{seconds:02d}"

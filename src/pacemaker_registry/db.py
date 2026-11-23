@@ -9,12 +9,7 @@ from psycopg import Connection
 from psycopg.types.json import Jsonb
 from psycopg.rows import dict_row
 
-from pacemaker_registry.russiarunning import (
-    TARGET_TIME_TYPE_ROUND,
-    TARGET_TIME_TYPE_SUB_MINUTE,
-    RaceResult,
-    RussiaRunningError,
-)
+from pacemaker_registry.imports import TARGET_TIME_TYPE_ROUND, TARGET_TIME_TYPE_SUB_MINUTE, RaceResult, ResultImportError
 
 
 from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig, mean_rating, pacemaker_rating
@@ -378,7 +373,7 @@ def _target_time_type_from_target_time(target_time: str) -> str | None:
 def _split_athlete_name(full_name: str) -> tuple[str, str]:
     parts = full_name.split(maxsplit=1)
     if len(parts) != 2:
-        raise RussiaRunningError("Не удалось разделить фамилию и имя участника.")
+        raise ResultImportError("Не удалось разделить фамилию и имя участника.")
     return parts[0], parts[1]
 
 

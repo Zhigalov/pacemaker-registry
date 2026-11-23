@@ -32,12 +32,7 @@ from pacemaker_registry.rating import (
     default_event_rating, parse_event_rating, rating_color_style,
     PaceRatingConfig, parse_pace_rating,
 )
-from pacemaker_registry.russiarunning import (
-    InvalidResultUrl,
-    RaceResult,
-    RussiaRunningError,
-    guess_target_time,
-)
+from pacemaker_registry.imports import InvalidResultUrl, RaceResult, ResultImportError, guess_target_time
 from pacemaker_registry.sources import load_race_result, result_source_links as _result_source_links
 from pacemaker_registry.times import format_target_time, normalize_target_time
 from pacemaker_registry.avatars import avatar_url
@@ -348,7 +343,7 @@ async def _preview_result(request: Request, result_url: str) -> HTMLResponse:
         except InvalidResultUrl as exception:
             error = str(exception)
             status_code = 422
-        except RussiaRunningError as exception:
+        except ResultImportError as exception:
             error = str(exception)
             status_code = 502
 
@@ -408,7 +403,7 @@ async def save_result(
         except InvalidResultUrl as exception:
             error = str(exception)
             status_code = 422
-        except RussiaRunningError as exception:
+        except ResultImportError as exception:
             error = str(exception)
             status_code = 502
         except (PsycopgError, RuntimeError):

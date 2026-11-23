@@ -1,6 +1,6 @@
 import pytest
 
-from pacemaker_registry.russiarunning import InvalidResultUrl
+from pacemaker_registry.imports import InvalidResultUrl
 from pacemaker_registry.sources import load_race_result
 
 

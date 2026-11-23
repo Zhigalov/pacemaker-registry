@@ -8,7 +8,7 @@ from pacemaker_registry.db import (
 )
 from pacemaker_registry.models import RegistryCard
 from pacemaker_registry.main import app, asset_url
-from pacemaker_registry.russiarunning import Checkpoint, RaceResult
+from pacemaker_registry.imports import Checkpoint, RaceResult
 
 pytestmark = pytest.mark.usefixtures("admin_session")
 
