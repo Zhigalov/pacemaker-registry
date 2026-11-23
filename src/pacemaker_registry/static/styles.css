@@ -1447,6 +1447,7 @@ a.event-preview-count:hover span:first-child { text-decoration: underline; }
 @media (max-width: 420px) { .events-controls { flex-basis: 100%; } }
 
 .registry-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem; margin: 1rem 0; font-size: .85rem; }
+.registry-pagination [hidden] { display: none; }
 .registry-rating-note { margin: .85rem 0 0; color: #64756d; font-size: .78rem; line-height: 1.5; }
 
 .registry-filter-field--search { grid-column: 1 / -1; }

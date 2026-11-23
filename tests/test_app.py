@@ -63,7 +63,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=registry-pages"' in response.text
+    assert 'href="/static/styles.css?v=registry-scroll"' in response.text
     assert 'src="/static/apple-touch-icon.png?v=equal-flags"' in response.text
     assert 'class="registry-heading"' not in response.text
     assert 'Статистика отфильтрованного списка' in response.text
@@ -547,7 +547,7 @@ async def test_large_registry_is_paginated_and_keeps_filters(monkeypatch):
         assert len(first.content) < 1_000_000
         assert first.text.count('class="pacemaker-row"') == 25
         assert 'Страница 1 из 21' in first.text
-        next_url = html.unescape(re.search(r'href="([^"]+)">Далее', first.text)[1])
+        next_url = html.unescape(re.search(r'href="([^"]+)" data-next-page>Далее', first.text)[1])
         assert parse_qs(urlsplit(next_url).query) == {
             'event_id': ['1'], 'min_events': ['2'], 'distance_km': ['10'],
             'q': ['Пейсмейкер'], 'page': ['2'],
@@ -555,8 +555,28 @@ async def test_large_registry_is_paginated_and_keeps_filters(monkeypatch):
         second = await client.get(next_url)
         assert 'Пейсмейкер 25</a>' in second.text
         assert 'Пейсмейкер 0</a>' not in second.text
+        fragment = await client.get(next_url + '&fragment=true')
+        assert fragment.status_code == 200
+        assert '<html' not in fragment.text
+        assert '<script' not in fragment.text
+        assert 'data-registry-fragment' in fragment.text
+        assert 'data-next-url=' in fragment.text
+        assert fragment.text.count('class="pacemaker-row"') == 25
+        assert 'Пейсмейкер 25</a>' in fragment.text
+        assert len(fragment.content) < len(second.content)
         last = await client.get('/?page=999')
         assert last.text.count('class="pacemaker-row"') == 1
         assert 'Страница 21 из 21' in last.text
+        last_fragment = await client.get('/?page=21&fragment=true')
+        assert 'data-next-url=' not in last_fragment.text
         invalid = await client.get('/?page=0')
         assert invalid.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_fragment_database_error_can_be_retried(monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise RuntimeError('Database unavailable')
+    monkeypatch.setattr('pacemaker_registry.main.load_registry', unavailable)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        assert (await client.get('/?fragment=true')).status_code == 503

@@ -1,0 +1,34 @@
+{% from '_result_card.html' import result_card %}
+          {% for pacemaker in visible_pacemakers %}
+            <article class="pacemaker-row">
+              <header class="pacemaker-profile">
+                <a class="pacemaker-avatar" href="/pacemakers/{{ pacemaker.id }}" aria-label="Профиль: {{ pacemaker.full_name }}">
+                  <span aria-hidden="true">{{ pacemaker.initials }}</span>
+                  {% set photo_url = pacemaker.avatar_key | avatar_url %}
+                  {% if photo_url %}<img src="{{ photo_url }}" alt="" width="45" height="45" loading="lazy" decoding="async" data-avatar-image>{% endif %}
+                </a>
+                <div>
+                  <h2><a class="pacemaker-name-link" href="/pacemakers/{{ pacemaker.id }}">{{ pacemaker.full_name }}</a></h2>
+                  <span class="pacemaker-event-count" title="Количество выступлений за всю историю, включая разные дистанции одного соревнования">Выступлений: {{ pacemaker.performance_count }}</span>
+                  <div
+                    class="pacemaker-rating"
+                    style="{{ pacemaker.rating | rating_color }}"
+                    aria-label="Рейтинг {{ '%.1f'|format(pacemaker.rating)|replace('.', ',') }} из 10"
+                  >
+                    <span class="pacemaker-rating-value">{{ "%.1f"|format(pacemaker.rating)|replace(".", ",") }}</span>
+                    <span class="pacemaker-rating-max">/10</span>
+                    <span class="rating-meter" aria-hidden="true">
+                      <span style="width: {{ pacemaker.rating * 10 }}%"></span>
+                    </span>
+                  </div>
+                </div>
+              </header>
+
+              <div class="results-strip">
+                {% for result in pacemaker.results %}
+                  {{ result_card(result, registry.selected_event_id or 0, registry.min_events, registry.selected_distance, registry.search) }}
+
+                {% endfor %}
+              </div>
+            </article>
+          {% endfor %}

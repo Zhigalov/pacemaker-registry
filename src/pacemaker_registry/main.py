@@ -126,6 +126,7 @@ def home(
     distance_km: DistanceFilter = None,
     q: NameSearch = "",
     page: Annotated[int, Query(ge=1)] = 1,
+    fragment: bool = False,
 ) -> HTMLResponse:
     q = ' '.join(q.split())
     registry_error = None
@@ -137,6 +138,8 @@ def home(
             search=q,
         )
     except (PsycopgError, RuntimeError):
+        if fragment:
+            raise HTTPException(503, "Не удалось загрузить следующую страницу.")
         registry = Registry((), 0, 0, min_events=min_events, search=q)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
     page_size = 25
@@ -144,7 +147,7 @@ def home(
     page = min(page, page_count)
     parameters = _registry_parameters(registry.selected_event_id, min_events, distance_km, q)
     return templates.TemplateResponse(
-        request=request, name="index.html",
+        request=request, name="registry_fragment.html" if fragment else "index.html",
         context={"registry": registry, "registry_error": registry_error,
                  "visible_pacemakers": registry.pacemakers[(page - 1) * page_size:page * page_size],
                  "page": page, "page_count": page_count,
