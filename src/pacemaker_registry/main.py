@@ -125,6 +125,7 @@ def home(
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
     distance_km: DistanceFilter = None,
     q: NameSearch = "",
+    page: Annotated[int, Query(ge=1)] = 1,
 ) -> HTMLResponse:
     q = ' '.join(q.split())
     registry_error = None
@@ -138,9 +139,17 @@ def home(
     except (PsycopgError, RuntimeError):
         registry = Registry((), 0, 0, min_events=min_events, search=q)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
+    page_size = 25
+    page_count = max(1, (len(registry.pacemakers) + page_size - 1) // page_size)
+    page = min(page, page_count)
+    parameters = _registry_parameters(registry.selected_event_id, min_events, distance_km, q)
     return templates.TemplateResponse(
         request=request, name="index.html",
         context={"registry": registry, "registry_error": registry_error,
+                 "visible_pacemakers": registry.pacemakers[(page - 1) * page_size:page * page_size],
+                 "page": page, "page_count": page_count,
+                 "previous_page_url": '/?' + urlencode(dict(parameters, page=page - 1)),
+                 "next_page_url": '/?' + urlencode(dict(parameters, page=page + 1)),
                  "clear_search_url": '/?' + urlencode(_registry_parameters(
                      registry.selected_event_id, min_events, distance_km))},
     )

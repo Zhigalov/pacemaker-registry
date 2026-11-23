@@ -9,7 +9,7 @@
     <title>Реестр пейсмейкеров</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png?v=equal-flags">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=equal-flags">
-    <link rel="stylesheet" href="/static/styles.css?v=event-suggest">
+    <link rel="stylesheet" href="/static/styles.css?v=registry-pages">
     <link rel="stylesheet" href="/static/profiles.css?v=3">
     <script src="/static/registry.js?v=name-search" defer></script>
     <script src="/static/event-suggest.js?v=1" defer></script>
@@ -104,7 +104,7 @@
             <span>Соревнования</span>
           </div>
 
-          {% for pacemaker in registry.pacemakers %}
+          {% for pacemaker in visible_pacemakers %}
             <article class="pacemaker-row">
               <header class="pacemaker-profile">
                 <a class="pacemaker-avatar" href="/pacemakers/{{ pacemaker.id }}" aria-label="Профиль: {{ pacemaker.full_name }}">
@@ -138,6 +138,14 @@
             </article>
           {% endfor %}
         </section>
+
+        {% if page_count > 1 %}
+        <nav class="registry-pagination" aria-label="Страницы рейтинга">
+          {% if page > 1 %}<a class="button button-secondary" href="{{ previous_page_url }}">← Назад</a>{% endif %}
+          <span>Страница {{ page }} из {{ page_count }}</span>
+          {% if page < page_count %}<a class="button button-secondary" href="{{ next_page_url }}">Далее →</a>{% endif %}
+        </nav>
+        {% endif %}
 
         <details class="rating-methodology" id="rating-methodology">
           <summary>

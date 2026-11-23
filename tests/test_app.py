@@ -63,7 +63,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "Реестр пейсмейкеров" in response.text
     assert 'href="/static/favicon.png?v=equal-flags"' in response.text
     assert 'href="/static/apple-touch-icon.png?v=equal-flags"' in response.text
-    assert 'href="/static/styles.css?v=event-suggest"' in response.text
+    assert 'href="/static/styles.css?v=registry-pages"' in response.text
     assert 'src="/static/apple-touch-icon.png?v=equal-flags"' in response.text
     assert 'class="registry-heading"' not in response.text
     assert 'Статистика отфильтрованного списка' in response.text
@@ -525,3 +525,38 @@ async def test_name_search_is_carried_by_result_cards(monkeypatch):
         r = await client.get('/?q=Иван+Петров&distance_km=10')
     link = html.unescape(re.search(r'class="result-summary"\s+href="([^"]+)"',r.text).group(1))
     assert parse_qs(urlsplit(link).query)['q'] == ['Иван Петров']
+
+
+@pytest.mark.anyio
+async def test_large_registry_is_paginated_and_keeps_filters(monkeypatch):
+    from dataclasses import replace
+    from urllib.parse import parse_qs, urlsplit
+    import html
+    import re
+
+    card = RegistryCard(1, 1, 'Большое соревнование', '10', '00:50', '00:49:59', 10, 10, 10)
+    pacemakers = tuple(
+        RegistryPacemaker(i, f'Пейсмейкер {i}', 'ПП', 10, tuple(replace(card, id=i * 10 + n) for n in range(5)))
+        for i in range(501)
+    )
+    registry = Registry(pacemakers, 1, 2505, selected_event_id=1)
+    monkeypatch.setattr('pacemaker_registry.main.load_registry', lambda *a, **k: registry)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        first = await client.get('/?event_id=1&min_events=2&distance_km=10&q=Пейсмейкер')
+        assert first.status_code == 200
+        assert len(first.content) < 1_000_000
+        assert first.text.count('class="pacemaker-row"') == 25
+        assert 'Страница 1 из 21' in first.text
+        next_url = html.unescape(re.search(r'href="([^"]+)">Далее', first.text)[1])
+        assert parse_qs(urlsplit(next_url).query) == {
+            'event_id': ['1'], 'min_events': ['2'], 'distance_km': ['10'],
+            'q': ['Пейсмейкер'], 'page': ['2'],
+        }
+        second = await client.get(next_url)
+        assert 'Пейсмейкер 25</a>' in second.text
+        assert 'Пейсмейкер 0</a>' not in second.text
+        last = await client.get('/?page=999')
+        assert last.text.count('class="pacemaker-row"') == 1
+        assert 'Страница 21 из 21' in last.text
+        invalid = await client.get('/?page=0')
+        assert invalid.status_code == 422
