@@ -1,7 +1,7 @@
 import html
 import re
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from urllib.parse import urlsplit
 from uuid import NAMESPACE_URL, uuid5
 
@@ -13,6 +13,11 @@ from pacemaker_registry.russiarunning import (
     RaceResult,
     RussiaRunningError,
     guess_target_time,
+)
+
+from pacemaker_registry.times import (
+    elapsed_seconds, format_duration, format_elapsed_time, format_pace,
+    parse_distance, format_distance,
 )
 
 
@@ -70,8 +75,8 @@ def parse_result_html(link: RuncResultLink, document: str) -> RaceResult:
         raise RussiaRunningError("В ответе RUNC не хватает обязательных полей.")
 
     try:
-        distance = _parse_decimal(distance_text)
-        chip_seconds = _time_to_seconds(chip_time)
+        distance = parse_distance(distance_text)
+        chip_seconds = elapsed_seconds(chip_time)
     except (ArithmeticError, ValueError) as error:
         raise RussiaRunningError("RUNC вернул некорректное время или дистанцию.") from error
     if distance <= 0:
@@ -85,22 +90,22 @@ def parse_result_html(link: RuncResultLink, document: str) -> RaceResult:
         if distance_value <= previous_distance:
             continue
         try:
-            elapsed_seconds = _time_to_seconds(elapsed_time)
+            checkpoint_seconds = elapsed_seconds(elapsed_time)
         except ValueError:
             # RUNC can show a placeholder for an unrecorded split.
             continue
-        if elapsed_seconds <= previous_time:
+        if checkpoint_seconds <= previous_time:
             continue
         checkpoints.append(
             _make_checkpoint(
                 distance_value,
-                elapsed_seconds,
+                checkpoint_seconds,
                 previous_distance,
                 previous_time,
             )
         )
         previous_distance = distance_value
-        previous_time = elapsed_seconds
+        previous_time = checkpoint_seconds
 
     if distance > previous_distance and chip_seconds > previous_time:
         checkpoints.append(
@@ -112,7 +117,7 @@ def parse_result_html(link: RuncResultLink, document: str) -> RaceResult:
             )
         )
 
-    normalized_chip_time = _format_finish_time(chip_seconds)
+    normalized_chip_time = format_duration(chip_seconds)
     source_participant_id = str(
         uuid5(NAMESPACE_URL, f"runc:{link.event_code}:{link.result_id}")
     )
@@ -121,7 +126,7 @@ def parse_result_html(link: RuncResultLink, document: str) -> RaceResult:
         source_event_id=f"runc:{link.event_code}",
         source_participant_id=source_participant_id,
         event_name=event_name,
-        distance_km=_format_distance(distance),
+        distance_km=format_distance(distance),
         chip_time=normalized_chip_time,
         target_time=guess_target_time(normalized_chip_time),
         pace=f"{_pace_value(pace)} /км",
@@ -194,7 +199,7 @@ def _parse_checkpoint_values(document: str) -> list[tuple[Decimal, str]]:
         elapsed_time = _clean_html(elapsed_html)
         if not distance_match or not elapsed_time:
             continue
-        parsed.append((_parse_decimal(distance_match.group()), elapsed_time))
+        parsed.append((parse_distance(distance_match.group()), elapsed_time))
     return parsed
 
 
@@ -207,64 +212,16 @@ def _make_checkpoint(
     segment_distance = distance - previous_distance
     segment_seconds = elapsed_seconds - previous_time
     return Checkpoint(
-        distance_km=_format_distance(distance, fixed=True),
-        segment_distance_km=_format_distance(segment_distance, fixed=True),
-        time=_format_elapsed_time(elapsed_seconds),
-        pace_per_km=_format_pace(segment_seconds, segment_distance),
+        distance_km=format_distance(distance, fixed=True),
+        segment_distance_km=format_distance(segment_distance, fixed=True),
+        time=format_elapsed_time(elapsed_seconds),
+        pace_per_km=format_pace(segment_seconds, segment_distance),
     )
 
 
 def _clean_html(value: str) -> str:
     without_tags = TAG_PATTERN.sub(" ", value)
     return " ".join(html.unescape(without_tags).split())
-
-
-def _parse_decimal(value: str) -> Decimal:
-    return Decimal(value.strip().replace(",", "."))
-
-
-def _time_to_seconds(value: str) -> int:
-    parts = value.strip().split(":")
-    if len(parts) == 2:
-        hours = 0
-        minutes, seconds = map(int, parts)
-    elif len(parts) == 3:
-        hours, minutes, seconds = map(int, parts)
-    else:
-        raise ValueError("unsupported time")
-    if hours < 0 or minutes < 0 or seconds < 0 or minutes >= 60 or seconds >= 60:
-        raise ValueError("invalid time")
-    return hours * 3600 + minutes * 60 + seconds
-
-
-def _format_finish_time(total_seconds: int) -> str:
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-
-
-def _format_elapsed_time(total_seconds: int) -> str:
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    if hours:
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-    return f"{minutes:02d}:{seconds:02d}"
-
-
-def _format_pace(segment_seconds: int, segment_distance: Decimal) -> str:
-    seconds_per_km = int(
-        (Decimal(segment_seconds) / segment_distance).quantize(
-            Decimal("1"), rounding=ROUND_HALF_UP
-        )
-    )
-    minutes, seconds = divmod(seconds_per_km, 60)
-    return f"{minutes:02d}:{seconds:02d}"
-
-
-def _format_distance(value: Decimal, *, fixed: bool = False) -> str:
-    if fixed:
-        return f"{value:.2f}".replace(".", ",")
-    return format(value.normalize(), "f").replace(".", ",")
 
 
 def _pace_value(value: str) -> str:

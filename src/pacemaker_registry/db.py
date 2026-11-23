@@ -21,7 +21,7 @@ from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, Eve
 from pacemaker_registry.names import matches_name
 from pacemaker_registry.models import Registry, RegistryEvent, RegistryPacemaker, ResultDetails, PacemakerProfile
 from pacemaker_registry.registry import score_result, _sort_pacemakers
-from pacemaker_registry.times import normalize_target_time, target_seconds
+from pacemaker_registry.times import normalize_target_time, target_seconds, parse_distance
 
 
 def _read_results(connection, conditions=(), parameters=(), *, events=None, details=False,
@@ -285,7 +285,7 @@ def save_race_result(result: RaceResult, target_time: str, account_id: int | Non
     target_time = normalize_target_time(target_time)
     last_name, first_name = _split_athlete_name(result.athlete_name)
     checkpoints = [asdict(checkpoint) for checkpoint in result.checkpoints]
-    distance = Decimal(result.distance_km.replace(",", "."))
+    distance = parse_distance(result.distance_km)
     target_time_type = _target_time_type_from_target_time(target_time)
 
     with connect_database() as connection:

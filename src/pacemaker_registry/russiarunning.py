@@ -8,7 +8,7 @@ from uuid import UUID
 
 import httpx
 
-from pacemaker_registry.times import elapsed_seconds
+from pacemaker_registry.times import elapsed_seconds, format_distance
 
 
 RUSSIA_RUNNING_ORIGIN = "https://results.russiarunning.com"
@@ -138,8 +138,8 @@ def parse_result_payloads(
         segment_distance = checkpoint_distance - previous_checkpoint_distance
         checkpoints.append(
             Checkpoint(
-                distance_km=_format_distance(checkpoint_distance, fixed=True),
-                segment_distance_km=_format_distance(segment_distance, fixed=True),
+                distance_km=format_distance(checkpoint_distance, fixed=True),
+                segment_distance_km=format_distance(segment_distance, fixed=True),
                 time=checkpoint_time,
                 pace_per_km=_pace_value(checkpoint_pace),
             )
@@ -165,7 +165,7 @@ def parse_result_payloads(
         source_event_id=str(required_fields["source_event_id"]),
         source_participant_id=link.participant_id,
         event_name=required_fields["event_name"],
-        distance_km=_format_distance(distance),
+        distance_km=format_distance(distance),
         chip_time=required_fields["chip_time"],
         target_time=guess_target_time(required_fields["chip_time"]),
         pace=required_fields["pace"],
@@ -232,13 +232,6 @@ async def load_race_result(value: str) -> RaceResult:
         ) from error
 
     return parse_result_payloads(link, event, options, profile)
-
-
-def _format_distance(value: Any, *, fixed: bool = False) -> str:
-    distance = Decimal(str(value))
-    if fixed:
-        return f"{distance:.2f}".replace(".", ",")
-    return format(distance.normalize(), "f").replace(".", ",")
 
 
 def _pace_value(value: str) -> str:

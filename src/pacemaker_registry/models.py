@@ -39,8 +39,12 @@ class RegistryCard:
         return format_duration(elapsed_seconds(self.chip_time))
 
     @property
+    def time_deviation(self) -> int:
+        return _time_difference_seconds(self.target_time, self.chip_time)
+
+    @property
     def finish_difference_display(self) -> str:
-        difference = _time_difference_seconds(self.target_time, self.chip_time)
+        difference = self.time_deviation
         sign = "+" if difference > 0 else "−" if difference < 0 else ""
         return f"{sign}{abs(difference)} с"
 
@@ -72,7 +76,7 @@ class RegistryPacemaker:
 
     @property
     def mean_finish_deviation(self) -> float:
-        return (sum(abs(_time_difference_seconds(result.target_time, result.chip_time))
+        return (sum(abs(result.time_deviation)
                     for result in self.results) / len(self.results)) if self.results else float("inf")
 
 

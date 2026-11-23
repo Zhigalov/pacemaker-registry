@@ -1,5 +1,6 @@
-from pacemaker_registry.registry import (_calculate_target_pace, _format_time_difference, _sort_pacemakers, calculate_combined_rating, calculate_rating_for_difference, calculate_pacemaker_rating, calculate_split_rating, calculate_splits_rating)
+from pacemaker_registry.registry import (_format_time_difference, _sort_pacemakers, calculate_combined_rating, calculate_rating_for_difference, calculate_pacemaker_rating, calculate_split_rating, calculate_splits_rating)
 from decimal import Decimal
+from pacemaker_registry.times import format_pace, target_seconds
 
 import pytest
 
@@ -72,11 +73,11 @@ def test_save_result_records_event_type_from_confirmed_target(
 
 
 def test_calculate_target_pace_from_flag_time_and_distance() -> None:
-    assert _calculate_target_pace("01:54", Decimal("21.1")) == "05:24 /км"
+    assert format_pace(target_seconds("01:54"), Decimal("21.1")) == "05:24"
 
 
 def test_calculate_target_pace_rounds_to_nearest_second() -> None:
-    assert _calculate_target_pace("00:30", Decimal("5")) == "06:00 /км"
+    assert format_pace(target_seconds("00:30"), Decimal("5")) == "06:00"
 
 
 def test_rating_uses_event_formula_not_target_minutes() -> None:

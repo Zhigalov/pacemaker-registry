@@ -1,6 +1,6 @@
 """Registry assembly and scoring; no database or network operations."""
 from dataclasses import asdict, dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from math import isfinite
 from pacemaker_registry.models import RegistryCard, RegistryResult, RegistryPacemaker, RegistryEvent, ResultScore
 from pacemaker_registry.rating import (
@@ -8,6 +8,7 @@ from pacemaker_registry.rating import (
 )
 from pacemaker_registry.times import (
     time_difference_seconds as _time_difference_seconds, target_seconds as _target_time_seconds,
+    elapsed_seconds, pace_seconds, format_pace, parse_distance, format_distance,
 )
 
 FINISH_RATING_WEIGHT = 0.6
@@ -23,6 +24,8 @@ class ScoredResult:
     target_time: str
     chip_time: str
     score: ResultScore
+    target_seconds: int
+    chip_seconds: int
     pacemaker_id: int = 0
     last_name: str = ""
     first_name: str = ""
@@ -37,16 +40,20 @@ class ScoredResult:
     def rating(self) -> float:
         return self.score.rating
 
+    @property
+    def time_deviation(self) -> int:
+        return self.score.finish_deviation
+
     def card(self) -> RegistryCard:
         return RegistryCard(
-            self.id, self.event.id, self.event.name, _format_registry_distance(self.distance),
+            self.id, self.event.id, self.event.name, format_distance(self.distance),
             self.target_time, self.chip_time, self.score.finish_rating, self.score.splits_rating,
             self.rating, splits_enabled=self.event.splits_enabled,
         )
 
     def details(self) -> RegistryResult:
         return RegistryResult(
-            **asdict(self.card()), target_pace=_calculate_target_pace(self.target_time, self.distance),
+            **asdict(self.card()), target_pace=format_pace(self.target_seconds, self.distance) + " /км",
             actual_pace=self.actual_pace, time_difference=_format_time_difference(self.score.finish_deviation),
             checkpoints=self.checkpoints, finish_deviation=self.score.finish_deviation,
             pace_markers=tuple({"label": str(point.get("distance_km", "?")) + " км",
@@ -57,25 +64,18 @@ class ScoredResult:
 
 def score_result(result_id, event, distance, target_time, chip_time, actual_pace, checkpoints,
                  *, details=False, **metadata) -> ScoredResult:
-    segments = _rated_segments(target_time, distance, checkpoints, event.pace_formula) if event.splits_enabled else ()
+    target = _target_time_seconds(target_time)
+    chip = elapsed_seconds(chip_time)
+    segments = _rated_segments(target, distance, checkpoints, event.pace_formula) if event.splits_enabled else ()
     if details:
         segments = tuple(segments)
-    deviation = _time_difference_seconds(target_time, chip_time)
+    deviation = chip - target
     finish = calculate_rating_for_difference(deviation, event.formula)
     splits = _weighted_splits_rating(distance, segments)
     score = ResultScore(finish, splits, calculate_combined_rating(finish, splits), deviation)
-    return ScoredResult(result_id, event, distance, target_time, chip_time, score,
+    return ScoredResult(result_id, event, distance, target_time, chip_time, score, target, chip,
                         actual_pace=actual_pace, checkpoints=tuple(checkpoints) if details else (),
                         segments=segments if details else (), **metadata)
-
-
-def _calculate_target_pace(target_time: str, distance_km: Decimal) -> str:
-    seconds_per_km = int(
-        (Decimal(_target_time_seconds(target_time)) / distance_km).quantize(
-            Decimal("1"), rounding=ROUND_HALF_UP
-        )
-    )
-    return f"{seconds_per_km // 60:02d}:{seconds_per_km % 60:02d} /км"
 
 
 def calculate_pacemaker_rating(
@@ -95,7 +95,7 @@ def calculate_splits_rating(
     config: PaceRatingConfig = PaceRatingConfig(),
 ) -> float | None:
     """Return a distance-weighted rating for checkpoint segment paces."""
-    return _weighted_splits_rating(distance_km, _rated_segments(target_time, distance_km, checkpoints, config))
+    return _weighted_splits_rating(distance_km, _rated_segments(_target_time_seconds(target_time), distance_km, checkpoints, config))
 
 
 def _weighted_splits_rating(distance_km, segments) -> float | None:
@@ -113,22 +113,20 @@ def _weighted_splits_rating(distance_km, segments) -> float | None:
     return weighted_rating / float(covered_distance)
 
 
-def _rated_segments(target_time, distance_km, checkpoints, config):
+def _rated_segments(target_seconds, distance_km, checkpoints, config):
     """One source for the weighted rating and exact per-segment chart markers."""
     if not distance_km.is_finite() or distance_km <= 0:
         return
-    target_pace_seconds = _target_time_seconds(target_time) / float(distance_km)
+    target_pace_seconds = target_seconds / float(distance_km)
     for checkpoint in checkpoints:
         try:
-            segment_distance = Decimal(
-                str(checkpoint["segment_distance_km"]).replace(",", ".")
-            )
-            pace_seconds = _pace_seconds(str(checkpoint["pace_per_km"]))
+            segment_distance = parse_distance(checkpoint["segment_distance_km"])
+            pace = pace_seconds(str(checkpoint["pace_per_km"]))
         except (KeyError, ValueError, ArithmeticError):
             continue
-        if not segment_distance.is_finite() or segment_distance <= 0 or pace_seconds <= 0:
+        if not segment_distance.is_finite() or segment_distance <= 0 or pace <= 0:
             continue
-        deviation = pace_seconds - target_pace_seconds
+        deviation = pace - target_pace_seconds
         if isfinite(deviation):
             yield checkpoint, segment_distance, deviation, calculate_split_rating(deviation, config)
 
@@ -144,12 +142,6 @@ def calculate_combined_rating(
         finish_rating * FINISH_RATING_WEIGHT
         + splits_rating * SPLITS_RATING_WEIGHT
     )
-
-
-def _pace_seconds(pace: str) -> int:
-    normalized = pace.replace("/км", "").strip()
-    minutes, seconds = map(int, normalized.split(":"))
-    return minutes * 60 + seconds
 
 
 def _format_time_difference(seconds: int) -> str:
@@ -178,7 +170,3 @@ def _sort_pacemakers(
             ),
         )
     )
-
-
-def _format_registry_distance(distance: Decimal) -> str:
-    return format(distance.normalize(), "f").replace(".", ",")
