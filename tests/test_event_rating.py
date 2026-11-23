@@ -130,6 +130,8 @@ def test_database_roundtrip_uses_event_id_and_json(monkeypatch):
     class Connection:
         def __enter__(self): return self
         def __exit__(self, *_): pass
+        def cursor(self, **kwargs): return self
+        def fetchall(self): return [self.fetchone()]
         def execute(self, query, parameters):
             nonlocal stored
             calls.append((query, parameters))
@@ -137,7 +139,7 @@ def test_database_roundtrip_uses_event_id_and_json(monkeypatch):
                 stored = parameters[0].obj
                 self.result = (7,)
             else:
-                self.result = (7, "Марафон", "round", stored, None, True, None)
+                self.result = dict(id=7, name="Марафон", target_time_type="round", rating_config=stored, pace_rating_config=None, splits_enabled=True, captain_account_id=None)
             return self
         def fetchone(self): return self.result
     monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)

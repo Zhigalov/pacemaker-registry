@@ -24,6 +24,11 @@ from pacemaker_registry.registry import score_result, _sort_pacemakers
 from pacemaker_registry.times import normalize_target_time, target_seconds, parse_distance
 
 
+def _read_rows(connection, query, parameters=()):
+    with connection.cursor(row_factory=dict_row) as cursor:
+        return cursor.execute(query, parameters).fetchall()
+
+
 def _read_results(connection, conditions=(), parameters=(), *, events=None, details=False,
                   order="lower(p.last_name), lower(p.first_name), rr.created_at DESC, lower(e.name)"):
     """Load and score the same result fields for every application view."""
@@ -46,17 +51,12 @@ def _read_results(connection, conditions=(), parameters=(), *, events=None, deta
         query += ' WHERE ' + ' AND '.join(conditions)
     query += ' ORDER BY ' + order
     events = {} if events is None else events
-    with connection.cursor(row_factory=dict_row) as cursor:
-        rows = cursor.execute(query, parameters).fetchall()
+    rows = _read_rows(connection, query, parameters)
     results = []
     for row in rows:
         event_id = row['event_id']
         if event_id not in events:
-            events[event_id] = _event_from_row(
-                tuple(row[key] for key in ('event_id', 'event_name', 'target_time_type',
-                                          'rating_config', 'pace_rating_config', 'splits_enabled')),
-                captain_account_id=row['captain_account_id'],
-            )
+            events[event_id] = _event_from_row(dict(row, id=event_id, name=row['event_name']))
         results.append(score_result(
             row['id'], events[event_id], row['distance_km'], row['target_time'], row['chip_time'],
             row.get('actual_pace'), row['checkpoints'], details=details, source_url=row.get('source_url', ''),
@@ -132,21 +132,23 @@ def get_pacemaker_profile(pacemaker_id: int, *,
                           with_results: bool = True, rating_formula=mean_rating) -> PacemakerProfile | None:
     with connect_database() as connection:
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
-        row = connection.execute(
-            """SELECT p.id, p.last_name, p.first_name, p.motto, p.avatar_key, p.contacts,
-                      p.achievements, p.profile_version, p.login, c.name, bc.name, p.personal_records
+        rows = _read_rows(connection,
+            """SELECT p.id, p.last_name, p.first_name, p.motto AS about, p.avatar_key, p.contacts,
+                      p.achievements, p.profile_version AS version, p.login, c.name AS city,
+                      bc.name AS club, p.personal_records
                FROM pacemakers p LEFT JOIN cities c ON c.id = p.city_id
                LEFT JOIN running_clubs bc ON bc.id = p.club_id WHERE p.id = %s""", (pacemaker_id,),
-        ).fetchone()
-        if row is None:
+        )
+        if not rows:
             return None
+        row = rows[0]
         results = []
         if with_results:
             results = _read_results(
                 connection, ('p.id = %s',), (pacemaker_id,), order="rr.created_at DESC, rr.id DESC",
             )
-    return PacemakerProfile(*row[:5], tuple(row[5]), tuple(row[6]), row[7],
-                            tuple(result.card() for result in results), *row[8:],
+    return PacemakerProfile(**dict(row, contacts=tuple(row['contacts']), achievements=tuple(row['achievements'])),
+                            results=tuple(result.card() for result in results),
                             rating=pacemaker_rating(results, rating_formula))
 
 
@@ -218,7 +220,7 @@ def load_registry(
     with connect_database() as connection:
         # All queries must see the same results and formulas during concurrent saves.
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
-        event_rows = connection.execute(
+        event_rows = _read_rows(connection,
             """
             SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config, e.splits_enabled
             FROM events AS e
@@ -229,7 +231,7 @@ def load_registry(
             )
             ORDER BY lower(e.name), e.id
             """
-        ).fetchall()
+        )
         events = tuple(_event_from_row(row) for row in event_rows)
         events_by_id = {event.id: event for event in events}
         selected_event_id = (
@@ -249,9 +251,9 @@ def load_registry(
             parameters += (distance_km,)
         search = ' '.join(search.split())
         if search:
-            names = connection.execute('SELECT id, last_name, first_name FROM pacemakers').fetchall()
+            names = _read_rows(connection, 'SELECT id, last_name, first_name FROM pacemakers')
             conditions.append('p.id = ANY(%s)')
-            parameters += ([pid for pid, last, first in names if matches_name(f'{last} {first}', search)],)
+            parameters += ([p['id'] for p in names if matches_name(f"{p['last_name']} {p['first_name']}", search)],)
         results = _read_results(connection, conditions, parameters, events=events_by_id)
 
     grouped = defaultdict(list)
@@ -380,33 +382,33 @@ def _split_athlete_name(full_name: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def _event_from_row(row: tuple, *, captain_account_id: int | None = None) -> RegistryEvent:
+def _event_from_row(row: dict) -> RegistryEvent:
     return RegistryEvent(
-        id=row[0], name=row[1], target_time_type=row[2],
-        rating_config=parse_event_rating(row[3], allow_legacy=True) if row[3] is not None else None,
-        pace_rating_config=parse_pace_rating(row[4]) if row[4] is not None else None,
-        captain_account_id=captain_account_id, splits_enabled=row[5],
+        id=row['id'], name=row['name'], target_time_type=row['target_time_type'],
+        rating_config=parse_event_rating(row['rating_config'], allow_legacy=True) if row['rating_config'] is not None else None,
+        pace_rating_config=parse_pace_rating(row['pace_rating_config']) if row['pace_rating_config'] is not None else None,
+        captain_account_id=row.get('captain_account_id'), splits_enabled=row['splits_enabled'],
     )
 
 
 def get_event(event_id: int) -> RegistryEvent | None:
     with connect_database() as connection:
-        row = connection.execute(
+        rows = _read_rows(connection,
             "SELECT id, name, target_time_type, rating_config, pace_rating_config, splits_enabled, captain_account_id FROM events WHERE id = %s",
             (event_id,),
-        ).fetchone()
-    return _event_from_row(row, captain_account_id=row[6]) if row else None
+        )
+    return _event_from_row(rows[0]) if rows else None
 
 
 def list_events() -> tuple[RegistryEvent, ...]:
     with connect_database() as connection:
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
-        event_rows = connection.execute(
+        event_rows = _read_rows(connection,
             """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config, e.splits_enabled
                FROM events AS e
                ORDER BY lower(e.name), e.id"""
-        ).fetchall()
-        events = {row[0]: _event_from_row(row) for row in event_rows}
+        )
+        events = {row['id']: _event_from_row(row) for row in event_rows}
         results = _read_results(connection, events=events)
 
     grouped = defaultdict(list)

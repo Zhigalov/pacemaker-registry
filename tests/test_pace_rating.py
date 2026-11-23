@@ -128,6 +128,8 @@ def test_database_roundtrip_only_updates_pace_and_scopes_event_id(monkeypatch):
     class Connection:
         def __enter__(self): return self
         def __exit__(self, *_): pass
+        def cursor(self, **kwargs): return self
+        def fetchall(self): return [self.fetchone()]
         def execute(self, query, parameters):
             nonlocal stored
             calls.append((query, parameters))
@@ -135,7 +137,7 @@ def test_database_roundtrip_only_updates_pace_and_scopes_event_id(monkeypatch):
                 stored = parameters[0].obj
                 self.row = (7,)
             else:
-                self.row = (7, "Тест", "round", finish, stored, True, None)
+                self.row = dict(id=7, name="Тест", target_time_type="round", rating_config=finish, pace_rating_config=stored, splits_enabled=True, captain_account_id=None)
             return self
         def fetchone(self): return self.row
     monkeypatch.setattr(db, "connect_database", Connection)
