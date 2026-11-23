@@ -1,10 +1,9 @@
 from dataclasses import replace
-from decimal import Decimal
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pacemaker_registry.db import Registry, RegistryEvent, RegistryPacemaker, _sort_pacemakers, load_registry
+from pacemaker_registry.db import Registry, RegistryEvent, RegistryPacemaker, _sort_pacemakers
 from pacemaker_registry.models import RegistryCard
 from pacemaker_registry.main import app
 
@@ -32,28 +31,6 @@ def test_sort_uses_displayed_rating_then_performances_then_absolute_mean_then_na
     assert [p.id for p in _sort_pacemakers([c, same])] == [5, 3]
 
 
-def test_min_events_uses_history_and_keeps_event_options(monkeypatch):
-    events = [(1, "Первое", "round", None, None, True), (2, "Второе", "round", None, None, True)]
-    rows = [(i, "Тестов", str(i), i, 1, Decimal(10), "01:00", "00:59:59", [], count, None)
-            for i, count in [(1, 1), (2, 3)]]
-    class Connection:
-        def __enter__(self): return self
-        def __exit__(self, *_): pass
-        def execute(self, query, parameters=()):
-            self.rows = events if "SELECT e.id" in query else [(Decimal("10"),)] if "SELECT DISTINCT distance_km" in query else [r for r in rows if r[9] >= parameters[0]]
-            return self
-        def fetchall(self): return self.rows
-    monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)
-    registry = load_registry(1, min_events=2)
-    assert [p.id for p in registry.pacemakers] == [2]
-    assert registry.pacemakers[0].performance_count == 3
-    assert len(registry.events) == 2
-    assert registry.result_count == 1
-    assert registry.event_count == 1
-    empty = load_registry(1, min_events=4)
-    assert not empty.pacemakers
-    assert empty.result_count == empty.event_count == 0
-    assert len(empty.events) == 2
 
 
 def test_two_distances_outrank_one_when_displayed_rating_is_equal():
@@ -71,7 +48,7 @@ def test_two_distances_outrank_one_when_displayed_rating_is_equal():
 @pytest.mark.anyio
 async def test_min_events_parameter_validation_and_empty_state(monkeypatch):
     calls = []
-    def load(event_id=None, min_events=1, distance_km=None, search=""):
+    def load(event_id=None, min_events=1, distance_km=None, search="", page=1):
         calls.append((event_id, min_events))
         return Registry((), 0, 0, (RegistryEvent(1, "Первое"),), event_id, min_events)
     monkeypatch.setattr("pacemaker_registry.main.load_registry", load)

@@ -135,21 +135,19 @@ def home(
             event_id if event_id and event_id > 0 else None,
             min_events=min_events,
             distance_km=distance_km if distance_km else None,
-            search=q,
+            search=q, page=page,
         )
     except (PsycopgError, RuntimeError):
         if fragment:
             raise HTTPException(503, "Не удалось загрузить следующую страницу.")
         registry = Registry((), 0, 0, min_events=min_events, search=q)
         registry_error = "Не удалось загрузить реестр. Обновите страницу чуть позже."
-    page_size = 25
-    page_count = max(1, (len(registry.pacemakers) + page_size - 1) // page_size)
-    page = min(page, page_count)
+    page, page_count = registry.page, registry.page_count
     parameters = _registry_parameters(registry.selected_event_id, min_events, distance_km, q)
     return templates.TemplateResponse(
         request=request, name="registry_fragment.html" if fragment else "index.html",
         context={"registry": registry, "registry_error": registry_error,
-                 "visible_pacemakers": registry.pacemakers[(page - 1) * page_size:page * page_size],
+                 "visible_pacemakers": registry.pacemakers,
                  "page": page, "page_count": page_count,
                  "previous_page_url": '/?' + urlencode(dict(parameters, page=page - 1)),
                  "next_page_url": '/?' + urlencode(dict(parameters, page=page + 1)),

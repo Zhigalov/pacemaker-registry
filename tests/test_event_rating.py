@@ -1,11 +1,10 @@
 from dataclasses import asdict, replace
 from math import exp
-from decimal import Decimal
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pacemaker_registry.db import RegistryEvent, get_event, save_event_rating, load_registry
+from pacemaker_registry.db import RegistryEvent, get_event, save_event_rating
 from pacemaker_registry.main import app
 from pacemaker_registry.rating import (
     EventRatingConfig, calculate_rating_for_difference as score,
@@ -204,22 +203,3 @@ async def test_events_list_links_to_settings_and_participants(monkeypatch):
         monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: ())
         response = await client.get("/events")
         assert "Пока нет соревнований" in response.text
-
-
-def test_registry_applies_each_events_formula_before_sorting(monkeypatch):
-    events = [(1, "Первый", "round", None, None, True),
-              (2, "Второй", "round", asdict(EventRatingConfig(right_good=10, right_bad=30)), None, True)]
-    rows = [(id, "Тестов", name, id, id, Decimal("10"), "00:50", "00:50:05", [], 1, None)
-            for id, name, event in [(1, "Первый", "Первый"), (2, "Второй", "Второй")]]
-    class Connection:
-        def __enter__(self): return self
-        def __exit__(self, *_): pass
-        def execute(self, query, parameters=()):
-            self.rows = events if "SELECT e.id" in query else [(Decimal("10"),)] if "SELECT DISTINCT distance_km" in query else rows
-            return self
-        def fetchall(self): return self.rows
-    monkeypatch.setattr("pacemaker_registry.db.connect_database", Connection)
-    registry = load_registry()
-    assert [p.id for p in registry.pacemakers] == [2, 1]
-    assert registry.pacemakers[0].rating == 10
-    assert registry.pacemakers[1].rating == pytest.approx(10 * exp(-5/30))

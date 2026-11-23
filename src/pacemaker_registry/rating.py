@@ -132,3 +132,12 @@ def calculate_rating_for_difference(difference: float, config: EventRatingConfig
         curve = config.right_curve
     # Prevent numerical underflow: even a very distant finish stays above zero.
     return edge_score * exp(-min(700, distance ** curve))
+
+
+def mean_rating(results) -> float | None:
+    return sum(result.rating for result in results) / len(results) if results else None
+
+
+def pacemaker_rating(results, formula=mean_rating) -> float | None:
+    """The selected formula receives complete scored performances, not just an average."""
+    return formula(results)

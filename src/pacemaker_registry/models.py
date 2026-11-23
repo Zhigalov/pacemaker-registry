@@ -1,9 +1,20 @@
 """Immutable view models, independent of SQL and HTTP."""
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from pacemaker_registry.rating import EventRatingConfig, PaceRatingConfig, default_event_rating
 from pacemaker_registry.times import elapsed_seconds, format_duration, format_target_time
 from pacemaker_registry.times import time_difference_seconds as _time_difference_seconds
+
+if TYPE_CHECKING:
+    from pacemaker_registry.registry import ScoredResult
+
+
+@dataclass(frozen=True, slots=True)
+class ResultScore:
+    finish_rating: float
+    splits_rating: float | None
+    rating: float
+    finish_deviation: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +62,7 @@ class RegistryPacemaker:
     full_name: str
     initials: str
     rating: float
-    results: tuple[RegistryCard, ...]
+    results: tuple["RegistryCard | ScoredResult", ...]
     total_result_count: int = 0
     avatar_key: str | None = None
 
@@ -80,6 +91,7 @@ class PacemakerProfile:
     city: str | None = None
     club: str | None = None
     personal_records: dict | None = None
+    rating: float | None = None
 
     @property
     def public_path(self) -> str:
@@ -92,10 +104,6 @@ class PacemakerProfile:
     @property
     def initials(self) -> str:
         return self.last_name[0] + self.first_name[0]
-
-    @property
-    def rating(self) -> float | None:
-        return sum(r.rating for r in self.results) / len(self.results) if self.results else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +139,9 @@ class Registry:
     distances: tuple[str, ...] = ()
     selected_distance: str | None = None
     search: str = ""
+    pacemaker_count: int = 0
+    page: int = 1
+    page_count: int = 1
 
 
 @dataclass(frozen=True, slots=True)

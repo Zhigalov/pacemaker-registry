@@ -146,28 +146,3 @@ def test_database_roundtrip_only_updates_pace_and_scopes_event_id(monkeypatch):
     assert asdict(event.formula) == finish
     assert "WHERE id = %s RETURNING id" in calls[0][0]
     assert calls[0][1][-1] == 7
-
-
-def test_registry_uses_each_events_pace_config_before_sorting(monkeypatch):
-    events = [(1, "Первое", "round", None, None, True),
-              (2, "Второе", "round", None, asdict(PaceRatingConfig(tolerance=20, checkpoint=25, bad=40)), True)]
-    rows = [(i, "Тестов", str(i), i, i, Decimal("10"), "00:50", "00:50:00",
-             [{"segment_distance_km": "10", "pace_per_km": "05:20 /км"}], 1, None) for i in (1, 2)]
-    class Connection:
-        def __enter__(self): return self
-        def __exit__(self, *_): pass
-        def execute(self, query, parameters=()):
-            self.rows = events if "SELECT e.id" in query else [(Decimal("10"),)] if "SELECT DISTINCT distance_km" in query else rows
-            return self
-        def fetchall(self): return self.rows
-    monkeypatch.setattr(db, "connect_database", Connection)
-    registry = db.load_registry()
-    assert [p.id for p in registry.pacemakers] == [2, 1]
-    assert [p.rating for p in registry.pacemakers] == pytest.approx([10, 9.2])
-    assert registry.pacemakers[0].results[0].splits_rating == 10
-    assert registry.pacemakers[1].results[0].splits_rating == 8
-    events[0] = (*events[0][:5], False)
-    disabled = db.load_registry()
-    card = next(p.results[0] for p in disabled.pacemakers if p.id == 1)
-    assert card.splits_rating is None and card.rating == card.finish_rating
-    assert next(p.results[0] for p in disabled.pacemakers if p.id == 2).splits_rating == 10

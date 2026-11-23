@@ -7,6 +7,7 @@ from typing import Any
 import psycopg
 from psycopg import Connection
 from psycopg.types.json import Jsonb
+from psycopg.rows import dict_row
 
 from pacemaker_registry.russiarunning import (
     TARGET_TIME_TYPE_ROUND,
@@ -16,32 +17,63 @@ from pacemaker_registry.russiarunning import (
 )
 
 
-from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig
+from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig, mean_rating, pacemaker_rating
 from pacemaker_registry.names import matches_name
 from pacemaker_registry.models import Registry, RegistryEvent, RegistryPacemaker, ResultDetails, PacemakerProfile
-from pacemaker_registry.registry import _build_registry_result, _sort_pacemakers
+from pacemaker_registry.registry import score_result, _sort_pacemakers
 from pacemaker_registry.times import normalize_target_time, target_seconds
+
+
+def _read_results(connection, conditions=(), parameters=(), *, events=None, details=False,
+                  order="lower(p.last_name), lower(p.first_name), rr.created_at DESC, lower(e.name)"):
+    """Load and score the same result fields for every application view."""
+    checkpoints = "rr.checkpoints" if details else """CASE WHEN e.splits_enabled THEN COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('segment_distance_km', point->'segment_distance_km',
+                                           'pace_per_km', point->'pace_per_km'))
+        FROM jsonb_array_elements(rr.checkpoints) AS point), '[]'::jsonb) ELSE '[]'::jsonb END"""
+    event_fields = "" if events is not None else """, e.name AS event_name, e.target_time_type,
+        e.rating_config, e.pace_rating_config, e.splits_enabled, e.captain_account_id"""
+    detail_fields = ", rr.pace AS actual_pace, rr.source_url" if details else ""
+    query = f"""SELECT rr.id, rr.distance_km, rr.target_time, rr.chip_time,
+        {checkpoints} AS checkpoints,
+        p.id AS pacemaker_id, p.last_name, p.first_name, p.avatar_key, history.total_result_count,
+        e.id AS event_id {event_fields} {detail_fields}
+        FROM race_results rr JOIN events e ON e.id = rr.event_id
+        JOIN pacemakers p ON p.id = rr.pacemaker_id
+        JOIN (SELECT pacemaker_id, count(*) AS total_result_count FROM race_results GROUP BY pacemaker_id)
+            history ON history.pacemaker_id = p.id"""
+    if conditions:
+        query += ' WHERE ' + ' AND '.join(conditions)
+    query += ' ORDER BY ' + order
+    events = {} if events is None else events
+    with connection.cursor(row_factory=dict_row) as cursor:
+        rows = cursor.execute(query, parameters).fetchall()
+    results = []
+    for row in rows:
+        event_id = row['event_id']
+        if event_id not in events:
+            events[event_id] = _event_from_row(
+                tuple(row[key] for key in ('event_id', 'event_name', 'target_time_type',
+                                          'rating_config', 'pace_rating_config', 'splits_enabled')),
+                captain_account_id=row['captain_account_id'],
+            )
+        results.append(score_result(
+            row['id'], events[event_id], row['distance_km'], row['target_time'], row['chip_time'],
+            row.get('actual_pace'), row['checkpoints'], details=details, source_url=row.get('source_url', ''),
+            **{key: row[key] for key in ('pacemaker_id', 'last_name', 'first_name',
+                                        'avatar_key', 'total_result_count')},
+        ))
+    return results
 
 
 def get_result_details(result_id: int) -> ResultDetails | None:
     with connect_database() as connection:
-        row = connection.execute(
-            """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config, e.splits_enabled,
-                      p.last_name, p.first_name, rr.source_url, rr.id, rr.distance_km,
-                      rr.target_time, rr.chip_time, rr.pace, rr.checkpoints, p.id, e.captain_account_id
-               FROM race_results AS rr
-               JOIN events AS e ON e.id = rr.event_id
-               JOIN pacemakers AS p ON p.id = rr.pacemaker_id
-               WHERE rr.id = %s""", (result_id,),
-        ).fetchone()
-    if row is None:
+        results = _read_results(connection, ('rr.id = %s',), (result_id,), details=True)
+    if not results:
         return None
-    event = _event_from_row(row[:6], captain_account_id=row[16])
-    return ResultDetails(
-        athlete_name=f"{row[6]} {row[7]}", source_url=row[8], event=event,
-        result=_build_registry_result(row[9], event, *row[10:15]),
-        pacemaker_id=row[15],
-    )
+    result = results[0]
+    return ResultDetails(f"{result.last_name} {result.first_name}", result.source_url,
+                         result.event, result.details(), result.pacemaker_id)
 
 
 def update_result_target_time(result_id: int, target_time: str, previous_target_time: str) -> bool:
@@ -97,7 +129,7 @@ def check_database() -> None:
 
 
 def get_pacemaker_profile(pacemaker_id: int, *,
-                          with_results: bool = True) -> PacemakerProfile | None:
+                          with_results: bool = True, rating_formula=mean_rating) -> PacemakerProfile | None:
     with connect_database() as connection:
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         row = connection.execute(
@@ -110,21 +142,12 @@ def get_pacemaker_profile(pacemaker_id: int, *,
             return None
         results = []
         if with_results:
-            rows = connection.execute(
-                """SELECT e.id, e.name, e.target_time_type, e.rating_config, e.pace_rating_config, e.splits_enabled,
-                          rr.id, rr.distance_km, rr.target_time, rr.chip_time,
-                          COALESCE((SELECT jsonb_agg(jsonb_build_object(
-                              'segment_distance_km', point->'segment_distance_km',
-                              'pace_per_km', point->'pace_per_km'))
-                              FROM jsonb_array_elements(rr.checkpoints) AS point), '[]'::jsonb)
-                   FROM race_results rr JOIN events e ON e.id = rr.event_id
-                   WHERE rr.pacemaker_id = %s ORDER BY rr.created_at DESC, rr.id DESC""",
-                (pacemaker_id,),
-            ).fetchall()
-            for result in rows:
-                results.append(_build_registry_result(result[6], _event_from_row(result[:6]),
-                    *result[7:10], None, result[10], details=False))
-    return PacemakerProfile(*row[:5], tuple(row[5]), tuple(row[6]), row[7], tuple(results), *row[8:])
+            results = _read_results(
+                connection, ('p.id = %s',), (pacemaker_id,), order="rr.created_at DESC, rr.id DESC",
+            )
+    return PacemakerProfile(*row[:5], tuple(row[5]), tuple(row[6]), row[7],
+                            tuple(result.card() for result in results), *row[8:],
+                            rating=pacemaker_rating(results, rating_formula))
 
 
 def get_profile_choices() -> dict:
@@ -188,6 +211,9 @@ def load_registry(
     min_events: int = 1,
     distance_km: Decimal | None = None,
     search: str = "",
+    page: int | None = None,
+    page_size: int = 25,
+    rating_formula=mean_rating,
 ) -> Registry:
     with connect_database() as connection:
         # All queries must see the same results and formulas during concurrent saves.
@@ -214,39 +240,7 @@ def load_registry(
             'SELECT DISTINCT distance_km FROM race_results ORDER BY distance_km').fetchall())
         selected_distance = format(distance_km.normalize(), 'f') if distance_km else None
 
-        # Cards need segment weights/paces, not full checkpoint details or chart markers.
-        # Count all history once per pacemaker, before applying the event filter.
-        query = """
-            SELECT
-                p.id,
-                p.last_name,
-                p.first_name,
-                rr.id,
-                e.id,
-                rr.distance_km,
-                rr.target_time,
-                rr.chip_time,
-                COALESCE((
-                    SELECT jsonb_agg(jsonb_build_object(
-                        'segment_distance_km', point->'segment_distance_km',
-                        'pace_per_km', point->'pace_per_km'
-                    ))
-                    FROM jsonb_array_elements(rr.checkpoints) AS point
-                ), '[]'::jsonb) AS segments,
-                history.total_result_count,
-                p.avatar_key
-            FROM pacemakers AS p
-            JOIN (
-                SELECT pacemaker_id, count(*) AS total_result_count
-                FROM race_results
-                GROUP BY pacemaker_id
-                HAVING count(*) >= %s
-            ) AS history ON history.pacemaker_id = p.id
-            JOIN race_results AS rr ON rr.pacemaker_id = p.id
-            JOIN events AS e ON e.id = rr.event_id
-        """
-        parameters: tuple = (min_events,)
-        conditions = []
+        conditions, parameters = ["history.total_result_count >= %s"], (min_events,)
         if selected_event_id is not None:
             conditions.append("e.id = %s")
             parameters += (selected_event_id,)
@@ -255,79 +249,35 @@ def load_registry(
             parameters += (distance_km,)
         search = ' '.join(search.split())
         if search:
-            # Fetch only names for matching; SQL loads result/segment data only for matching IDs.
             names = connection.execute('SELECT id, last_name, first_name FROM pacemakers').fetchall()
-            matching_ids = [pid for pid, last, first in names if matches_name(f'{last} {first}', search)]
             conditions.append('p.id = ANY(%s)')
-            parameters += (matching_ids,)
-        if conditions:
-            query += ' WHERE ' + ' AND '.join(conditions)
-        query += """
-            ORDER BY
-                lower(p.last_name),
-                lower(p.first_name),
-                rr.created_at DESC,
-                lower(e.name)
-        """
-        rows = connection.execute(query, parameters).fetchall()
+            parameters += ([pid for pid, last, first in names if matches_name(f'{last} {first}', search)],)
+        results = _read_results(connection, conditions, parameters, events=events_by_id)
 
-    grouped: dict[int, dict[str, Any]] = {}
-    event_ids: set[int] = set()
-    for row in rows:
-        (
-            pacemaker_id,
-            last_name,
-            first_name,
-            result_id,
-            event_id,
-            distance,
-            target_time,
-            chip_time,
-            checkpoints,
-            total_result_count,
-            avatar_key,
-        ) = row
-        event_ids.add(event_id)
-        pacemaker = grouped.setdefault(
-            pacemaker_id,
-            {
-                "full_name": f"{last_name} {first_name}",
-                "initials": f"{last_name[0]}{first_name[0]}",
-                "results": [],
-                "total_result_count": total_result_count,
-                "avatar_key": avatar_key,
-            },
-        )
-        pacemaker["results"].append(
-            _build_registry_result(result_id, events_by_id[event_id], distance,
-                                   target_time, chip_time, None, checkpoints, details=False)
-        )
-
+    grouped = defaultdict(list)
+    for result in results:
+        grouped[result.pacemaker_id].append(result)
     pacemakers = []
-    for pacemaker_id, data in grouped.items():
-        results = tuple(data["results"])
-        rating = sum(result.rating for result in results) / len(results)
-        pacemakers.append(
-            RegistryPacemaker(
-                id=pacemaker_id,
-                full_name=data["full_name"],
-                initials=data["initials"],
-                rating=rating,
-                results=results,
-                total_result_count=data["total_result_count"],
-                avatar_key=data["avatar_key"],
-            )
-        )
+    for pid, performances in grouped.items():
+        first = performances[0]
+        pacemakers.append(RegistryPacemaker(
+            pid, f"{first.last_name} {first.first_name}", first.last_name[0] + first.first_name[0],
+            pacemaker_rating(performances, rating_formula), tuple(performances),
+            first.total_result_count, first.avatar_key,
+        ))
+    pacemakers = _sort_pacemakers(pacemakers)
+    count = len(pacemakers)
+    page_count = max(1, (count + page_size - 1) // page_size)
+    if page is not None:
+        page = min(max(1, page), page_count)
+        pacemakers = pacemakers[(page - 1) * page_size:page * page_size]
     return Registry(
-        pacemakers=_sort_pacemakers(pacemakers),
-        event_count=len(event_ids),
-        result_count=sum(len(pacemaker.results) for pacemaker in pacemakers),
-        events=events,
-        selected_event_id=selected_event_id,
-        min_events=min_events,
-        distances=distances,
-        selected_distance=selected_distance,
-        search=search,
+        pacemakers=tuple(replace(pacer, results=tuple(result.card() for result in pacer.results))
+                         for pacer in pacemakers),
+        event_count=len({result.event.id for result in results}), result_count=len(results),
+        events=events, selected_event_id=selected_event_id, min_events=min_events,
+        distances=distances, selected_distance=selected_distance, search=search,
+        pacemaker_count=count, page=page or 1, page_count=page_count,
     )
 
 
@@ -456,27 +406,15 @@ def list_events() -> tuple[RegistryEvent, ...]:
                FROM events AS e
                ORDER BY lower(e.name), e.id"""
         ).fetchall()
-        result_rows = connection.execute(
-            """SELECT r.id, r.event_id, r.pacemaker_id, r.distance_km, r.target_time, r.chip_time,
-                      CASE WHEN e.splits_enabled THEN r.checkpoints ELSE '[]'::jsonb END
-               FROM race_results AS r
-               JOIN events AS e ON e.id = r.event_id"""
-        ).fetchall()
+        events = {row[0]: _event_from_row(row) for row in event_rows}
+        results = _read_results(connection, events=events)
 
-    events = {row[0]: _event_from_row(row) for row in event_rows}
-    ratings: dict[int, list[tuple[int, float]]] = defaultdict(list)
-    for result_id, event_id, pacemaker_id, distance, target, chip, checkpoints in result_rows:
-        result = _build_registry_result(
-            result_id, events[event_id], distance, target, chip, None, checkpoints, details=False,
-        )
-        ratings[event_id].append((pacemaker_id, result.rating))
-    return tuple(
-        replace(event, result_count=len(scores),
-                team_rating=sum(score for _, score in scores) / len(scores),
-                participant_count=len({pacemaker_id for pacemaker_id, _ in scores}))
-        if (scores := ratings.get(event.id)) else event
-        for event in events.values()
-    )
+    grouped = defaultdict(list)
+    for result in results:
+        grouped[result.event.id].append(result)
+    return tuple(replace(event, result_count=len(grouped[event.id]), team_rating=mean_rating(grouped[event.id]),
+                         participant_count=len({result.pacemaker_id for result in grouped[event.id]}))
+                 for event in events.values())
 
 
 def save_event_rating(event_id: int, config: EventRatingConfig) -> bool:

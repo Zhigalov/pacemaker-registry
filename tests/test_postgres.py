@@ -536,3 +536,50 @@ def test_admin_role_management_and_protected_achievement(database, monkeypatch):
         assert client.post('/admin/roles', data={'account_id': owner_id, 'make_admin': 'true'}, headers=headers).status_code == 303
         client.cookies.set(auth.SESSION_COOKIE, owner_token)
         assert client.get('/admin/roles').status_code == 200
+
+
+def test_shared_scores_pagination_and_alternative_aggregate(database, monkeypatch):
+    from pacemaker_registry.registry import ScoredResult
+    from statistics import median
+
+    migrate.migrate()
+    for index in range(31):
+        assert db.save_race_result(sample(athlete_name=f'Runner{index:02} Test',
+                                         chip_time=f'00:50:{index:02}'), '00:50')
+    assert db.save_race_result(sample(athlete_name='Runner00 Test', source_event_id='other-event',
+                                     chip_time='00:52:00', checkpoints=()), '00:50')
+    whole = db.load_registry()
+    calls = []
+    original = ScoredResult.card
+    def card(result):
+        calls.append(result.id)
+        return original(result)
+    monkeypatch.setattr(ScoredResult, 'card', card)
+
+    second = db.load_registry(page=2)
+    assert second.pacemaker_count == 31
+    assert second.page == second.page_count == 2
+    assert second.result_count == 32 and second.event_count == 2
+    assert [p.id for p in second.pacemakers] == [p.id for p in whole.pacemakers[25:]]
+    assert calls == [r.id for p in second.pacemakers for r in p.results]
+    calls.clear()
+    events = db.list_events()
+    assert calls == []
+    all_results = [r for p in whole.pacemakers for r in p.results]
+    for event in events:
+        ratings = [r.rating for r in all_results if r.event_id == event.id]
+        assert event.team_rating == pytest.approx(sum(ratings) / len(ratings))
+
+    def formula(results):
+        assert all(isinstance(result, ScoredResult) for result in results)
+        assert all(result.distance > 0 for result in results)
+        return median(result.rating for result in results)
+    alternate = db.load_registry(rating_formula=formula)
+    for pacer in alternate.pacemakers:
+        profile = db.get_pacemaker_profile(pacer.id, rating_formula=formula)
+        assert profile.rating == pytest.approx(pacer.rating)
+        assert profile.results == pacer.results
+    calls.clear()
+    empty = db.load_registry(min_events=3, page=100)
+    assert empty.pacemaker_count == empty.result_count == 0
+    assert empty.page == empty.page_count == 1 and calls == []

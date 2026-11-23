@@ -1,7 +1,8 @@
 """Registry assembly and scoring; no database or network operations."""
+from dataclasses import asdict, dataclass
 from decimal import Decimal, ROUND_HALF_UP
 from math import isfinite
-from pacemaker_registry.models import RegistryCard, RegistryResult, RegistryPacemaker
+from pacemaker_registry.models import RegistryCard, RegistryResult, RegistryPacemaker, RegistryEvent, ResultScore
 from pacemaker_registry.rating import (
     EventRatingConfig, PaceRatingConfig, calculate_rating_for_difference, calculate_split_rating,
 )
@@ -14,34 +15,58 @@ SPLITS_RATING_WEIGHT = 0.4
 MIN_SPLITS_COVERAGE = Decimal("0.8")
 
 
-def _build_registry_result(result_id, event, distance, target_time, chip_time,
-                           actual_pace, checkpoints, *, details=True) -> RegistryCard | RegistryResult:
-    """The registry and detail page must use the very same scoring pipeline."""
-    finish_rating = calculate_pacemaker_rating(target_time, chip_time, event.formula)
+@dataclass(slots=True)
+class ScoredResult:
+    id: int
+    event: RegistryEvent
+    distance: Decimal
+    target_time: str
+    chip_time: str
+    score: ResultScore
+    pacemaker_id: int = 0
+    last_name: str = ""
+    first_name: str = ""
+    avatar_key: str | None = None
+    total_result_count: int = 0
+    actual_pace: str | None = None
+    source_url: str = ""
+    checkpoints: tuple = ()
+    segments: tuple = ()
+
+    @property
+    def rating(self) -> float:
+        return self.score.rating
+
+    def card(self) -> RegistryCard:
+        return RegistryCard(
+            self.id, self.event.id, self.event.name, _format_registry_distance(self.distance),
+            self.target_time, self.chip_time, self.score.finish_rating, self.score.splits_rating,
+            self.rating, splits_enabled=self.event.splits_enabled,
+        )
+
+    def details(self) -> RegistryResult:
+        return RegistryResult(
+            **asdict(self.card()), target_pace=_calculate_target_pace(self.target_time, self.distance),
+            actual_pace=self.actual_pace, time_difference=_format_time_difference(self.score.finish_deviation),
+            checkpoints=self.checkpoints, finish_deviation=self.score.finish_deviation,
+            pace_markers=tuple({"label": str(point.get("distance_km", "?")) + " км",
+                               "deviation": deviation, "score": score}
+                              for point, _, deviation, score in self.segments),
+        )
+
+
+def score_result(result_id, event, distance, target_time, chip_time, actual_pace, checkpoints,
+                 *, details=False, **metadata) -> ScoredResult:
     segments = _rated_segments(target_time, distance, checkpoints, event.pace_formula) if event.splits_enabled else ()
     if details:
-        segments = tuple(segments)  # Detail charts reuse the exact scored segments.
-    splits_rating = _weighted_splits_rating(distance, segments)
-    rating = calculate_combined_rating(finish_rating, splits_rating)
-    card = dict(
-        id=result_id, event_id=event.id, event_name=event.name,
-        distance_km=_format_registry_distance(distance), target_time=target_time,
-        chip_time=chip_time,
-        finish_rating=finish_rating, splits_rating=splits_rating,
-        rating=rating, splits_enabled=event.splits_enabled,
-    )
-    if not details:
-        return RegistryCard(**card)
-    return RegistryResult(
-        **card, target_pace=_calculate_target_pace(target_time, distance), actual_pace=actual_pace,
-        time_difference=_format_time_difference(_time_difference_seconds(target_time, chip_time)),
-        checkpoints=tuple(checkpoints),
-        finish_deviation=_time_difference_seconds(target_time, chip_time),
-        pace_markers=tuple({"label": str(point.get("distance_km", "?")) + " км",
-                            "deviation": deviation, "score": score}
-                           for point, _, deviation, score in
-                           segments),
-    )
+        segments = tuple(segments)
+    deviation = _time_difference_seconds(target_time, chip_time)
+    finish = calculate_rating_for_difference(deviation, event.formula)
+    splits = _weighted_splits_rating(distance, segments)
+    score = ResultScore(finish, splits, calculate_combined_rating(finish, splits), deviation)
+    return ScoredResult(result_id, event, distance, target_time, chip_time, score,
+                        actual_pace=actual_pace, checkpoints=tuple(checkpoints) if details else (),
+                        segments=segments if details else (), **metadata)
 
 
 def _calculate_target_pace(target_time: str, distance_km: Decimal) -> str:

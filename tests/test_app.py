@@ -51,7 +51,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "pacemaker_registry.main.load_registry",
-        lambda event_id=None, min_events=1, distance_km=None, search="": registry,
+        lambda event_id=None, min_events=1, distance_km=None, search="", page=1: registry,
     )
 
     async with AsyncClient(
@@ -154,7 +154,7 @@ async def test_card_distinguishes_missing_pace_from_zero(monkeypatch):
 @pytest.mark.anyio
 async def test_home_filters_ignore_legacy_include_splits(monkeypatch) -> None:
     requested = []
-    def fake_load_registry(event_id=None, min_events=1, distance_km=None, search=""):
+    def fake_load_registry(event_id=None, min_events=1, distance_km=None, search="", page=1):
         requested.append(event_id)
         return Registry((), 1, 0, events=(RegistryEvent(2, "Марафон"),),
                         selected_event_id=event_id)
@@ -459,7 +459,7 @@ async def test_readiness_reports_database_failure(monkeypatch) -> None:
 async def test_distance_selection_switching_combination_and_validation(monkeypatch):
     from decimal import Decimal
     requested = []
-    def load(event_id=None, min_events=1, distance_km=None, search=""):
+    def load(event_id=None, min_events=1, distance_km=None, search="", page=1):
         requested.append((event_id, min_events, distance_km))
         return Registry((), 0, 0, events=(RegistryEvent(2, 'Марафон'),),
             selected_event_id=event_id, min_events=min_events,
@@ -490,7 +490,7 @@ async def test_name_search_url_clear_and_empty_state_preserve_other_filters(monk
     import re
     from urllib.parse import parse_qs, urlsplit
     calls = []
-    def load(event_id=None, min_events=1, distance_km=None, search=''):
+    def load(event_id=None, min_events=1, distance_km=None, search='', page=1):
         calls.append(search)
         return Registry((), 0, 0, events=(RegistryEvent(2, 'Забег'),), selected_event_id=event_id,
             min_events=min_events, distances=('10',),
@@ -540,7 +540,11 @@ async def test_large_registry_is_paginated_and_keeps_filters(monkeypatch):
         for i in range(501)
     )
     registry = Registry(pacemakers, 1, 2505, selected_event_id=1)
-    monkeypatch.setattr('pacemaker_registry.main.load_registry', lambda *a, **k: registry)
+    def load(*args, page=1, **kwargs):
+        page = min(page, 21)
+        return replace(registry, pacemakers=pacemakers[(page - 1) * 25:page * 25],
+                       pacemaker_count=501, page=page, page_count=21)
+    monkeypatch.setattr('pacemaker_registry.main.load_registry', load)
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
         first = await client.get('/?event_id=1&min_events=2&distance_km=10&q=Пейсмейкер')
         assert first.status_code == 200

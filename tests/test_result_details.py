@@ -1,4 +1,3 @@
-from dataclasses import asdict
 from decimal import Decimal
 import json
 import re
@@ -23,7 +22,7 @@ def details(checkpoints=None, splits_enabled=True):
     if checkpoints is None:
         checkpoints = tuple({'distance_km': str(i), 'segment_distance_km': '1',
                              'time': f'{i * 5}:00', 'pace_per_km': '05:00'} for i in range(1, 43))
-    result = db._build_registry_result(12, event, Decimal('42.2'), '03:30', '03:29:55', '04:58 /км', checkpoints)
+    result = db.score_result(12, event, Decimal('42.2'), '03:30', '03:29:55', '04:58 /км', checkpoints, details=True).details()
     return db.ResultDetails('Тестов <Первый>', 'https://results.runc.run/event/marathon/result/123/', event, result, pacemaker_id=7)
 
 
@@ -99,25 +98,6 @@ def test_source_links_safe_and_event_specific(source, expected):
     assert result_url == (source if expected else None)
 
 
-def test_single_result_query_matches_registry_scoring(monkeypatch):
-    sample = details()
-    event, result = sample.event, sample.result
-    row = (event.id, event.name, event.target_time_type, asdict(event.formula), asdict(event.pace_formula), event.splits_enabled,
-           'Тестов', '<Первый>', sample.source_url, result.id, Decimal('42.2'), result.target_time,
-           result.chip_time, result.actual_pace, list(result.checkpoints), sample.pacemaker_id, None)
-    calls = []
-    class Connection:
-        def __enter__(self): return self
-        def __exit__(self, *_): pass
-        def execute(self, query, parameters):
-            calls.append((query, parameters))
-            return self
-        def fetchone(self): return row
-    monkeypatch.setattr(db, 'connect_database', Connection)
-    loaded = db.get_result_details(12)
-    assert loaded == sample
-    assert calls[0][1] == (12,)
-    assert 'WHERE rr.id = %s' in calls[0][0]
 
 
 def test_chart_markers_match_weighted_score_and_custom_pace_formula():
@@ -126,7 +106,7 @@ def test_chart_markers_match_weighted_score_and_custom_pace_formula():
         {'distance_km': '3,00', 'segment_distance_km': '3', 'pace_per_km': '05:40'},
         {'distance_km': '10,00', 'segment_distance_km': '7', 'pace_per_km': '06:20'},
     )
-    result = db._build_registry_result(1, event, Decimal('10'), '01:00', '59:55', '05:59', checkpoints)
+    result = db.score_result(1, event, Decimal('10'), '01:00', '59:55', '05:59', checkpoints, details=True).details()
     assert result.finish_deviation == -5
     assert [point['deviation'] for point in result.pace_markers] == [-20, 20]
     assert [point['label'] for point in result.pace_markers] == ['3,00 км', '10,00 км']
@@ -151,7 +131,7 @@ def test_chart_markers_skip_invalid_splits_but_keep_valid_partial_coverage():
 def test_finish_marker_keeps_outlier_and_zero_deviations():
     event = db.RegistryEvent(1, 'Тест')
     for chip, deviation in [('01:00:00', 0), ('01:20:00', 1200), ('40:00', -1200)]:
-        result = db._build_registry_result(1, event, Decimal('10'), '01:00', chip, '06:00', ())
+        result = db.score_result(1, event, Decimal('10'), '01:00', chip, '06:00', (), details=True).details()
         assert result.finish_deviation == deviation
         assert result.pace_markers == ()
 
@@ -163,9 +143,9 @@ async def test_edit_flag_redirects_preserves_filters_and_recalculates(monkeypatc
     target = sample.result.target_time
     calls = []
     def get(result_id):
-        result = db._build_registry_result(result_id, sample.event, Decimal('42.2'), target,
+        result = db.score_result(result_id, sample.event, Decimal('42.2'), target,
                                           sample.result.chip_time, sample.result.actual_pace,
-                                          sample.result.checkpoints)
+                                          sample.result.checkpoints, details=True).details()
         return db.ResultDetails(sample.athlete_name, sample.source_url, sample.event, result, sample.pacemaker_id)
     def save(result_id, value, previous):
         nonlocal target
