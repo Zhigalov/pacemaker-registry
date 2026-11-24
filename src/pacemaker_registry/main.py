@@ -30,7 +30,7 @@ from pacemaker_registry.db import (
 )
 from pacemaker_registry.rating import (
     default_event_rating, parse_event_rating, rating_color_style,
-    PaceRatingConfig, parse_pace_rating,
+    PaceRatingConfig, parse_pace_rating, RANKING_FORMULAS, RankingFormula,
 )
 from pacemaker_registry.imports import InvalidResultUrl, RaceResult, ResultImportError, guess_target_time
 from pacemaker_registry.sources import load_race_result, result_source_links as _result_source_links
@@ -121,6 +121,7 @@ def home(
         registry = load_registry(
             filters.event_id or None, min_events=filters.min_events,
             distance_km=filters.distance_km, search=filters.q, page=page,
+            rating_formula=RANKING_FORMULAS[filters.formula][1],
         )
     except (PsycopgError, RuntimeError):
         if fragment:
@@ -133,6 +134,9 @@ def home(
         request=request, name="registry_fragment.html" if fragment else "index.html",
         context={"registry": registry, "registry_error": registry_error,
                  "visible_pacemakers": registry.pacemakers, "filters": filters,
+                 "ranking_formulas": RANKING_FORMULAS,
+                 "rating_max": 11 if filters.formula == RankingFormula.EXPERIENCE else 10,
+                 "all_events_url": replace(filters, event_id=0).url(),
                  "page": page, "page_count": page_count,
                  "previous_page_url": filters.url(page=page - 1),
                  "next_page_url": filters.url(page=page + 1),

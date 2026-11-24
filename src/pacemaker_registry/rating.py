@@ -1,7 +1,9 @@
 """Finish and segment-pace models, configured independently for each event."""
 
 from dataclasses import asdict, dataclass
-from math import exp, isfinite
+from enum import StrEnum
+from math import exp, isfinite, sqrt
+from statistics import median
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,3 +141,56 @@ def mean_rating(results) -> float | None:
 def pacemaker_rating(results, formula=mean_rating) -> float | None:
     """The selected formula receives complete scored performances, not just an average."""
     return formula(results)
+
+
+def smoothed_rating(results):
+    return (sum(result.rating for result in results) + 3 * 8) / (len(results) + 3) if results else None
+
+
+def experience_rating(results):
+    count = len(results)
+    return mean_rating(results) + count / (count + 5) if count else None
+
+
+def median_rating(results):
+    return median(result.rating for result in results) if results else None
+
+
+def best_ten_rating(results):
+    if not results:
+        return None
+    best = sorted((result.rating for result in results), reverse=True)[:10]
+    return (sum(best) + (10 - len(best)) * 8) / 10
+
+
+def reliability_rating(results):
+    count = len(results)
+    if not count:
+        return None
+    successes = sum(result.rating >= 9 for result in results)
+    if not successes:
+        return 0.0
+    proportion = successes / count
+    confidence = 1.96
+    adjustment = confidence ** 2 / count
+    margin = confidence * sqrt((proportion * (1 - proportion) + adjustment / 4) / count)
+    return 10 * (proportion + adjustment / 2 - margin) / (1 + adjustment)
+
+
+class RankingFormula(StrEnum):
+    MEAN = "mean"
+    SMOOTHED = "smoothed"
+    EXPERIENCE = "experience"
+    MEDIAN = "median"
+    BEST_TEN = "best-ten"
+    RELIABILITY = "reliability"
+
+
+RANKING_FORMULAS = {
+    RankingFormula.MEAN: ("Средняя температура", mean_rating),
+    RankingFormula.SMOOTHED: ("Десятку докажи", smoothed_rating),
+    RankingFormula.EXPERIENCE: ("За выслугу ног", experience_rating),
+    RankingFormula.MEDIAN: ("Без драмы", median_rating),
+    RankingFormula.BEST_TEN: ("Зал славы", best_ten_rating),
+    RankingFormula.RELIABILITY: ("Без авось", reliability_rating),
+}

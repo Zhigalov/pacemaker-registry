@@ -602,3 +602,34 @@ def test_formula_edits_are_scoped_and_preserve_other_settings(database):
     assert not db.save_event_rating(999999, finish)
     assert not db.save_event_pace_rating(999999, pace)
     assert db.get_event(999999) is None
+
+
+def test_registry_formula_switch_reorders_results_and_keeps_pagination(database):
+    from fastapi.testclient import TestClient
+    from pacemaker_registry.main import app
+
+    migrate.migrate()
+    for index in range(11):
+        assert db.save_race_result(sample(athlete_name='First Runner',
+            chip_time='50:03' if index == 10 else '50:00', checkpoints=()), '00:50')
+    for _ in range(5):
+        assert db.save_race_result(sample(athlete_name='Second Runner',
+            chip_time='50:00', checkpoints=()), '00:50')
+    for index in range(24):
+        assert db.save_race_result(sample(athlete_name=f'Other Runner{index}',
+            chip_time='52:00', checkpoints=()), '00:50')
+
+    client = TestClient(app)
+    mean = client.get('/').raise_for_status().text
+    assert mean.index('Second Runner') < mean.index('First Runner')
+    for formula in ('smoothed', 'experience', 'median', 'best-ten', 'reliability'):
+        page = client.get('/', params={'formula': formula, 'min_events': 1}).raise_for_status().text
+        assert page.index('First Runner') < page.index('Second Runner')
+        assert f'value="{formula}" selected' in page
+        assert f'formula={formula}&amp;page=2' in page
+    experience = client.get('/?formula=experience').text
+    assert 'Рейтинг 10,6 из 11' in experience
+    assert 'Рейтинг 10,5 из 11' in experience
+    fragment = client.get('/?formula=experience&page=2&fragment=true').raise_for_status().text
+    assert 'из 11' in fragment
+    assert client.get('/?formula=unknown').status_code == 422

@@ -6,6 +6,8 @@ from urllib.parse import urlencode
 
 from fastapi import Depends, Query
 
+from pacemaker_registry.rating import RankingFormula
+
 
 @dataclass(frozen=True, slots=True)
 class RegistryFilters:
@@ -13,6 +15,7 @@ class RegistryFilters:
     min_events: int = 1
     distance_km: Decimal | None = None
     q: str = ''
+    formula: RankingFormula = RankingFormula.MEAN
 
     def url(self, path='/', **extra) -> str:
         params = {'event_id': self.event_id or 0, 'min_events': self.min_events}
@@ -20,6 +23,8 @@ class RegistryFilters:
             params['distance_km'] = format(self.distance_km.normalize(), 'f')
         if self.q:
             params['q'] = self.q
+        if self.formula != RankingFormula.MEAN:
+            params['formula'] = self.formula.value
         return path + '?' + urlencode(params | extra)
 
     def without_search(self):
@@ -31,8 +36,9 @@ def registry_filters(
     min_events: Annotated[int, Query(ge=1, le=10000)] = 1,
     distance_km: Annotated[Decimal | None, Query(ge=0, le=Decimal('99999.999'), decimal_places=3)] = None,
     q: Annotated[str, Query(max_length=160)] = '',
+    formula: RankingFormula = RankingFormula.MEAN,
 ) -> RegistryFilters:
-    return RegistryFilters(event_id, min_events, distance_km or None, ' '.join(q.split()))
+    return RegistryFilters(event_id, min_events, distance_km or None, ' '.join(q.split()), formula)
 
 
 Filters = Annotated[RegistryFilters, Depends(registry_filters)]

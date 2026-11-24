@@ -12,7 +12,7 @@ from psycopg.rows import dict_row
 from pacemaker_registry.imports import TARGET_TIME_TYPE_ROUND, TARGET_TIME_TYPE_SUB_MINUTE, RaceResult, ResultImportError
 
 
-from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig, mean_rating, pacemaker_rating
+from pacemaker_registry.rating import parse_event_rating, parse_pace_rating, EventRatingConfig, PaceRatingConfig, mean_rating, median_rating, pacemaker_rating
 from pacemaker_registry.names import matches_name
 from pacemaker_registry.models import Registry, RegistryEvent, RegistryPacemaker, ResultDetails, PacemakerProfile
 from pacemaker_registry.registry import score_result, _sort_pacemakers
@@ -262,7 +262,7 @@ def load_registry(
             pacemaker_rating(performances, rating_formula), tuple(performances),
             first.total_result_count, first.avatar_key,
         ))
-    pacemakers = _sort_pacemakers(pacemakers)
+    pacemakers = _sort_pacemakers(pacemakers, filtered_count=rating_formula is median_rating)
     count = len(pacemakers)
     page_count = max(1, (count + page_size - 1) // page_size)
     if page is not None:

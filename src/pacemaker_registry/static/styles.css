@@ -683,7 +683,7 @@ tbody tr:hover { background: #fbfcfc; }
 
 .registry-filter {
   display: grid;
-  grid-template-columns: minmax(12rem, 1fr) 10rem 11rem;
+  grid-template-columns: minmax(12rem, 1fr) 9rem 10rem 12rem;
   align-items: end;
   gap: 1rem;
 }
@@ -831,6 +831,7 @@ tbody tr:hover { background: #fbfcfc; }
 @media (max-width: 40rem) {
   .registry-toolbar { padding: .75rem; }
   .registry-filter { gap: .75rem; }
+  .registry-filter-field--formula { grid-column: 1 / -1; }
   .registry-filter select { font-size: 1rem; }
   .event-suggest input { font-size: 1rem; }
   .filter-hint { left: auto; right: 0; }

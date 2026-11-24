@@ -155,14 +155,14 @@ def _format_time_difference(seconds: int) -> str:
 
 
 def _sort_pacemakers(
-    pacemakers: list[RegistryPacemaker],
+    pacemakers: list[RegistryPacemaker], *, filtered_count: bool = False,
 ) -> tuple[RegistryPacemaker, ...]:
     return tuple(
         sorted(
             pacemakers,
             key=lambda pacemaker: (
                 -float(format(pacemaker.rating, ".1f")),
-                -pacemaker.performance_count,
+                -(len(pacemaker.results) if filtered_count else pacemaker.performance_count),
                 pacemaker.mean_finish_deviation,
                 pacemaker.full_name.casefold(),
                 pacemaker.id,

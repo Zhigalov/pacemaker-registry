@@ -13,12 +13,12 @@
                   <div
                     class="pacemaker-rating"
                     style="{{ pacemaker.rating | rating_color }}"
-                    aria-label="Рейтинг {{ '%.1f'|format(pacemaker.rating)|replace('.', ',') }} из 10"
+                    aria-label="Рейтинг {{ '%.1f'|format(pacemaker.rating)|replace('.', ',') }} из {{ rating_max }}"
                   >
                     <span class="pacemaker-rating-value">{{ "%.1f"|format(pacemaker.rating)|replace(".", ",") }}</span>
-                    <span class="pacemaker-rating-max">/10</span>
+                    <span class="pacemaker-rating-max">/{{ rating_max }}</span>
                     <span class="rating-meter" aria-hidden="true">
-                      <span style="width: {{ pacemaker.rating * 10 }}%"></span>
+                      <span style="width: {{ pacemaker.rating * (100 / rating_max) }}%"></span>
                     </span>
                   </div>
                 </div>

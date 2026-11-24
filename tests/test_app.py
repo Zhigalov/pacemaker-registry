@@ -51,7 +51,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "pacemaker_registry.main.load_registry",
-        lambda event_id=None, min_events=1, distance_km=None, search="", page=1: registry,
+        lambda event_id=None, min_events=1, distance_km=None, search="", page=1, rating_formula=None: registry,
     )
 
     async with AsyncClient(
@@ -154,7 +154,7 @@ async def test_card_distinguishes_missing_pace_from_zero(monkeypatch):
 @pytest.mark.anyio
 async def test_home_filters_ignore_legacy_include_splits(monkeypatch) -> None:
     requested = []
-    def fake_load_registry(event_id=None, min_events=1, distance_km=None, search="", page=1):
+    def fake_load_registry(event_id=None, min_events=1, distance_km=None, search="", page=1, rating_formula=None):
         requested.append(event_id)
         return Registry((), 1, 0, events=(RegistryEvent(2, "Марафон"),),
                         selected_event_id=event_id)
@@ -169,7 +169,7 @@ async def test_home_filters_ignore_legacy_include_splits(monkeypatch) -> None:
     assert response.status_code == 200
     assert requested == [2, 1, None, None, None]
     assert 'href="/events/2"' in response.text
-    assert 'href="/?min_events=1"' in response.text
+    assert 'href="/?event_id=0&amp;min_events=1"' in response.text
 
 
 @pytest.mark.anyio
@@ -459,7 +459,7 @@ async def test_readiness_reports_database_failure(monkeypatch) -> None:
 async def test_distance_selection_switching_combination_and_validation(monkeypatch):
     from decimal import Decimal
     requested = []
-    def load(event_id=None, min_events=1, distance_km=None, search="", page=1):
+    def load(event_id=None, min_events=1, distance_km=None, search="", page=1, rating_formula=None):
         requested.append((event_id, min_events, distance_km))
         return Registry((), 0, 0, events=(RegistryEvent(2, 'Марафон'),),
             selected_event_id=event_id, min_events=min_events,
@@ -490,7 +490,7 @@ async def test_name_search_url_clear_and_empty_state_preserve_other_filters(monk
     import re
     from urllib.parse import parse_qs, urlsplit
     calls = []
-    def load(event_id=None, min_events=1, distance_km=None, search='', page=1):
+    def load(event_id=None, min_events=1, distance_km=None, search='', page=1, rating_formula=None):
         calls.append(search)
         return Registry((), 0, 0, events=(RegistryEvent(2, 'Забег'),), selected_event_id=event_id,
             min_events=min_events, distances=('10',),
