@@ -1,0 +1,27 @@
+.about-page {
+  width: min(100%, 48rem);
+  margin: clamp(1.5rem, 5vw, 3rem) auto 0;
+  line-height: 1.6;
+}
+.about-page h1 { margin: 0; font-size: clamp(2rem, 6vw, 3rem); letter-spacing: -.04em; }
+.about-page h2 { margin: 0; font-size: clamp(1.55rem, 4vw, 2rem); letter-spacing: -.025em; }
+.about-page a { color: #176f59; text-underline-offset: .18em; }
+.about-lead { font-size: clamp(1.05rem, 3vw, 1.2rem); font-weight: 570; }
+#rating-formulas { margin-top: 2.5rem; scroll-margin-top: 1rem; }
+.about-examples { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: .75rem; margin: 1.25rem 0; }
+.about-example, .about-formula { margin: 0; padding: clamp(.9rem, 3vw, 1.3rem); border: 1px solid #dce7e2; border-radius: .9rem; background: white; }
+.about-example figcaption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .2rem .5rem; }
+.about-example figcaption span, .about-worked, .about-note { color: #52665d; }
+.about-score-strip { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .65rem; }
+.about-score { min-width: 1.65rem; padding: .15rem .25rem; border-radius: .35rem; background: #e5f1ec; color: #176f59; text-align: center; font-weight: 700; }
+.about-formula { margin-top: .75rem; }
+.about-formula h3 { margin: 0; font-size: 1.22rem; }
+.about-formula p { margin: .5rem 0; }
+.about-math { padding: .55rem .7rem; background: #f1f5f3; border-radius: .45rem; overflow-wrap: anywhere; font-weight: 600; }
+.about-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin: .85rem 0; }
+.about-comparison div { padding: .5rem .7rem; border: 1px solid #e0e8e4; border-radius: .55rem; }
+.about-comparison dt { font-size: .85rem; color: #52665d; }
+.about-comparison dd { margin: 0; font-size: 1.2rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.about-formula footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; font-size: .9rem; }
+.about-formula summary { cursor: pointer; color: #176f59; font-weight: 650; }
+.about-note { font-size: .9rem; }

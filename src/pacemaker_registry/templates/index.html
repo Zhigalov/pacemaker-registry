@@ -62,7 +62,10 @@
         <input id="min-events-filter" name="min_events" type="number" min="1" max="10000" step="1" value="{{ registry.min_events }}" data-registry-filter aria-describedby="min-events-hint">
       </div>
       <div class="registry-filter-field registry-filter-field--formula">
-        <label for="rating-formula">Формула рейтинга</label>
+        <div class="rating-filter-label">
+          <label for="rating-formula">Формула рейтинга</label>
+          <a class="rating-formula-help" href="/about#rating-formulas" aria-label="Как работают формулы рейтинга">?</a>
+        </div>
         <span class="registry-filter-select">
           <select id="rating-formula" name="formula" data-registry-filter>
             {% for formula, (label, _) in ranking_formulas.items() %}

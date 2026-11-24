@@ -80,6 +80,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "05:23 /км" not in response.text
     assert 'class="result-event"' not in response.text
     assert "Место <strong>1</strong>" in response.text
+    assert 'href="/about#rating-formulas"' in response.text
     assert '>Цель </span>' in response.text
     assert '>Факт </span>' in response.text
     assert '>Финиш </span>' in response.text

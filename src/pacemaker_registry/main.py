@@ -4,6 +4,7 @@ from functools import lru_cache
 from hashlib import sha256
 from dataclasses import asdict, replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
@@ -177,6 +178,19 @@ def _event_response(request, event, *, values=None, pace_values=None, splits_ena
             "error": error, "saved": saved,
         },
         status_code=status_code,
+    )
+
+
+@app.get("/about", response_class=HTMLResponse)
+def about_page(request: Request):
+    examples = ((10,) * 10 + (9,), (10,) * 5)
+    performances = [tuple(SimpleNamespace(rating=score) for score in scores) for scores in examples]
+    formulas = {
+        key: (label, *(calculate(results) for results in performances))
+        for key, (label, calculate) in RANKING_FORMULAS.items()
+    }
+    return templates.TemplateResponse(
+        request=request, name="about.html", context={"examples": examples, "formulas": formulas},
     )
 
 
