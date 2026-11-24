@@ -183,7 +183,7 @@ def _event_response(request, event, *, values=None, pace_values=None, splits_ena
 
 @app.get("/about", response_class=HTMLResponse)
 def about_page(request: Request):
-    examples = ((10,) * 10 + (9,), (10,) * 5)
+    examples = ((10, 10, 10, 9), (10, 10))
     performances = [tuple(SimpleNamespace(rating=score) for score in scores) for scores in examples]
     formulas = {
         key: (label, *(calculate(results) for results in performances))

@@ -36,5 +36,6 @@ def test_about_page_has_formula_anchor_and_worked_examples():
     for key, (label, _) in RANKING_FORMULAS.items():
         assert f'<h3>{label}</h3>' in response.text
         assert f'href="/?formula={key}"' in response.text
-    assert '9,909' in response.text
-    assert '7,412' in response.text
+    assert '9,750' in response.text
+    assert response.text.count('Сильная сторона') == 6
+    assert response.text.count('Слабая сторона') == 6

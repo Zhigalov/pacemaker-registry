@@ -25,3 +25,12 @@
 .about-formula footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; font-size: .9rem; }
 .about-formula summary { cursor: pointer; color: #176f59; font-weight: 650; }
 .about-note { font-size: .9rem; }
+
+.about-page .about-project-title { margin-top: .35rem; font-size: clamp(1.2rem, 4vw, 1.6rem); }
+.about-score--below-max { background: #fbefcb; color: #744d0a; }
+.about-tradeoffs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem 1rem; margin: .85rem 0; font-size: .9rem; }
+.about-tradeoffs dt { font-weight: 700; }
+.about-tradeoffs dd { margin: .15rem 0 0; color: #52665d; }
+@media (max-width: 34rem) {
+  .about-tradeoffs { grid-template-columns: 1fr; }
+}
