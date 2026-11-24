@@ -27,6 +27,11 @@ class RegistryFilters:
             params['formula'] = self.formula.value
         return path + '?' + urlencode(params | extra)
 
+    def formula_url(self, path: str, **params) -> str:
+        if self.formula != RankingFormula.MEAN:
+            params['formula'] = self.formula.value
+        return path + '?' + urlencode(params) if params else path
+
     def without_search(self):
         return replace(self, q='')
 

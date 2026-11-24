@@ -914,44 +914,12 @@ tbody tr:hover { background: #fbfcfc; }
   line-height: 1.3;
 }
 
-.pacemaker-rating {
-  --rating-color: #ad6a2b;
-  display: grid;
-  grid-template-columns: auto auto minmax(3.5rem, 1fr);
-  align-items: center;
-  gap: 0.18rem;
-  max-width: 8.5rem;
-  margin-top: 0.35rem;
-  color: var(--rating-color);
+.pacemaker-rank {
+  display: block;
+  margin-top: .3rem;
+  color: #176f59;
+  font-size: .85rem;
   font-variant-numeric: tabular-nums;
-}
-
-
-.pacemaker-rating-value {
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.pacemaker-rating-max {
-  color: #83908c;
-  font-size: 0.62rem;
-  font-weight: 650;
-}
-
-.rating-meter {
-  display: block;
-  position: relative;
-  height: 0.38rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #dce5e2;
-}
-
-.rating-meter > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--rating-color);
 }
 
 .results-strip {

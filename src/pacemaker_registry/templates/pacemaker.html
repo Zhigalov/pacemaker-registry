@@ -8,7 +8,7 @@
 {% endblock %}
 {% block shell_class %}app-shell profile-shell{% endblock %}
 {% block content %}
-<nav class="profile-breadcrumb"><a href="/">← Рейтинг пейсмейкеров</a></nav>
+<nav class="profile-breadcrumb"><a href="{{ filters.formula_url('/') }}">← Рейтинг пейсмейкеров</a></nav>
 {% if saved %}<p class="success-message" role="status">Профиль сохранён.</p>{% endif %}
 <section class="profile-intro" aria-labelledby="profile-name">
   <div class="profile-avatar" aria-label="Фотография пейсмейкера">
@@ -17,6 +17,7 @@
   </div>
   <div class="profile-identity">
     <h1 id="profile-name">{{ profile.full_name }}</h1>
+    {% if profile.rank is not none %}<span class="pacemaker-rank">Место в общем рейтинге <strong>{{ profile.rank }}</strong></span>{% endif %}
     {% if profile.city or profile.club %}<p class="profile-location">{% if profile.city %}<span>⌖ {{ profile.city }}</span>{% endif %}{% if profile.club %}<span>◈ {{ profile.club }}</span>{% endif %}</p>{% endif %}
     <div class="profile-identity-meta">
     {% if profile.login %}<a class="profile-public-link" href="{{ profile.public_path }}">pacersreg.ru{{ profile.public_path }}</a>{% endif %}
@@ -29,7 +30,7 @@
 
     </div>
   </div>
-  {% if can_edit_profile %}<a class="button profile-edit-link" href="/pacemakers/{{ profile.id }}/edit">Редактировать профиль</a>{% endif %}
+  {% if can_edit_profile %}<a class="button profile-edit-link" href="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/edit') }}">Редактировать профиль</a>{% endif %}
 </section>
 <div class="profile-information">
   <div class="profile-story">
@@ -45,10 +46,9 @@
 <section class="profile-performances" aria-labelledby="performances-title">
   <div class="profile-results-heading">
     <h2 id="performances-title">Выступления <span>{{ profile.results|length }}</span></h2>
-    {% if profile.rating is not none %}<span class="profile-average" style="{{ profile.rating | rating_color }}">Рейтинг <strong>{{ '%.1f'|format(profile.rating)|replace('.', ',') }}</strong><small>/10</small></span>{% endif %}
   </div>
   {% if profile.results %}<div class="profile-results-grid">
-    {% for result in profile.results %}{{ result_card(result) }}{% endfor %}
+    {% for result in profile.results %}{{ result_card(result, filters) }}{% endfor %}
   </div>{% else %}<p class="event-note">В реестре пока нет выступлений этого пейсмейкера.</p>{% endif %}
 </section>
   </div>

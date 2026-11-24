@@ -8,15 +8,18 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile
 
 from pacemaker_registry import auth, avatars, db
+from pacemaker_registry.filters import Filters
+from pacemaker_registry.rating import RANKING_FORMULAS, mean_rating
 from pacemaker_registry.profiles import (
     ACHIEVEMENTS, CONTACT_TYPES, RECORD_DISTANCES, contact_view,
     ProfileEdit, read_profile_form, profile_form_values,
 )
 
 
-def _load(pacemaker_id, *, with_results=True):
+def _load(pacemaker_id, *, with_results=True, rating_formula=mean_rating, include_rank=False):
     try:
-        profile = db.get_pacemaker_profile(pacemaker_id, with_results=with_results)
+        profile = db.get_pacemaker_profile(pacemaker_id, with_results=with_results,
+                                           rating_formula=rating_formula, include_rank=include_rank)
     except (PsycopgError, RuntimeError):
         raise HTTPException(503, 'Не удалось загрузить пейсмейкера. Попробуйте позже.') from None
     if profile is None:
@@ -56,10 +59,10 @@ def _require_profile_editor(account, pacemaker_id):
 def create_profile_router(templates):
     router = APIRouter()
 
-    def edit_response(request, profile, *, values=None, error=None, status_code=200):
+    def edit_response(request, profile, filters, *, values=None, error=None, status_code=200):
         return templates.TemplateResponse(request=request, name='pacemaker_edit.html',
             context={'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
-                     'values': profile_form_values(profile) if values is None else values,
+                     'values': profile_form_values(profile) if values is None else values, 'filters': filters,
                      'contact_types': CONTACT_TYPES,
                      'achievement_types': ACHIEVEMENTS, 'record_distances': RECORD_DISTANCES,
                      'can_edit_achievements': auth.request_account(request).is_admin,
@@ -67,33 +70,33 @@ def create_profile_router(templates):
             status_code=status_code)
 
     @router.get('/p/{login}')
-    def public_profile(request: Request, login: str, saved: bool = False):
+    def public_profile(request: Request, login: str, filters: Filters, saved: bool = False):
         try:
             pacemaker_id = db.find_pacemaker_login(login)
         except (PsycopgError, RuntimeError):
             raise HTTPException(503, 'Не удалось загрузить профиль. Попробуйте позже.') from None
         if pacemaker_id is None:
             raise HTTPException(404, 'Пейсмейкер не найден.')
-        return profile_page(request, pacemaker_id, saved)
+        return profile_page(request, pacemaker_id, filters, saved)
 
     @router.get('/pacemakers/{pacemaker_id}')
-    def profile_page(request: Request, pacemaker_id: int, saved: bool = False):
-        profile = _load(pacemaker_id)
+    def profile_page(request: Request, pacemaker_id: int, filters: Filters, saved: bool = False):
+        profile = _load(pacemaker_id, include_rank=True, rating_formula=RANKING_FORMULAS[filters.formula][1])
         account = auth.request_account(request)
         return templates.TemplateResponse(request=request, name='pacemaker.html', context={
             'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
             'contacts': [contact_view(c) for c in profile.contacts], 'achievement_types': ACHIEVEMENTS,
-            'saved': saved, 'record_distances': RECORD_DISTANCES,
+            'saved': saved, 'record_distances': RECORD_DISTANCES, 'filters': filters,
             'can_edit_profile': account is not None and account.can_edit_profile(pacemaker_id),
         })
 
     @router.get('/pacemakers/{pacemaker_id}/edit')
-    def edit_page(request: Request, pacemaker_id: int):
+    def edit_page(request: Request, pacemaker_id: int, filters: Filters):
         _require_profile_editor(auth.require_account(request), pacemaker_id)
-        return edit_response(request, _load(pacemaker_id, with_results=False))
+        return edit_response(request, _load(pacemaker_id, with_results=False), filters)
 
     @router.post('/pacemakers/{pacemaker_id}/edit')
-    async def save_page(request: Request, pacemaker_id: int):
+    async def save_page(request: Request, pacemaker_id: int, filters: Filters):
         account = auth.require_write(request)
         _require_profile_editor(account, pacemaker_id)
         try:
@@ -109,7 +112,7 @@ def create_profile_router(templates):
                     raise ValueError('Некорректные поля контактов. Обновите форму.')
                 version = int(values['profile_version'])
                 if version < 0 or version != profile.version:
-                    return edit_response(request, profile, values=values, status_code=409,
+                    return edit_response(request, profile, filters, values=values, status_code=409,
                         error='Профиль уже изменили. Обновите страницу перед сохранением.')
                 clean = ProfileEdit.validate(values, profile, is_admin=account.is_admin)
                 upload = form.get('photo')
@@ -124,16 +127,17 @@ def create_profile_router(templates):
             except UniqueViolation as error:
                 if error.diag.constraint_name != 'pacemakers_login_key':
                     raise
-                return edit_response(request, profile, values=values, status_code=422,
+                return edit_response(request, profile, filters, values=values, status_code=422,
                     error='Этот логин уже занят. Выберите другой.')
             except ValueError as error:
-                return edit_response(request, profile, values=values, error=str(error), status_code=422)
+                return edit_response(request, profile, filters, values=values, error=str(error), status_code=422)
             except (PsycopgError, RuntimeError):
-                return edit_response(request, profile, values=values, status_code=503,
+                return edit_response(request, profile, filters, values=values, status_code=503,
                     error='Не удалось сохранить профиль. Попробуйте ещё раз; фото нужно выбрать заново.')
         if not updated:
-            return edit_response(request, profile, values=values, status_code=409,
+            return edit_response(request, profile, filters, values=values, status_code=409,
                 error='Профиль уже изменили. Обновите страницу перед сохранением.')
-        return RedirectResponse((f'/p/{clean.login}' if clean.login else f'/pacemakers/{pacemaker_id}') + '?saved=true', status_code=303)
+        path = f'/p/{clean.login}' if clean.login else f'/pacemakers/{pacemaker_id}'
+        return RedirectResponse(filters.formula_url(path, saved='true'), status_code=303)
 
     return router

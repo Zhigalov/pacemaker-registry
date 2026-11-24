@@ -124,7 +124,8 @@ def check_database() -> None:
 
 
 def get_pacemaker_profile(pacemaker_id: int, *,
-                          with_results: bool = True, rating_formula=mean_rating) -> PacemakerProfile | None:
+                          with_results: bool = True, rating_formula=mean_rating,
+                          include_rank: bool = False) -> PacemakerProfile | None:
     with connect_database() as connection:
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         rows = _read_rows(connection,
@@ -138,13 +139,17 @@ def get_pacemaker_profile(pacemaker_id: int, *,
             return None
         row = rows[0]
         results = []
+        rank = None
         if with_results:
             results = _read_results(
                 connection, ('p.id = %s',), (pacemaker_id,), order="rr.created_at DESC, rr.id DESC",
             )
+        if include_rank and results:
+            ranked = _rank_pacemakers(_read_results(connection), rating_formula)
+            rank = next(position for position, pacer in enumerate(ranked, 1) if pacer.id == pacemaker_id)
     return PacemakerProfile(**dict(row, contacts=tuple(row['contacts']), achievements=tuple(row['achievements'])),
                             results=tuple(result.card() for result in results),
-                            rating=pacemaker_rating(results, rating_formula))
+                            rating=pacemaker_rating(results, rating_formula), rank=rank)
 
 
 def get_profile_choices() -> dict:
@@ -203,13 +208,31 @@ def get_event_target_time_type(source_event_id: str) -> str | None:
     return row[0] if row else None
 
 
+REGISTRY_PAGE_SIZE = 25
+
+
+def _rank_pacemakers(results, rating_formula):
+    grouped = defaultdict(list)
+    for result in results:
+        grouped[result.pacemaker_id].append(result)
+    pacemakers = []
+    for pid, performances in grouped.items():
+        first = performances[0]
+        pacemakers.append(RegistryPacemaker(
+            pid, f"{first.last_name} {first.first_name}", first.last_name[0] + first.first_name[0],
+            pacemaker_rating(performances, rating_formula), tuple(performances),
+            first.total_result_count, first.avatar_key,
+        ))
+    return _sort_pacemakers(pacemakers, filtered_count=rating_formula is median_rating)
+
+
 def load_registry(
     event_id: int | None = None,
     min_events: int = 1,
     distance_km: Decimal | None = None,
     search: str = "",
     page: int | None = None,
-    page_size: int = 25,
+    page_size: int = REGISTRY_PAGE_SIZE,
     rating_formula=mean_rating,
 ) -> Registry:
     with connect_database() as connection:
@@ -251,18 +274,7 @@ def load_registry(
             parameters += ([p['id'] for p in names if matches_name(f"{p['last_name']} {p['first_name']}", search)],)
         results = _read_results(connection, conditions, parameters, events=events_by_id)
 
-    grouped = defaultdict(list)
-    for result in results:
-        grouped[result.pacemaker_id].append(result)
-    pacemakers = []
-    for pid, performances in grouped.items():
-        first = performances[0]
-        pacemakers.append(RegistryPacemaker(
-            pid, f"{first.last_name} {first.first_name}", first.last_name[0] + first.first_name[0],
-            pacemaker_rating(performances, rating_formula), tuple(performances),
-            first.total_result_count, first.avatar_key,
-        ))
-    pacemakers = _sort_pacemakers(pacemakers, filtered_count=rating_formula is median_rating)
+    pacemakers = _rank_pacemakers(results, rating_formula)
     count = len(pacemakers)
     page_count = max(1, (count + page_size - 1) // page_size)
     if page is not None:

@@ -8,9 +8,9 @@
 {% endblock %}
 {% block shell_class %}app-shell profile-shell{% endblock %}
 {% block content %}
-<nav class="profile-breadcrumb"><a href="/pacemakers/{{ profile.id }}">← Профиль пейсмейкера</a></nav>
+<nav class="profile-breadcrumb"><a href="{{ filters.formula_url('/pacemakers/' ~ profile.id) }}">← Профиль пейсмейкера</a></nav>
 <div class="profile-edit-heading"><h1>Редактировать профиль</h1><p>{{ profile.full_name }}</p></div>
-<form class="profile-form" action="/pacemakers/{{ profile.id }}/edit" method="post" enctype="multipart/form-data">
+<form class="profile-form" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/edit') }}" method="post" enctype="multipart/form-data">
   <input type="hidden" name="profile_version" value="{{ values.profile_version }}">
   {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
   <section class="profile-form-section" aria-labelledby="photo-heading">
@@ -95,6 +95,6 @@
     {% endfor %}</div>
   </section>
   {% endif %}
-  <div class="profile-form-actions"><button class="button button--primary" type="submit">Сохранить профиль</button><a class="button" href="/pacemakers/{{ profile.id }}">Отмена</a></div>
+  <div class="profile-form-actions"><button class="button button--primary" type="submit">Сохранить профиль</button><a class="button" href="{{ filters.formula_url('/pacemakers/' ~ profile.id) }}">Отмена</a></div>
 </form>
 {% endblock %}

@@ -96,6 +96,7 @@ class PacemakerProfile:
     club: str | None = None
     personal_records: dict | None = None
     rating: float | None = None
+    rank: int | None = None
 
     @property
     def public_path(self) -> str:

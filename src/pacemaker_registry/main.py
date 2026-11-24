@@ -16,7 +16,7 @@ from psycopg import Error as PsycopgError
 from pacemaker_registry import auth
 from pacemaker_registry.filters import Filters, RegistryFilters
 from pacemaker_registry.db import (
-    Registry,
+    Registry, REGISTRY_PAGE_SIZE,
     list_events,
     get_event,
     save_event_rating,
@@ -30,7 +30,7 @@ from pacemaker_registry.db import (
 )
 from pacemaker_registry.rating import (
     default_event_rating, parse_event_rating, rating_color_style,
-    PaceRatingConfig, parse_pace_rating, RANKING_FORMULAS, RankingFormula,
+    PaceRatingConfig, parse_pace_rating, RANKING_FORMULAS,
 )
 from pacemaker_registry.imports import InvalidResultUrl, RaceResult, ResultImportError, guess_target_time
 from pacemaker_registry.sources import load_race_result, result_source_links as _result_source_links
@@ -135,7 +135,7 @@ def home(
         context={"registry": registry, "registry_error": registry_error,
                  "visible_pacemakers": registry.pacemakers, "filters": filters,
                  "ranking_formulas": RANKING_FORMULAS,
-                 "rating_max": 11 if filters.formula == RankingFormula.EXPERIENCE else 10,
+                 "rank_offset": (page - 1) * REGISTRY_PAGE_SIZE,
                  "all_events_url": replace(filters, event_id=0).url(),
                  "page": page, "page_count": page_count,
                  "previous_page_url": filters.url(page=page - 1),
@@ -271,7 +271,7 @@ def _result_response(request, details, filters, *,
             "source_url": source_url, "source_event_url": source_event_url,
             "finish_config": asdict(details.event.formula),
             "pace_config": asdict(details.event.pace_formula),
-            "back_url": filters.url(),
+            "back_url": filters.url(), "filters": filters,
             "edit_url": filters.url(f"/results/{details.result.id}/target-time"),
             "target_time_value": details.result.target_time_display if target_time is None else target_time,
             "error": error, "saved": saved,

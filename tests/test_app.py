@@ -71,7 +71,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert 'Результаты забегов' not in response.text
     assert 'class="visually-hidden">Пейсмейкеры</h1>' in response.text
     assert 'class="filter-hint" role="tooltip">За всю историю пейсера</span>' in response.text
-    assert response.text.count('--rating-color: hsl(') == 4
+    assert response.text.count('--rating-color: hsl(') == 3
     assert 'href="/add"' in response.text
     assert 'href="/results/1?event_id=0&amp;min_events=1"' in response.text
     assert "Жигалов Сергей" in response.text
@@ -79,7 +79,7 @@ async def test_home_page_is_rendered(monkeypatch) -> None:
     assert "05:24 /км" not in response.text
     assert "05:23 /км" not in response.text
     assert 'class="result-event"' not in response.text
-    assert "Рейтинг 9,5 из 10" in response.text
+    assert "Место <strong>1</strong>" in response.text
     assert '>Цель </span>' in response.text
     assert '>Факт </span>' in response.text
     assert '>Финиш </span>' in response.text

@@ -628,8 +628,15 @@ def test_registry_formula_switch_reorders_results_and_keeps_pagination(database)
         assert f'value="{formula}" selected' in page
         assert f'formula={formula}&amp;page=2' in page
     experience = client.get('/?formula=experience').text
-    assert 'Рейтинг 10,6 из 11' in experience
-    assert 'Рейтинг 10,5 из 11' in experience
+    assert 'rating-meter' not in experience
+    assert 'Место <strong>1</strong>' in experience
+    ranked = db.load_registry().pacemakers
+    first = next(pacer for pacer in ranked if pacer.full_name == 'First Runner')
+    profile = client.get(f'/pacemakers/{first.id}').raise_for_status().text
+    assert 'Место в общем рейтинге <strong>2</strong>' in profile
+    assert f'/pacemakers/{first.id}?formula=experience' in experience
+    alternate_profile = client.get(f'/pacemakers/{first.id}?formula=experience').raise_for_status().text
+    assert 'Место в общем рейтинге <strong>1</strong>' in alternate_profile
     fragment = client.get('/?formula=experience&page=2&fragment=true').raise_for_status().text
-    assert 'из 11' in fragment
+    assert 'Место <strong>26</strong>' in fragment
     assert client.get('/?formula=unknown').status_code == 422
