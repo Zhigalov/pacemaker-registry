@@ -21,7 +21,6 @@
         <label for="review-event">Соревнование</label>
         <span class="registry-filter-select">
           <select id="review-event" name="event_id" required>
-            {% if review_events %}<option value="" selected disabled>Выберите соревнование</option>{% endif %}
             <option value="0">Без соревнования</option>
             {% for id, name in review_events.items() %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
           </select>
