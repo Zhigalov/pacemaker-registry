@@ -56,7 +56,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
     assert migrate.migrate() == [
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
         '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql', '0008_roles.sql',
-        '0009_flag_time_seconds.sql', '0010_event_splits_enabled.sql',
+        '0009_flag_time_seconds.sql', '0010_event_splits_enabled.sql', '0011_pacemaker_reviews.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -640,3 +640,52 @@ def test_registry_formula_switch_reorders_results_and_keeps_pagination(database)
     fragment = client.get('/?formula=experience&page=2&fragment=true').raise_for_status().text
     assert 'Место <strong>26</strong>' in fragment
     assert client.get('/?formula=unknown').status_code == 422
+
+
+def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(database, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from pacemaker_registry.main import app
+
+    migrate.migrate()
+    assert db.save_race_result(sample(), '00:50')
+    assert db.save_race_result(sample(source_event_id='second', event_name='Другой забег'), '00:50')
+    assert db.save_race_result(sample(athlete_name='Other Runner', source_event_id='other'), '00:50')
+    registry = db.load_registry()
+    pacer = next(p for p in registry.pacemakers if p.full_name == 'Testov First')
+    event_ids = {result.event_name: result.event_id for result in pacer.results}
+    first = event_ids['Тестовый забег']
+    second = event_ids['Другой забег']
+    unrelated = next(event.id for event in registry.events if event.id not in event_ids.values())
+    with database() as connection:
+        account_id = connection.execute(
+            "INSERT INTO accounts (yandex_user_id) VALUES ('runner') RETURNING id"
+        ).fetchone()[0]
+    account = None
+    monkeypatch.setattr(auth, 'request_account', lambda request: account)
+    monkeypatch.setattr(auth, 'oauth_settings', lambda: ('test-client', 'https://test'))
+    client = TestClient(app, base_url='https://test', follow_redirects=False)
+    route = f'/pacemakers/{pacer.id}'
+    origin = {'Origin': 'https://test'}
+
+    def submit(event, score, comment='', headers=origin):
+        return client.post(route + '/reviews', headers=headers,
+                           data={'event_id': event, 'score': score, 'comment': comment})
+
+    assert 'Оценок пока нет' in client.get(route).text
+    assert submit(first, 5, 'Гость не может писать').status_code == 401
+    assert submit(first, 5, headers={'Origin': 'https://other.example'}).status_code == 403
+    assert submit(unrelated, 5).status_code == 404
+    assert submit(first, 6).status_code == 422
+    assert submit(first, 3).status_code == 303
+    assert submit(first, 4).status_code == 303
+    assert submit(second, 5).status_code == 303
+    assert 'Оценок: 2' in client.get(route).text
+
+    account = auth.SignedInAccount(account_id, 'runner', None)
+    assert submit(first, 5, 'Спасибо! <b>Ровный темп</b>').status_code == 303
+    assert submit(first, 4).status_code == 303
+    profile = client.get(route).raise_for_status().text
+    assert 'Оценок: 2' in profile
+    assert '4,5 из 5' in profile
+    assert 'Спасибо! &lt;b&gt;Ровный темп&lt;/b&gt;' in profile

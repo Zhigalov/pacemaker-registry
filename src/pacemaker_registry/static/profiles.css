@@ -166,3 +166,25 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
   .profile-qr-print-name { display: block; margin: 0; color: black; font-size: 18pt; font-weight: 700; }
   .profile-qr-image { width: 85mm; max-width: 100%; }
 }
+
+.profile-reviews { scroll-margin-top: 1rem; }
+.review-summary { margin: .25rem 0 .75rem; color: #52655d; }
+.review-summary strong, .review-heading strong { color: #176f59; }
+.review-list { margin: 0 0 1rem; padding: 0; list-style: none; }
+.review-list li { padding: .7rem 0; border-bottom: 1px solid #e7eeea; }
+.review-heading { display: flex; justify-content: space-between; gap: .6rem; font-size: .9rem; }
+.review-heading span, .review-list p { overflow-wrap: anywhere; }
+.review-heading strong { white-space: nowrap; }
+.review-list p { margin: .4rem 0 0; white-space: pre-wrap; }
+.review-form { display: grid; gap: .45rem; max-width: 34rem; }
+.review-form label, .review-scores legend { font-size: .88rem; font-weight: 650; }
+.review-form select, .review-form textarea { width: 100%; padding: .6rem; border: 1px solid #cddbd5; border-radius: .6rem; font: inherit; background: #fff; color: inherit; }
+.review-form textarea { resize: vertical; }
+.review-form .button { justify-self: start; margin-top: .3rem; }
+.review-form .event-note { margin: .2rem 0; }
+.review-scores { display: flex; gap: .35rem; margin: .3rem 0; border: 0; padding: 0; }
+.review-scores label { position: relative; cursor: pointer; }
+.review-scores input { position: absolute; opacity: 0; }
+.review-scores span { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .55rem; border: 1px solid #cddbd5; color: #176f59; }
+.review-scores input:checked + span { background: #176f59; color: white; border-color: #176f59; }
+.review-scores input:focus-visible + span { outline: 2px solid #176f59; outline-offset: 2px; }

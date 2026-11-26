@@ -121,6 +121,7 @@ def check_database() -> None:
             a.yandex_last_name, a.yandex_first_name, a.is_admin, s.token_hash, s.expires_at
             FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
             LIMIT 0""")
+        connection.execute("SELECT score, comment FROM pacemaker_reviews LIMIT 0")
 
 
 def get_pacemaker_profile(pacemaker_id: int, *,

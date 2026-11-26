@@ -1,0 +1,43 @@
+<section id="reviews" class="profile-panel profile-reviews" aria-labelledby="reviews-title">
+  <h2 id="reviews-title">Оценки и отзывы бегунов</h2>
+  {% if review_saved %}<p class="success-message" role="status">Оценка сохранена.</p>{% endif %}
+  {% if not reviews_available %}
+    <p class="event-note">Отзывы временно недоступны. Попробуйте позже.</p>
+  {% else %}
+    {% if reviews %}
+      <p class="review-summary"><strong>{{ '%.1f'|format(review_average)|replace('.', ',') }} из 5</strong> · Оценок: {{ reviews|length }}</p>
+      <ul class="review-list">
+      {% for review in reviews %}
+        <li>
+          <div class="review-heading"><span>{{ review.event_name }}</span><strong>{{ review.score }} из 5</strong></div>
+          {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
+        </li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <p class="event-note">Оценок пока нет.</p>
+    {% endif %}
+    {% if review_events %}
+      <form class="review-form" method="post" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/reviews') }}">
+        <label for="review-event">Соревнование</label>
+        <select id="review-event" name="event_id" required>
+          {% if review_events|length > 1 %}<option value="" selected disabled>Выберите соревнование</option>{% endif %}
+          {% for id, name in review_events.items() %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
+        </select>
+        <fieldset class="review-scores">
+          <legend>Ваша оценка</legend>
+          {% for value in range(1, 6) %}
+          <label><input type="radio" name="score" value="{{ value }}" required><span>{{ value }}</span></label>
+          {% endfor %}
+        </fieldset>
+        {% if signed_in_account %}
+          <label for="review-comment">Комментарий по желанию</label>
+          <textarea id="review-comment" name="comment" maxlength="1000" rows="3"></textarea>
+        {% elif yandex_login_enabled %}
+          <p class="event-note"><a href="/auth/yandex?review_for={{ profile.id }}">Войдите через Яндекс</a>, чтобы оставить комментарий.</p>
+        {% endif %}
+        <button type="submit" class="button button--primary">Сохранить оценку</button>
+      </form>
+    {% endif %}
+  {% endif %}
+</section>

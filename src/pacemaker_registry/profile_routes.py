@@ -10,6 +10,7 @@ from starlette.datastructures import UploadFile
 from pacemaker_registry import auth, avatars, db
 from pacemaker_registry.filters import Filters
 from pacemaker_registry.profile_qr import profile_qr_image
+from pacemaker_registry.reviews import list_reviews
 from pacemaker_registry.rating import RANKING_FORMULAS, mean_rating
 from pacemaker_registry.profiles import (
     ACHIEVEMENTS, CONTACT_TYPES, RECORD_DISTANCES, contact_view,
@@ -85,9 +86,20 @@ def create_profile_router(templates):
         profile = _load(pacemaker_id, include_rank=True, rating_formula=RANKING_FORMULAS[filters.formula][1])
         account = auth.request_account(request)
         qr_url = 'https://pacersreg.ru' + profile.public_path
+        review_events = {result.event_id: result.event_name for result in profile.results}
+        reviews = []
+        reviews_available = True
+        if review_events:
+            try:
+                reviews = list_reviews(profile.id)
+            except (PsycopgError, RuntimeError):
+                reviews_available = False
         return templates.TemplateResponse(request=request, name='pacemaker.html', context={
             'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
             'qr_url': qr_url, 'qr_image': profile_qr_image(qr_url),
+            'reviews': reviews, 'review_events': review_events, 'reviews_available': reviews_available,
+            'review_average': sum(review['score'] for review in reviews) / len(reviews) if reviews else None,
+            'review_saved': request.query_params.get('review_saved') == 'true',
             'contacts': [contact_view(c) for c in profile.contacts], 'achievement_types': ACHIEVEMENTS,
             'saved': saved, 'record_distances': RECORD_DISTANCES, 'filters': filters,
             'can_edit_profile': account is not None and account.can_edit_profile(pacemaker_id),

@@ -106,6 +106,8 @@ from pacemaker_registry.profile_routes import create_profile_router
 from pacemaker_registry.profile_linking import create_profile_link_router
 app.include_router(create_profile_router(templates))
 app.include_router(create_profile_link_router(templates))
+from pacemaker_registry.reviews import router as reviews_router
+app.include_router(reviews_router)
 app.include_router(auth.router)
 app.include_router(create_admin_router(templates))
 

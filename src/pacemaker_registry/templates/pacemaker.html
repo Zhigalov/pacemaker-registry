@@ -51,6 +51,7 @@
     {% for result in profile.results %}{{ result_card(result, filters) }}{% endfor %}
   </div>{% else %}<p class="event-note">В реестре пока нет выступлений этого пейсмейкера.</p>{% endif %}
 </section>
+    {% include "_reviews.html" %}
   </div>
   <aside class="profile-panel profile-contact-panel">
     {% if contacts %}<h2 id="contact-title">Контакты</h2>

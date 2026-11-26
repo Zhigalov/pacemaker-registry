@@ -171,7 +171,7 @@ def _redirect(location: str) -> RedirectResponse:
 
 
 @router.get("/yandex")
-def login() -> RedirectResponse:
+def login(review_for: int | None = None) -> RedirectResponse:
     settings = oauth_settings()
     if settings is None:
         raise HTTPException(404)
@@ -189,7 +189,10 @@ def login() -> RedirectResponse:
         "code_challenge_method": "S256",
     })
     response = _redirect("https://oauth.yandex.ru/authorize?" + query)
-    response.set_cookie(FLOW_COOKIE, f"{state}.{verifier}", max_age=FLOW_SECONDS, **COOKIE_OPTIONS)
+    flow = f"{state}.{verifier}"
+    if review_for and 0 < review_for <= 9223372036854775807:
+        flow += f".{review_for}"
+    response.set_cookie(FLOW_COOKIE, flow, max_age=FLOW_SECONDS, **COOKIE_OPTIONS)
     return response
 
 
@@ -240,7 +243,8 @@ def callback(request: Request) -> RedirectResponse:
     if settings is None:
         raise HTTPException(404)
     client_id, _ = settings
-    state, _, verifier = request.cookies.get(FLOW_COOKIE, "").partition(".")
+    state, _, remainder = request.cookies.get(FLOW_COOKIE, "").partition(".")
+    verifier, _, review_for = remainder.partition(".")
     returned_state = request.query_params.get("state", "")
     code = request.query_params.get("code", "")
     error = request.query_params.get("error")
@@ -256,7 +260,8 @@ def callback(request: Request) -> RedirectResponse:
         try:
             identity = yandex_identity(client_id, code, verifier)
             session = create_session(identity, _session_hash(request))
-            location = "/account/profile"
+            location = (f"/pacemakers/{review_for}#reviews"
+                        if re.fullmatch(r"[1-9][0-9]{0,18}", review_for) else "/account/profile")
         except (httpx.HTTPError, ValueError, KeyError, TypeError, PsycopgError, RuntimeError):
             location = "/?auth_error=unavailable"
     response = _redirect(location)
