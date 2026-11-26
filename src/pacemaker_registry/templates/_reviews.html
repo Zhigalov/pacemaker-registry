@@ -13,31 +13,40 @@
         <li>
           <div class="review-heading"><span>{{ review.event_name or "Без соревнования" }}</span><strong>{{ review.score }} из 5</strong></div>
           {% if review.comment %}
+            {% set own_comment = signed_in_account and signed_in_account.id == review.account_id %}
             <div class="review-author">
               <span class="review-author-avatar" aria-hidden="true">
                 {{ review.author_initials }}
                 {% if review.author_avatar %}<img src="{{ review.author_avatar }}" alt="" width="32" height="32" loading="lazy" referrerpolicy="no-referrer" data-avatar-image>{% endif %}
               </span>
               <strong>{{ review.author_name }}</strong>
+              {% if own_comment or (signed_in_account and signed_in_account.is_admin) %}
+                <div class="review-actions">
+                  {% if own_comment %}
+                    <button type="button" class="review-action" data-edit-review-comment aria-label="Редактировать комментарий" title="Редактировать" aria-expanded="false" aria-controls="review-editor-{{ loop.index }}">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 5.5 3 3M4 20l4.2-1 11-11a2.12 2.12 0 0 0-3-3L5 16z"/></svg>
+                    </button>
+                  {% endif %}
+                  <form data-remove-review-comment method="post" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/reviews/remove-comment') }}">
+                    <input type="hidden" name="author_id" value="{{ review.account_id }}">
+                    <input type="hidden" name="event_id" value="{{ review.event_id or 0 }}">
+                    <button type="submit" class="review-action review-action--delete" aria-label="Удалить комментарий" title="Удалить">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v6m4-6v6"/></svg>
+                    </button>
+                  </form>
+                </div>
+              {% endif %}
             </div>
             <p class="review-comment">{{ review.comment }}</p>
-            {% set own_comment = signed_in_account and signed_in_account.id == review.account_id %}
             {% if own_comment %}
-              <details class="review-comment-editor">
-                <summary>Редактировать комментарий</summary>
-                <form class="review-form" method="post" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/reviews/edit-comment') }}">
-                  <input type="hidden" name="author_id" value="{{ review.account_id }}">
-                  <input type="hidden" name="event_id" value="{{ review.event_id or 0 }}">
-                  <textarea name="comment" aria-label="Текст комментария" rows="3" maxlength="1000" required>{{ review.comment }}</textarea>
-                  <button type="submit" class="button button--primary">Сохранить комментарий</button>
-                </form>
-              </details>
-            {% endif %}
-            {% if own_comment or (signed_in_account and signed_in_account.is_admin) %}
-              <form class="review-moderation" data-remove-review-comment method="post" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/reviews/remove-comment') }}">
+              <form id="review-editor-{{ loop.index }}" class="review-form review-comment-editor" method="post" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/reviews/edit-comment') }}" hidden>
                 <input type="hidden" name="author_id" value="{{ review.account_id }}">
                 <input type="hidden" name="event_id" value="{{ review.event_id or 0 }}">
-                <button type="submit" class="button">Удалить комментарий</button>
+                <textarea name="comment" aria-label="Текст комментария" rows="3" maxlength="1000" required>{{ review.comment }}</textarea>
+                <div class="review-editor-actions">
+                  <button type="submit" class="button button--primary">Сохранить</button>
+                  <button type="button" class="button" data-cancel-review-edit>Отмена</button>
+                </div>
               </form>
             {% endif %}
           {% endif %}

@@ -179,13 +179,28 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .review-author-avatar { position: relative; display: grid; place-items: center; flex: 0 0 2rem; height: 2rem; border-radius: 50%; overflow: hidden; color: #176f59; background: #e5f1ec; font-size: .72rem; font-weight: 700; }
 .review-author-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .review-list p { margin: .4rem 0 0; white-space: pre-wrap; }
-.review-comment-editor { margin-top: .45rem; }
-.review-comment-editor summary { width: fit-content; color: #176f59; cursor: pointer; font-size: .82rem; font-weight: 650; }
-.review-comment-editor[open] .review-form { margin-top: .45rem; }
-.review-list li:has(.review-comment-editor[open]) > .review-comment { display: none; }
-.review-moderation { margin-top: .45rem; }
-.review-moderation .button { min-height: 2.15rem; padding: .3rem .6rem; border-color: #ead6d2; background: #fff; color: #8a342c; font-size: .8rem; }
-.review-moderation .button:hover { background: #faefed; }
+.review-actions { display: flex; flex: none; align-items: center; gap: .3rem; margin-left: auto; }
+.review-actions form { margin: 0; }
+.review-action {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid #dce6e2;
+  border-radius: .55rem;
+  background: #fff;
+  color: #176f59;
+  cursor: pointer;
+}
+.review-action svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.review-action:hover, .review-action[aria-expanded="true"] { background: #e5f1ec; }
+.review-action:focus-visible { outline: 2px solid #176f59; outline-offset: 2px; }
+.review-action--delete { color: #8a342c; }
+.review-action--delete:hover { background: #faefed; }
+.review-comment-editor { margin-top: .65rem; }
+.review-comment-editor[hidden] { display: none; }
+.review-editor-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
 .review-form { display: grid; gap: .45rem; max-width: 34rem; }
 .review-form label, .review-scores legend { font-size: .88rem; font-weight: 650; }
 .review-form select, .review-form textarea { width: 100%; padding: .6rem; border: 1px solid #cddbd5; border-radius: .6rem; font: inherit; background: #fff; color: inherit; }

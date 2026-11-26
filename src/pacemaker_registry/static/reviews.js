@@ -5,6 +5,24 @@
     });
   });
 
+  document.querySelectorAll('[data-edit-review-comment]').forEach(button => {
+    const editor = document.getElementById(button.getAttribute('aria-controls'));
+    const comment = button.closest('li').querySelector('.review-comment');
+    function toggleEditor(open) {
+      editor.hidden = !open;
+      comment.hidden = open;
+      button.setAttribute('aria-expanded', String(open));
+      if (open) {
+        editor.elements.namedItem('comment').focus();
+      } else {
+        editor.reset();
+        button.focus();
+      }
+    }
+    button.addEventListener('click', () => toggleEditor(editor.hidden));
+    editor.querySelector('[data-cancel-review-edit]').addEventListener('click', () => toggleEditor(false));
+  });
+
   const form = document.querySelector('[data-review-form]');
   if (!form) return;
 
