@@ -100,6 +100,7 @@ def create_profile_router(templates):
             'review_average': sum(review['score'] for review in reviews) / len(reviews) if reviews else None,
             'review_saved': request.query_params.get('review_saved') == 'true',
             'comment_removed': request.query_params.get('comment_removed') == 'true',
+            'comment_edited': request.query_params.get('comment_edited') == 'true',
             'contacts': [contact_view(c) for c in profile.contacts], 'achievement_types': ACHIEVEMENTS,
             'saved': saved, 'record_distances': RECORD_DISTANCES, 'filters': filters,
             'can_edit_profile': account is not None and account.can_edit_profile(pacemaker_id),

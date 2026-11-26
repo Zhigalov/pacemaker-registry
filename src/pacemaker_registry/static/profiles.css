@@ -179,6 +179,10 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .review-author-avatar { position: relative; display: grid; place-items: center; flex: 0 0 2rem; height: 2rem; border-radius: 50%; overflow: hidden; color: #176f59; background: #e5f1ec; font-size: .72rem; font-weight: 700; }
 .review-author-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .review-list p { margin: .4rem 0 0; white-space: pre-wrap; }
+.review-comment-editor { margin-top: .45rem; }
+.review-comment-editor summary { width: fit-content; color: #176f59; cursor: pointer; font-size: .82rem; font-weight: 650; }
+.review-comment-editor[open] .review-form { margin-top: .45rem; }
+.review-list li:has(.review-comment-editor[open]) > .review-comment { display: none; }
 .review-moderation { margin-top: .45rem; }
 .review-moderation .button { min-height: 2.15rem; padding: .3rem .6rem; border-color: #ead6d2; background: #fff; color: #8a342c; font-size: .8rem; }
 .review-moderation .button:hover { background: #faefed; }

@@ -105,26 +105,47 @@ def save_review(
     return response
 
 
+def _update_comment(pacemaker_id, event_id, author_id, comment, filters):
+    if not 0 < pacemaker_id <= MAX_DB_ID:
+        raise HTTPException(404, 'Пейсмейкер не найден.')
+    try:
+        with db.connect_database() as connection:
+            updated = connection.execute("""
+                UPDATE pacemaker_reviews SET comment = %s
+                WHERE pacemaker_id = %s AND event_id IS NOT DISTINCT FROM %s
+                    AND author_key = %s AND comment IS NOT NULL
+            """, (comment, pacemaker_id, event_id or None, f'account:{author_id}')).rowcount
+    except (PsycopgError, RuntimeError):
+        raise HTTPException(503, 'Не удалось обновить комментарий. Попробуйте позже.') from None
+    if not updated:
+        raise HTTPException(404, 'Комментарий не найден.')
+    notice = 'comment_removed' if comment is None else 'comment_edited'
+    location = filters.formula_url(f'/pacemakers/{pacemaker_id}', **{notice: 'true'})
+    return RedirectResponse(location + '#reviews', status_code=303, headers={'Cache-Control': 'no-store'})
+
+
+@router.post('/pacemakers/{pacemaker_id}/reviews/edit-comment')
+def edit_review_comment(
+    request: Request, pacemaker_id: int, filters: Filters,
+    author_id: Annotated[int, Form(gt=0, le=MAX_DB_ID)],
+    event_id: Annotated[int, Form(ge=0, le=MAX_DB_ID)],
+    comment: Annotated[str, Form(min_length=1, max_length=1000)],
+):
+    if auth.require_write(request).id != author_id:
+        raise HTTPException(403, 'Редактировать комментарий может только его автор.')
+    comment = comment.strip()
+    if not comment:
+        raise HTTPException(422, 'Введите текст комментария.')
+    return _update_comment(pacemaker_id, event_id, author_id, comment, filters)
+
+
 @router.post('/pacemakers/{pacemaker_id}/reviews/remove-comment')
 def remove_review_comment(
     request: Request, pacemaker_id: int, filters: Filters,
     author_id: Annotated[int, Form(gt=0, le=MAX_DB_ID)],
     event_id: Annotated[int, Form(ge=0, le=MAX_DB_ID)],
 ):
-    if not auth.require_write(request).is_admin:
-        raise HTTPException(403, 'Удалять комментарии может только администратор.')
-    if not 0 < pacemaker_id <= MAX_DB_ID:
-        raise HTTPException(404, 'Пейсмейкер не найден.')
-    try:
-        with db.connect_database() as connection:
-            removed = connection.execute("""
-                UPDATE pacemaker_reviews SET comment = NULL
-                WHERE pacemaker_id = %s AND event_id IS NOT DISTINCT FROM %s
-                    AND author_key = %s AND comment IS NOT NULL
-            """, (pacemaker_id, event_id or None, f'account:{author_id}')).rowcount
-    except (PsycopgError, RuntimeError):
-        raise HTTPException(503, 'Не удалось удалить комментарий. Попробуйте позже.') from None
-    if not removed:
-        raise HTTPException(404, 'Комментарий не найден.')
-    location = filters.formula_url(f'/pacemakers/{pacemaker_id}', comment_removed='true')
-    return RedirectResponse(location + '#reviews', status_code=303, headers={'Cache-Control': 'no-store'})
+    account = auth.require_write(request)
+    if account.id != author_id and not account.is_admin:
+        raise HTTPException(403, 'Удалять комментарий может его автор или администратор.')
+    return _update_comment(pacemaker_id, event_id, author_id, None, filters)

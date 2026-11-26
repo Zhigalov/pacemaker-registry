@@ -707,12 +707,29 @@ def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(datab
 
     delete_url = route + '/reviews/remove-comment?formula=median'
     delete_fields = {'author_id': account_id, 'event_id': 0}
-    assert 'Удалить комментарий' not in page
+    edit_url = route + '/reviews/edit-comment?formula=median'
+    edit_fields = {'author_id': account_id, 'event_id': first, 'comment': 'Уточнила отзыв'}
+    assert 'Удалить комментарий' in page and 'Редактировать комментарий' in page
+    assert client.post(edit_url, headers=origin, data=dict(edit_fields, comment='  ')).status_code == 422
+    edited = client.post(edit_url, headers=origin, data=edit_fields)
+    assert edited.status_code == 303
+    page = client.get(edited.headers['location']).text
+    assert 'Комментарий обновлён' in page and 'Уточнила отзыв' in page
+    assert 'Спасибо! &lt;b&gt;Ровный темп&lt;/b&gt;' not in page
+    assert 'Оценок: 3' in page and '4,3 из 5' in page
+
+    account = auth.SignedInAccount(account_id + 1, 'other', None)
+    page = client.get(route).text
+    assert 'Удалить комментарий' not in page and 'Редактировать комментарий' not in page
+    assert client.post(edit_url, headers=origin, data=edit_fields).status_code == 403
     assert client.post(delete_url, headers=origin, data=delete_fields).status_code == 403
     account = None
     assert client.post(delete_url, headers=origin, data=delete_fields).status_code == 401
-    account = auth.SignedInAccount(account_id, 'runner', None, is_admin=True)
-    assert client.get(route).text.count('Удалить комментарий') == 2
+    account = auth.SignedInAccount(account_id + 1, 'admin', None, is_admin=True)
+    page = client.get(route).text
+    assert page.count('Удалить комментарий') == 2
+    assert 'Редактировать комментарий' not in page
+    assert client.post(edit_url, headers=origin, data=edit_fields).status_code == 403
     assert client.post(delete_url, headers={'Origin': 'https://other.example'}, data=delete_fields).status_code == 403
     deleted = client.post(delete_url, headers=origin, data=delete_fields)
     assert deleted.status_code == 303
@@ -720,10 +737,17 @@ def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(datab
     page = client.get(deleted.headers['location']).text
     assert 'Комментарий удалён. Оценка сохранена.' in page
     assert 'Соревнования ещё нет в реестре' not in page
-    assert 'Спасибо! &lt;b&gt;Ровный темп&lt;/b&gt;' in page
+    assert 'Уточнила отзыв' in page
     assert '<span>Без соревнования</span><strong>4 из 5</strong>' in page
     assert 'Оценок: 3' in page
     assert page.count('Удалить комментарий') == 1
+
+    account = auth.SignedInAccount(account_id, 'runner', None)
+    deleted = client.post(delete_url, headers=origin, data=dict(delete_fields, event_id=first))
+    assert deleted.status_code == 303
+    page = client.get(deleted.headers['location']).text
+    assert 'Уточнила отзыв' not in page
+    assert 'Оценок: 3' in page and '4,3 из 5' in page
 
     with database() as connection:
         new_pacer_id = connection.execute(
