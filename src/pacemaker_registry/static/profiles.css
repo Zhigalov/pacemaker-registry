@@ -190,7 +190,29 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .review-scores { display: flex; gap: .35rem; margin: .3rem 0; border: 0; padding: 0; }
 .review-scores label { position: relative; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: .55rem; cursor: pointer; }
 .review-scores input { position: absolute; opacity: 0; }
-.review-star { display: block; width: 1.95rem; height: 1.95rem; color: #658578; fill: #f1f7f4; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
-.review-scores label:is(:has(input:checked), :has(~ label input:checked)) .review-star { color: #176f59; fill: #176f59; }
-.review-scores label:hover { background: #e5f1ec; }
+.review-star {
+  display: block;
+  width: 1.95rem;
+  height: 1.95rem;
+  color: var(--star-color, #658578);
+  fill: var(--star-fill, #f1f7f4);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.review-scores label:where(:has(input:checked), :has(~ label input:checked)) {
+  --star-color: #176f59;
+  --star-fill: #176f59;
+}
+@media (hover: hover) {
+  .review-scores:has(label:hover) label {
+    --star-color: #658578;
+    --star-fill: #f1f7f4;
+  }
+  .review-scores:has(label:hover) label:is(:hover, :has(~ label:hover)) {
+    --star-color: #176f59;
+    --star-fill: #176f59;
+  }
+  .review-scores label:hover { background: #e5f1ec; }
+}
 .review-scores label:has(input:focus-visible) { outline: 2px solid #176f59; outline-offset: 2px; }

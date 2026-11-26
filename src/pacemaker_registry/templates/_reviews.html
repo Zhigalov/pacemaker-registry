@@ -17,7 +17,7 @@
     {% else %}
       <p class="event-note">Оценок пока нет.</p>
     {% endif %}
-      <form class="review-form" method="post" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/reviews') }}">
+      <form class="review-form" data-review-form method="post" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/reviews') }}">
         <label for="review-event">Соревнование</label>
         <span class="registry-filter-select">
           <select id="review-event" name="event_id" required>
