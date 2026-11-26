@@ -10,6 +10,7 @@ from psycopg import Error as PsycopgError
 from psycopg.rows import dict_row
 
 from pacemaker_registry import auth, db
+from pacemaker_registry.avatars import yandex_avatar_url
 from pacemaker_registry.filters import Filters
 
 router = APIRouter()
@@ -19,12 +20,25 @@ GUEST_MAX_AGE = 365 * 24 * 60 * 60
 
 def list_reviews(pacemaker_id: int) -> list[dict]:
     with db.connect_database() as connection, connection.cursor(row_factory=dict_row) as cursor:
-        return cursor.execute("""
-            SELECT r.event_id, e.name AS event_name, r.score, r.comment
-            FROM pacemaker_reviews r LEFT JOIN events e ON e.id = r.event_id
+        rows = cursor.execute("""
+            SELECT r.event_id, e.name AS event_name, r.score, r.comment,
+                   a.yandex_first_name, a.yandex_last_name, a.yandex_avatar_id
+            FROM pacemaker_reviews r
+            LEFT JOIN events e ON e.id = r.event_id
+            LEFT JOIN accounts a ON a.id = r.account_id AND r.comment IS NOT NULL
             WHERE r.pacemaker_id = %s
             ORDER BY r.updated_at DESC, r.event_id, r.author_key
         """, (pacemaker_id,)).fetchall()
+    for row in rows:
+        first_name = row.pop('yandex_first_name')
+        last_name = row.pop('yandex_last_name')
+        avatar_id = row.pop('yandex_avatar_id')
+        if row['comment']:
+            names = [name for name in (first_name, last_name) if name]
+            row['author_name'] = ' '.join(names) or 'Пользователь Яндекса'
+            row['author_initials'] = ''.join(name[0] for name in names).upper() or 'Я'
+            row['author_avatar'] = yandex_avatar_url(avatar_id)
+    return rows
 
 
 def _save_review(pacemaker_id, event_id, token, account_id, score, comment):

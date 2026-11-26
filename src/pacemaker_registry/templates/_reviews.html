@@ -10,7 +10,16 @@
       {% for review in reviews %}
         <li>
           <div class="review-heading"><span>{{ review.event_name or "Без соревнования" }}</span><strong>{{ review.score }} из 5</strong></div>
-          {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
+          {% if review.comment %}
+            <div class="review-author">
+              <span class="review-author-avatar" aria-hidden="true">
+                {{ review.author_initials }}
+                {% if review.author_avatar %}<img src="{{ review.author_avatar }}" alt="" width="32" height="32" loading="lazy" referrerpolicy="no-referrer" data-avatar-image>{% endif %}
+              </span>
+              <strong>{{ review.author_name }}</strong>
+            </div>
+            <p>{{ review.comment }}</p>
+          {% endif %}
         </li>
       {% endfor %}
       </ul>
@@ -38,7 +47,8 @@
         </fieldset>
         {% if signed_in_account %}
           <label for="review-comment">Комментарий по желанию</label>
-          <textarea id="review-comment" name="comment" maxlength="1000" rows="3"></textarea>
+          <textarea id="review-comment" name="comment" maxlength="1000" rows="3" aria-describedby="review-author-note"></textarea>
+          <p class="event-note" id="review-author-note">Имя и аватар из Яндекса будут видны рядом с комментарием.</p>
         {% elif yandex_login_enabled %}
           <p class="event-note"><a href="/auth/yandex?review_for={{ profile.id }}">Войдите через Яндекс</a>, чтобы оставить комментарий.</p>
         {% endif %}

@@ -175,6 +175,9 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .review-heading { display: flex; justify-content: space-between; gap: .6rem; font-size: .9rem; }
 .review-heading span, .review-list p { overflow-wrap: anywhere; }
 .review-heading strong { white-space: nowrap; }
+.review-author { display: flex; align-items: center; gap: .55rem; margin-top: .55rem; font-size: .9rem; overflow-wrap: anywhere; }
+.review-author-avatar { position: relative; display: grid; place-items: center; flex: 0 0 2rem; height: 2rem; border-radius: 50%; overflow: hidden; color: #176f59; background: #e5f1ec; font-size: .72rem; font-weight: 700; }
+.review-author-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .review-list p { margin: .4rem 0 0; white-space: pre-wrap; }
 .review-form { display: grid; gap: .45rem; max-width: 34rem; }
 .review-form label, .review-scores legend { font-size: .88rem; font-weight: 650; }

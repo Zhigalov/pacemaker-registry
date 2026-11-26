@@ -660,7 +660,8 @@ def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(datab
     unrelated = next(event.id for event in registry.events if event.id not in event_ids.values())
     with database() as connection:
         account_id = connection.execute(
-            "INSERT INTO accounts (yandex_user_id) VALUES ('runner') RETURNING id"
+            """INSERT INTO accounts (yandex_user_id, yandex_first_name, yandex_last_name, yandex_avatar_id)
+               VALUES ('runner', 'Анна', 'Бегунова', '123/abc') RETURNING id"""
         ).fetchone()[0]
     account = None
     monkeypatch.setattr(auth, 'request_account', lambda request: account)
@@ -686,13 +687,14 @@ def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(datab
     account = auth.SignedInAccount(account_id, 'runner', None)
     assert submit(first, 5, 'Спасибо! <b>Ровный темп</b>').status_code == 303
     assert submit(first, 4).status_code == 303
+    account = None
     profile = client.get(route).raise_for_status().text
     assert 'Оценок: 2' in profile
     assert '4,5 из 5' in profile
     assert 'Спасибо! &lt;b&gt;Ровный темп&lt;/b&gt;' in profile
+    assert profile.count('<strong>Анна Бегунова</strong>') == 1
+    assert 'https://avatars.yandex.net/get-yapic/123/abc/' in profile
 
-
-    account = None
     assert submit(0, 3).status_code == 303
     assert submit(0, 2).status_code == 303
     assert 'Оценок: 3' in client.get(route).text
