@@ -412,13 +412,17 @@ def test_strava_rejects_non_profile_web_urls_and_unsafe_links(value):
 
 
 @pytest.mark.anyio
-async def test_profile_qr_targets_opened_public_route_without_query(monkeypatch):
-    monkeypatch.setattr(db, 'get_pacemaker_profile', lambda *args, **kwargs: profile(login='pacer', contacts=()))
+@pytest.mark.parametrize('path,login,expected_path', [
+    ('/p/pacer', 'pacer', '/p/pacer'),
+    ('/pacemakers/7', 'pacer', '/p/pacer'),
+    ('/pacemakers/7', None, '/pacemakers/7'),
+])
+async def test_profile_qr_uses_public_path_without_query(monkeypatch, path, login, expected_path):
+    monkeypatch.setattr(db, 'get_pacemaker_profile', lambda *args, **kwargs: profile(login=login, contacts=()))
     monkeypatch.setattr(db, 'find_pacemaker_login', lambda login: 7 if login == 'pacer' else None)
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
-        for path in ('/p/pacer', '/pacemakers/7'):
-            page = await client.get(path, params={'formula': 'median', 'saved': 'true', 'q': 'test'})
-            assert page.status_code == 200
-            assert f'class="profile-qr-image" href="https://pacersreg.ru{path}"' in page.text
-            assert 'data:image/png;base64,' in page.text
-            assert 'Распечатать QR-код' in page.text
+        page = await client.get(path, params={'formula': 'median', 'saved': 'true', 'q': 'test'})
+    assert page.status_code == 200
+    assert f'class="profile-qr-image" href="https://pacersreg.ru{expected_path}"' in page.text
+    assert 'data:image/png;base64,' in page.text
+    assert 'Распечатать QR-код' in page.text
