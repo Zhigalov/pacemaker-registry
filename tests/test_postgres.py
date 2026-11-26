@@ -57,6 +57,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
         '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql', '0008_roles.sql',
         '0009_flag_time_seconds.sql', '0010_event_splits_enabled.sql', '0011_pacemaker_reviews.sql',
+        '0012_reviews_without_event.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -689,3 +690,25 @@ def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(datab
     assert 'Оценок: 2' in profile
     assert '4,5 из 5' in profile
     assert 'Спасибо! &lt;b&gt;Ровный темп&lt;/b&gt;' in profile
+
+
+    account = None
+    assert submit(0, 3).status_code == 303
+    assert submit(0, 2).status_code == 303
+    assert 'Оценок: 3' in client.get(route).text
+    account = auth.SignedInAccount(account_id, 'runner', None)
+    assert submit(0, 4, 'Соревнования ещё нет в реестре').status_code == 303
+    page = client.get(route).text
+    assert 'Оценок: 3' in page
+    assert '<span>Без соревнования</span><strong>4 из 5</strong>' in page
+    assert 'Соревнования ещё нет в реестре' in page
+
+    with database() as connection:
+        new_pacer_id = connection.execute(
+            "INSERT INTO pacemakers (first_name, last_name) VALUES ('First', 'Noresults') RETURNING id"
+        ).fetchone()[0]
+    empty_profile = client.get(f'/pacemakers/{new_pacer_id}').raise_for_status().text
+    assert '<option value="0">Без соревнования</option>' in empty_profile
+    response = client.post(f'/pacemakers/{new_pacer_id}/reviews', headers=origin, data={'score': 5})
+    assert response.status_code == 303
+    assert 'Оценок: 1' in client.get(f'/pacemakers/{new_pacer_id}').text

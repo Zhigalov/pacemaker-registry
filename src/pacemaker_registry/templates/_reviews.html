@@ -9,7 +9,7 @@
       <ul class="review-list">
       {% for review in reviews %}
         <li>
-          <div class="review-heading"><span>{{ review.event_name }}</span><strong>{{ review.score }} из 5</strong></div>
+          <div class="review-heading"><span>{{ review.event_name or "Без соревнования" }}</span><strong>{{ review.score }} из 5</strong></div>
           {% if review.comment %}<p>{{ review.comment }}</p>{% endif %}
         </li>
       {% endfor %}
@@ -17,17 +17,24 @@
     {% else %}
       <p class="event-note">Оценок пока нет.</p>
     {% endif %}
-    {% if review_events %}
       <form class="review-form" method="post" action="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/reviews') }}">
         <label for="review-event">Соревнование</label>
-        <select id="review-event" name="event_id" required>
-          {% if review_events|length > 1 %}<option value="" selected disabled>Выберите соревнование</option>{% endif %}
-          {% for id, name in review_events.items() %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
-        </select>
+        <span class="registry-filter-select">
+          <select id="review-event" name="event_id" required>
+            {% if review_events %}<option value="" selected disabled>Выберите соревнование</option>{% endif %}
+            <option value="0">Без соревнования</option>
+            {% for id, name in review_events.items() %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
+          </select>
+        </span>
         <fieldset class="review-scores">
           <legend>Ваша оценка</legend>
           {% for value in range(1, 6) %}
-          <label><input type="radio" name="score" value="{{ value }}" required><span>{{ value }}</span></label>
+          <label>
+            <input type="radio" name="score" value="{{ value }}" aria-label="{{ value }} из 5" required>
+            <svg class="review-star" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2.8l2.8 5.7 6.3.9-4.5 4.4 1.1 6.2-5.7-3-5.7 3 1.1-6.2-4.5-4.4 6.3-.9z"/>
+            </svg>
+          </label>
           {% endfor %}
         </fieldset>
         {% if signed_in_account %}
@@ -38,6 +45,5 @@
         {% endif %}
         <button type="submit" class="button button--primary">Сохранить оценку</button>
       </form>
-    {% endif %}
   {% endif %}
 </section>

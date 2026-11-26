@@ -89,11 +89,10 @@ def create_profile_router(templates):
         review_events = {result.event_id: result.event_name for result in profile.results}
         reviews = []
         reviews_available = True
-        if review_events:
-            try:
-                reviews = list_reviews(profile.id)
-            except (PsycopgError, RuntimeError):
-                reviews_available = False
+        try:
+            reviews = list_reviews(profile.id)
+        except (PsycopgError, RuntimeError):
+            reviews_available = False
         return templates.TemplateResponse(request=request, name='pacemaker.html', context={
             'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
             'qr_url': qr_url, 'qr_image': profile_qr_image(qr_url),
