@@ -16,12 +16,13 @@ from pacemaker_registry.filters import Filters
 router = APIRouter()
 GUEST_COOKIE = '__Host-pacers-review'
 GUEST_MAX_AGE = 365 * 24 * 60 * 60
+MAX_DB_ID = 2**63 - 1
 
 
 def list_reviews(pacemaker_id: int) -> list[dict]:
     with db.connect_database() as connection, connection.cursor(row_factory=dict_row) as cursor:
         rows = cursor.execute("""
-            SELECT r.event_id, e.name AS event_name, r.score, r.comment,
+            SELECT r.event_id, e.name AS event_name, r.score, r.comment, r.account_id,
                    a.yandex_first_name, a.yandex_last_name, a.yandex_avatar_id
             FROM pacemaker_reviews r
             LEFT JOIN events e ON e.id = r.event_id
@@ -73,10 +74,10 @@ def _save_review(pacemaker_id, event_id, token, account_id, score, comment):
 def save_review(
     request: Request, pacemaker_id: int, filters: Filters,
     score: Annotated[int, Form(ge=1, le=5)],
-    event_id: Annotated[int, Form(ge=0, le=9223372036854775807)] = 0,
+    event_id: Annotated[int, Form(ge=0, le=MAX_DB_ID)] = 0,
     comment: Annotated[str, Form(max_length=1000)] = '',
 ):
-    if not 0 < pacemaker_id <= 9223372036854775807:
+    if not 0 < pacemaker_id <= MAX_DB_ID:
         raise HTTPException(404, 'Пейсмейкер не найден.')
     settings = auth.oauth_settings()
     origin = settings[1] if settings else str(request.base_url).rstrip('/')
@@ -102,3 +103,28 @@ def save_review(
     if new_token and account is None:
         response.set_cookie(GUEST_COOKIE, token, max_age=GUEST_MAX_AGE, **auth.COOKIE_OPTIONS)
     return response
+
+
+@router.post('/pacemakers/{pacemaker_id}/reviews/remove-comment')
+def remove_review_comment(
+    request: Request, pacemaker_id: int, filters: Filters,
+    author_id: Annotated[int, Form(gt=0, le=MAX_DB_ID)],
+    event_id: Annotated[int, Form(ge=0, le=MAX_DB_ID)],
+):
+    if not auth.require_write(request).is_admin:
+        raise HTTPException(403, 'Удалять комментарии может только администратор.')
+    if not 0 < pacemaker_id <= MAX_DB_ID:
+        raise HTTPException(404, 'Пейсмейкер не найден.')
+    try:
+        with db.connect_database() as connection:
+            removed = connection.execute("""
+                UPDATE pacemaker_reviews SET comment = NULL
+                WHERE pacemaker_id = %s AND event_id IS NOT DISTINCT FROM %s
+                    AND author_key = %s AND comment IS NOT NULL
+            """, (pacemaker_id, event_id or None, f'account:{author_id}')).rowcount
+    except (PsycopgError, RuntimeError):
+        raise HTTPException(503, 'Не удалось удалить комментарий. Попробуйте позже.') from None
+    if not removed:
+        raise HTTPException(404, 'Комментарий не найден.')
+    location = filters.formula_url(f'/pacemakers/{pacemaker_id}', comment_removed='true')
+    return RedirectResponse(location + '#reviews', status_code=303, headers={'Cache-Control': 'no-store'})

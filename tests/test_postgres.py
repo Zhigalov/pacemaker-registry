@@ -705,6 +705,26 @@ def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(datab
     assert '<span>Без соревнования</span><strong>4 из 5</strong>' in page
     assert 'Соревнования ещё нет в реестре' in page
 
+    delete_url = route + '/reviews/remove-comment?formula=median'
+    delete_fields = {'author_id': account_id, 'event_id': 0}
+    assert 'Удалить комментарий' not in page
+    assert client.post(delete_url, headers=origin, data=delete_fields).status_code == 403
+    account = None
+    assert client.post(delete_url, headers=origin, data=delete_fields).status_code == 401
+    account = auth.SignedInAccount(account_id, 'runner', None, is_admin=True)
+    assert client.get(route).text.count('Удалить комментарий') == 2
+    assert client.post(delete_url, headers={'Origin': 'https://other.example'}, data=delete_fields).status_code == 403
+    deleted = client.post(delete_url, headers=origin, data=delete_fields)
+    assert deleted.status_code == 303
+    assert deleted.headers['location'].endswith('?comment_removed=true&formula=median#reviews')
+    page = client.get(deleted.headers['location']).text
+    assert 'Комментарий удалён. Оценка сохранена.' in page
+    assert 'Соревнования ещё нет в реестре' not in page
+    assert 'Спасибо! &lt;b&gt;Ровный темп&lt;/b&gt;' in page
+    assert '<span>Без соревнования</span><strong>4 из 5</strong>' in page
+    assert 'Оценок: 3' in page
+    assert page.count('Удалить комментарий') == 1
+
     with database() as connection:
         new_pacer_id = connection.execute(
             "INSERT INTO pacemakers (first_name, last_name) VALUES ('First', 'Noresults') RETURNING id"

@@ -1,4 +1,10 @@
 (() => {
+  document.querySelectorAll('[data-remove-review-comment]').forEach(form => {
+    form.addEventListener('submit', event => {
+      if (!window.confirm('Удалить комментарий? Оценка сохранится.')) event.preventDefault();
+    });
+  });
+
   const form = document.querySelector('[data-review-form]');
   if (!form) return;
 
