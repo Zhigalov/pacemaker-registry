@@ -85,7 +85,7 @@ def create_profile_router(templates):
         profile = _load(pacemaker_id, include_rank=True, rating_formula=RANKING_FORMULAS[filters.formula][1])
         account = auth.request_account(request)
         path = profile.public_path if request.url.path.startswith('/p/') else f'/pacemakers/{profile.id}'
-        qr_url = filters.formula_url('https://pacersreg.ru' + path)
+        qr_url = 'https://pacersreg.ru' + path
         return templates.TemplateResponse(request=request, name='pacemaker.html', context={
             'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
             'qr_url': qr_url, 'qr_image': profile_qr_image(qr_url),
