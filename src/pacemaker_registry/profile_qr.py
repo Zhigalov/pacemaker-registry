@@ -30,7 +30,10 @@ def profile_qr_image(url: str) -> str:
     )
     image.paste(logo, (offset, offset), logo)
 
-    lines = wrap(url, width=36, break_on_hyphens=False)
+    address, separator, query = url.partition("?")
+    lines = wrap(address, width=36, break_on_hyphens=False)
+    if separator:
+        lines.append(separator + query)
     size = round(width * 0.052)
     font = ImageFont.load_default(size=size)
     while max(map(font.getlength, lines)) > width * 0.92:

@@ -162,7 +162,7 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
     padding: 0;
     border: 0;
   }
-  .profile-qr { break-inside: avoid; padding: 8mm 0; }
+  .profile-contact-panel > .profile-qr { break-inside: avoid; margin: 0; padding: 8mm 0; border: 0; }
   .profile-qr-print-name { display: block; margin: 0; color: black; font-size: 18pt; font-weight: 700; }
   .profile-qr-image { width: 85mm; max-width: 100%; }
 }
