@@ -52,8 +52,9 @@
   </div>{% else %}<p class="event-note">В реестре пока нет выступлений этого пейсмейкера.</p>{% endif %}
 </section>
   </div>
-  {% if contacts %}<aside class="profile-panel profile-contact-panel" aria-labelledby="contact-title"><h2 id="contact-title">Контакты</h2>
-    {% if contacts %}<ul class="profile-contacts" aria-label="Контакты">
+  <aside class="profile-panel profile-contact-panel">
+    {% if contacts %}<h2 id="contact-title">Контакты</h2>
+    <ul class="profile-contacts" aria-labelledby="contact-title">
       {% for contact in contacts %}<li>
         {% if contact.href %}<a class="profile-contact" href="{{ contact.href }}"{% if not contact.href.startswith('tel:') %} target="_blank" rel="noopener noreferrer"{% endif %}>
         {% else %}<span class="profile-contact">{% endif %}
@@ -63,6 +64,14 @@
         {% if contact.href %}</a>{% else %}</span>{% endif %}
       </li>{% endfor %}
     </ul>{% endif %}
-  </aside>{% endif %}
+    <section class="profile-qr" aria-labelledby="profile-qr-title">
+      <h2 id="profile-qr-title">QR-код профиля</h2>
+      <p class="profile-qr-print-name">{{ profile.full_name }}</p>
+      <a class="profile-qr-image" href="{{ qr_url }}">
+        <img src="{{ qr_image }}" alt="QR-код профиля. Адрес {{ qr_url }}">
+      </a>
+      <button type="button" class="button" data-profile-print hidden>Распечатать QR-код</button>
+    </section>
+  </aside>
 </div>
 {% endblock %}

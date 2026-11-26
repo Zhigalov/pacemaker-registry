@@ -1,5 +1,10 @@
 (() => {
   'use strict';
+  const printButton = document.querySelector('[data-profile-print]');
+  if (printButton) {
+    printButton.hidden = false;
+    printButton.addEventListener('click', () => window.print());
+  }
   const fields = document.querySelector('[data-contact-fields]');
   document.querySelector('[data-add-contact]')?.addEventListener('click', () => {
     if (fields.querySelectorAll('[name="contact_type"]').length >= 20) return;

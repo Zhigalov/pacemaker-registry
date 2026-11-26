@@ -9,6 +9,7 @@ from starlette.datastructures import UploadFile
 
 from pacemaker_registry import auth, avatars, db
 from pacemaker_registry.filters import Filters
+from pacemaker_registry.profile_qr import profile_qr_image
 from pacemaker_registry.rating import RANKING_FORMULAS, mean_rating
 from pacemaker_registry.profiles import (
     ACHIEVEMENTS, CONTACT_TYPES, RECORD_DISTANCES, contact_view,
@@ -83,8 +84,11 @@ def create_profile_router(templates):
     def profile_page(request: Request, pacemaker_id: int, filters: Filters, saved: bool = False):
         profile = _load(pacemaker_id, include_rank=True, rating_formula=RANKING_FORMULAS[filters.formula][1])
         account = auth.request_account(request)
+        path = profile.public_path if request.url.path.startswith('/p/') else f'/pacemakers/{profile.id}'
+        qr_url = filters.formula_url('https://pacersreg.ru' + path)
         return templates.TemplateResponse(request=request, name='pacemaker.html', context={
             'profile': profile, 'avatar_url': avatars.avatar_url(profile.avatar_key),
+            'qr_url': qr_url, 'qr_image': profile_qr_image(qr_url),
             'contacts': [contact_view(c) for c in profile.contacts], 'achievement_types': ACHIEVEMENTS,
             'saved': saved, 'record_distances': RECORD_DISTANCES, 'filters': filters,
             'can_edit_profile': account is not None and account.can_edit_profile(pacemaker_id),

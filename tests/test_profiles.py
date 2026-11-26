@@ -409,3 +409,16 @@ def test_strava_accepts_shared_text_profile_links_and_id(value, expected):
 def test_strava_rejects_non_profile_web_urls_and_unsafe_links(value):
     with pytest.raises(ValueError):
         normalize_contacts([{'type': 'strava', 'value': value}])
+
+
+@pytest.mark.anyio
+async def test_profile_qr_targets_opened_public_route_without_saved_state(monkeypatch):
+    monkeypatch.setattr(db, 'get_pacemaker_profile', lambda *args, **kwargs: profile(login='pacer', contacts=()))
+    monkeypatch.setattr(db, 'find_pacemaker_login', lambda login: 7 if login == 'pacer' else None)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        for path in ('/p/pacer', '/pacemakers/7'):
+            page = await client.get(path, params={'formula': 'median', 'saved': 'true'})
+            assert page.status_code == 200
+            assert f'class="profile-qr-image" href="https://pacersreg.ru{path}?formula=median"' in page.text
+            assert 'data:image/png;base64,' in page.text
+            assert 'Распечатать QR-код' in page.text

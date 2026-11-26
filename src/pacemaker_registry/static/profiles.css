@@ -134,3 +134,35 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .profile-identity .achievement-badge { position: static; }
 .profile-identity .achievement-tooltip { left: 0; right: auto; max-width: 100%; }
 .profile-form [data-photo-error][hidden] { display: none; }
+
+
+.profile-qr {
+  display: grid;
+  justify-items: center;
+  gap: .45rem;
+  text-align: center;
+}
+.profile-contacts + .profile-qr { margin-top: .8rem; padding-top: .9rem; border-top: 1px solid #e7eeea; }
+.profile-qr-image { display: block; width: min(100%, 14rem); }
+.profile-qr-image img { display: block; width: 100%; height: auto; }
+.profile-qr-print-name, .profile-qr button[hidden] { display: none; }
+
+@media print {
+  body:has(.profile-qr) { min-width: 0; min-height: 0; background: white; }
+  .profile-shell:has(.profile-qr) > :not(.profile-information),
+  .profile-information:has(.profile-qr) > :not(.profile-contact-panel),
+  .profile-contact-panel:has(.profile-qr) > :not(.profile-qr),
+  .profile-qr button, .profile-qr h2 { display: none; }
+  .profile-shell:has(.profile-qr),
+  .profile-information:has(.profile-qr),
+  .profile-contact-panel:has(.profile-qr) {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .profile-qr { break-inside: avoid; padding: 8mm 0; }
+  .profile-qr-print-name { display: block; margin: 0; color: black; font-size: 18pt; font-weight: 700; }
+  .profile-qr-image { width: 85mm; max-width: 100%; }
+}

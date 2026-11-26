@@ -15,6 +15,7 @@ markupsafe==3.0.3
 psycopg==3.3.5
 psycopg-binary==3.3.5
 pillow==13.0.0
+qrcode==8.2
 pydantic==2.13.5
 pydantic-core==2.46.5
 python-dotenv==1.2.3
