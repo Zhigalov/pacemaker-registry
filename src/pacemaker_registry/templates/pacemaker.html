@@ -17,24 +17,31 @@
     {% if avatar_url %}<img src="{{ avatar_url }}" alt="{{ profile.full_name }}" width="128" height="128" data-avatar-image>{% endif %}
   </div>
   <div class="profile-identity">
-    <h1 id="profile-name">{{ profile.full_name }}</h1>
-    {% if profile.rank is not none %}<span class="pacemaker-rank">Место в общем рейтинге <strong>{{ profile.rank }}</strong></span>{% endif %}
-    {% if profile.city or profile.club %}<p class="profile-location">{% if profile.city %}<span>⌖ {{ profile.city }}</span>{% endif %}{% if profile.club %}<span>◈ {{ profile.club }}</span>{% endif %}</p>{% endif %}
-    <div class="profile-identity-meta">
-    {% if profile.login %}<a class="profile-public-link" href="{{ profile.public_path }}">pacersreg.ru{{ profile.public_path }}</a>{% endif %}
-
-    {% if profile.achievements %}<ul class="profile-achievements" aria-label="Достижения">
-      {% for code in profile.achievements %}{% if code in achievement_types %}
-        <li>{{ achievement_badge(code, achievement_types[code], true) }}</li>
-      {% endif %}{% endfor %}
-    </ul>{% endif %}
-
+    <div class="profile-name-row">
+      <h1 id="profile-name">{{ profile.full_name }}</h1>
+      {% if profile.achievements %}<ul class="profile-achievements" aria-label="Достижения">
+        {% for code in profile.achievements %}{% if code in achievement_types %}
+          <li>{{ achievement_badge(code, achievement_types[code], true) }}</li>
+        {% endif %}{% endfor %}
+      </ul>{% endif %}
     </div>
+    {% if profile.rank is not none or profile.city or profile.club %}
+    <div class="profile-identity-meta">
+      {% if profile.rank is not none %}<span class="pacemaker-rank">Место в общем рейтинге <strong>{{ profile.rank }}</strong></span>{% endif %}
+      {% if profile.city %}<span class="profile-location"><span aria-hidden="true">⌖</span> {{ profile.city }}</span>{% endif %}
+      {% if profile.club %}<span class="profile-location"><span aria-hidden="true">◈</span> {{ profile.club }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if profile.login %}<a class="profile-public-link" href="{{ profile.public_path }}">pacersreg.ru{{ profile.public_path }}</a>{% endif %}
+  </div>
+  {% if profile.donation_url or can_edit_profile %}
+  <div class="profile-actions">
     {% if profile.donation_url %}
     <a class="button button--primary profile-support" href="{{ profile.donation_url }}" target="_blank" rel="noopener noreferrer" aria-label="Поддержать через CloudTips (откроется в новой вкладке)">Поддержать <span aria-hidden="true">↗</span></a>
     {% endif %}
+    {% if can_edit_profile %}<a class="button profile-edit-link" href="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/edit') }}">Редактировать</a>{% endif %}
   </div>
-  {% if can_edit_profile %}<a class="button profile-edit-link" href="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/edit') }}">Редактировать профиль</a>{% endif %}
+  {% endif %}
 </section>
 <div class="profile-information">
   <div class="profile-story">

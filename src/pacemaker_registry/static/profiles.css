@@ -68,14 +68,20 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .profile-shell { max-width: 74rem; margin-inline: auto; }
 .profile-intro { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; align-items: center; gap: 1.1rem; padding: 1.25rem; border: 1px solid #dce6e2; border-radius: 1rem; background: #fff; }
 .profile-intro .profile-avatar { width: 5.5rem; height: 5.5rem; border-radius: 1rem; }
-.profile-identity { min-width: 0; }
-.profile-support { margin-top: .75rem; gap: .4rem; }
+.profile-identity { display: grid; justify-items: start; gap: .5rem; min-width: 0; position: relative; }
+.profile-name-row, .profile-identity-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .7rem; min-width: 0; }
+.profile-identity-meta { font-size: .85rem; overflow-wrap: anywhere; }
+.profile-identity .pacemaker-rank { margin: 0; padding: .25rem .55rem; border-radius: .5rem; background: #eaf4ef; }
+.profile-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+.profile-actions .button { min-height: 2.65rem; padding: .55rem .85rem; font-size: .85rem; }
+.profile-actions .profile-support:not(:hover) { box-shadow: none; }
 #donation-hint a { color: #176f59; }
-.profile-location { display: flex; flex-wrap: wrap; gap: .3rem 1rem; margin: .4rem 0; color: #52655d; font-size: .85rem; }
-.profile-public-link { display: inline-block; margin-top: .25rem; color: #176f59; font-size: .8rem; overflow-wrap: anywhere; }
+.profile-location { color: #52655d; }
+.profile-public-link { color: #176f59; font-size: .8rem; overflow-wrap: anywhere; text-underline-offset: .18em; }
 .profile-achievements { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; margin: 0; padding: 0; }
-.profile-achievements .achievement-badge { width: 2.4rem; height: 2.4rem; }
-.profile-edit-link { align-self: start; border-color: #dce6e2; color: #176f59; background: #f3f8f5; font-size: .8rem; }
+.profile-achievements .achievement-badge { width: 2rem; height: 2rem; border-radius: .55rem; }
+.profile-edit-link { border-color: #dce6e2; color: #176f59; background: #f3f8f5; }
+.profile-edit-link:hover { background: #e5f2eb; }
 .profile-information { display: grid; grid-template-columns: minmax(0, 1fr) 18.5rem; align-items: start; gap: 1rem; margin-top: 1rem; }
 .profile-information:not(:has(.profile-contact-panel)) { grid-template-columns: minmax(0, 1fr); }
 .profile-story { display: grid; gap: 1rem; min-width: 0; }
@@ -106,15 +112,19 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
   .profile-information { grid-template-columns: minmax(0, 1fr) 16rem; }
   .profile-record-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 48rem) {
+  .profile-intro { grid-template-columns: 4.25rem minmax(0, 1fr); padding: 1rem; gap: .85rem; }
+  .profile-intro .profile-avatar { width: 4.25rem; height: 4.25rem; align-self: start; }
+  .profile-actions { grid-column: 1 / -1; justify-content: flex-start; padding-top: .75rem; border-top: 1px solid #e7eeea; }
+  .profile-actions .button { padding-inline: .55rem; }
+  .profile-identity .pacemaker-rank { font-size: .8rem; }
+}
 @media (max-width: 42rem) {
   .profile-information { display: flex; flex-direction: column; }
   .profile-story { display: contents; }
   .profile-panel, .profile-performances { width: 100%; }
   .profile-contact-panel { order: 2; }
   .profile-performances { order: 3; }
-  .profile-intro { grid-template-columns: 4.25rem minmax(0, 1fr); padding: 1rem; gap: .85rem; }
-  .profile-intro .profile-avatar { width: 4.25rem; height: 4.25rem; align-self: start; }
-  .profile-edit-link { grid-column: 1 / -1; justify-self: start; }
   .profile-record-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 35rem) {
@@ -130,9 +140,6 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
   .profile-record-edit-row .record-source { grid-column: 2 / -1; }
 }
 
-.profile-identity-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; margin-top: .5rem; }
-.profile-identity-meta:empty { display: none; }
-.profile-identity-meta { position: relative; }
 .profile-identity .achievement-badge { position: static; }
 .profile-identity .achievement-tooltip { left: 0; right: auto; max-width: 100%; }
 .profile-form [data-photo-error][hidden] { display: none; }
