@@ -112,7 +112,7 @@ def check_database() -> None:
     with connect_database() as connection:
         connection.execute("""SELECT rr.id, e.rating_config, e.pace_rating_config, e.splits_enabled, p.last_name,
             p.motto, p.avatar_key, p.contacts, p.achievements, p.profile_version, p.profile_updated_at,
-            p.login, p.city_id, p.club_id, p.personal_records, p.account_id, e.captain_account_id
+            p.login, p.city_id, p.club_id, p.personal_records, p.donation_url, p.account_id, e.captain_account_id
             FROM race_results AS rr
             JOIN events AS e ON e.id = rr.event_id
             JOIN pacemakers AS p ON p.id = rr.pacemaker_id
@@ -132,7 +132,7 @@ def get_pacemaker_profile(pacemaker_id: int, *,
         rows = _read_rows(connection,
             """SELECT p.id, p.last_name, p.first_name, p.motto AS about, p.avatar_key, p.contacts,
                       p.achievements, p.profile_version AS version, p.login, c.name AS city,
-                      bc.name AS club, p.personal_records
+                      bc.name AS club, p.personal_records, p.donation_url
                FROM pacemakers p LEFT JOIN cities c ON c.id = p.city_id
                LEFT JOIN running_clubs bc ON bc.id = p.club_id WHERE p.id = %s""", (pacemaker_id,),
         )
@@ -177,7 +177,7 @@ def _profile_choice(connection, table: str, name: str) -> int | None:
 
 def save_pacemaker_profile(pacemaker_id: int, version: int, about: str,
                            contacts: list[dict], achievements: list[str], avatar_key: str | None,
-                           *, login=None, city='', club='', personal_records=None) -> bool:
+                           *, login=None, city='', club='', personal_records=None, donation_url=None) -> bool:
     with connect_database() as connection:
         # Lock before creating lookup values: stale edits must not leave orphan cities or clubs.
         row = connection.execute('SELECT profile_version FROM pacemakers WHERE id = %s FOR UPDATE',
@@ -188,11 +188,11 @@ def save_pacemaker_profile(pacemaker_id: int, version: int, about: str,
         club_id = _profile_choice(connection, 'running_clubs', club)
         connection.execute(
             """UPDATE pacemakers SET motto = %s, contacts = %s, achievements = %s, avatar_key = %s,
-                   login = %s, city_id = %s, club_id = %s, personal_records = %s,
+                   login = %s, city_id = %s, club_id = %s, personal_records = %s, donation_url = %s,
                    profile_version = profile_version + 1, profile_updated_at = now()
                WHERE id = %s""",
             (about or None, Jsonb(contacts), Jsonb(achievements), avatar_key, login, city_id, club_id,
-             Jsonb(personal_records or {}), pacemaker_id))
+             Jsonb(personal_records or {}), donation_url, pacemaker_id))
         return True
 
 

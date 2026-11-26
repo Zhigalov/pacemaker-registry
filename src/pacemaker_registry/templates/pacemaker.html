@@ -30,6 +30,9 @@
     </ul>{% endif %}
 
     </div>
+    {% if profile.donation_url %}
+    <a class="button button--primary profile-support" href="{{ profile.donation_url }}" target="_blank" rel="noopener noreferrer" aria-label="Поддержать через CloudTips (откроется в новой вкладке)">Поддержать <span aria-hidden="true">↗</span></a>
+    {% endif %}
   </div>
   {% if can_edit_profile %}<a class="button profile-edit-link" href="{{ filters.formula_url('/pacemakers/' ~ profile.id ~ '/edit') }}">Редактировать профиль</a>{% endif %}
 </section>

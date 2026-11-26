@@ -39,7 +39,7 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .profile-form-section { margin-bottom: 1rem; padding: 1.5rem; border: 1px solid #dce6e2; border-radius: 1rem; background: #fff; }
 .profile-form-section h2 { font-size: 1.1rem; margin: 0 0 1rem; }
 .profile-form label { font-size: .88rem; font-weight: 600; }
-.profile-form input[type="text"], .profile-form input:not([type]), .profile-form textarea { display: block; width: 100%; min-height: 2.8rem; margin: .4rem 0 0; padding: .7rem; border: 1px solid #cddbd5; border-radius: .65rem; font: inherit; font-weight: 400; background: #fff; color: #17231f; }
+.profile-form input[type="text"], .profile-form input[type="url"], .profile-form input:not([type]), .profile-form textarea { display: block; width: 100%; min-height: 2.8rem; margin: .4rem 0 0; padding: .7rem; border: 1px solid #cddbd5; border-radius: .65rem; font: inherit; font-weight: 400; background: #fff; color: #17231f; }
 .profile-form textarea { resize: vertical; }
 .profile-form input:focus-visible, .profile-form textarea:focus-visible { outline: 2px solid #176f59; outline-offset: 2px; }
 .profile-photo-controls { display: grid; grid-template-columns: 8rem minmax(0, 1fr); align-items: center; gap: 1.25rem; margin-bottom: 1.4rem; }
@@ -69,6 +69,8 @@ a.profile-contact:hover, a.profile-contact:focus-visible { color: #176f59; backg
 .profile-intro { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; align-items: center; gap: 1.1rem; padding: 1.25rem; border: 1px solid #dce6e2; border-radius: 1rem; background: #fff; }
 .profile-intro .profile-avatar { width: 5.5rem; height: 5.5rem; border-radius: 1rem; }
 .profile-identity { min-width: 0; }
+.profile-support { margin-top: .75rem; gap: .4rem; }
+#donation-hint a { color: #176f59; }
 .profile-location { display: flex; flex-wrap: wrap; gap: .3rem 1rem; margin: .4rem 0; color: #52655d; font-size: .85rem; }
 .profile-public-link { display: inline-block; margin-top: .25rem; color: #176f59; font-size: .8rem; overflow-wrap: anywhere; }
 .profile-achievements { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; margin: 0; padding: 0; }

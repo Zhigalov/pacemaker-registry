@@ -57,7 +57,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
         '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql', '0008_roles.sql',
         '0009_flag_time_seconds.sql', '0010_event_splits_enabled.sql', '0011_pacemaker_reviews.sql',
-        '0012_reviews_without_event.sql',
+        '0012_reviews_without_event.sql', '0013_profile_donation_url.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -221,17 +221,24 @@ def test_profile_save_conflict_and_reimport_preserve_fields(database):
     assert len(profile.results) == 1
     contacts = [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}]
     avatar = f'avatars/{pacemaker_id}/' + 'a' * 32 + '.webp'
-    assert db.save_pacemaker_profile(pacemaker_id, 0, 'Ведём вместе', contacts, ['pshp_graduate'], avatar)
+    donation_url = 'https://pay.cloudtips.ru/p/1a2b3c4d'
+    assert profile.donation_url is None
+    assert db.save_pacemaker_profile(pacemaker_id, 0, 'Ведём вместе', contacts, ['pshp_graduate'], avatar,
+                                     donation_url=donation_url)
     assert not db.save_pacemaker_profile(pacemaker_id, 0, 'Overwrite', [], [], None)
     assert db.save_race_result(sample(), '00:50')
     changed = db.get_pacemaker_profile(pacemaker_id)
     assert changed.about == 'Ведём вместе' and changed.contacts == tuple(contacts)
     assert changed.achievements == ('pshp_graduate',)
+    assert changed.donation_url == donation_url
     assert changed.version == 1 and len(changed.results) == 2
     assert changed.avatar_key == db.load_registry().pacemakers[0].avatar_key == avatar
     assert db.get_result_details(changed.results[0].id).pacemaker_id == pacemaker_id
     assert changed.results[0].rating == db.get_result_details(changed.results[0].id).result.rating
     assert not db.get_pacemaker_profile(pacemaker_id, with_results=False).results
+    assert db.save_pacemaker_profile(pacemaker_id, 1, changed.about, contacts, ['pshp_graduate'], avatar,
+                                     donation_url=None)
+    assert db.get_pacemaker_profile(pacemaker_id).donation_url is None
 
 
 def test_profile_details_lookup_reuse_unique_login_and_atomic_conflict(database):
@@ -272,7 +279,7 @@ def test_previous_mottos_survive_profile_extension(database, tmp_path, monkeypat
     migrate.migrate()
     with database() as connection:
         pacer = connection.execute("INSERT INTO pacemakers(last_name,first_name,motto) VALUES ('Old','Pacer','Старый девиз') RETURNING id").fetchone()[0]
-    (tmp_path / '0003_profile_details.sql').write_text((original / '0003_profile_details.sql').read_text())
+    monkeypatch.setattr(migrate, 'MIGRATIONS_DIR', original)
     migrate.migrate()
     assert db.get_pacemaker_profile(pacer, with_results=False).about == 'Старый девиз'
 

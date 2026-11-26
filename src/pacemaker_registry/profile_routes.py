@@ -39,6 +39,7 @@ def _save(profile, values, photo, remove_photo):
         updated = db.save_pacemaker_profile(
             profile.id, values.profile_version, values.about, values.contacts, values.achievements, key,
             login=values.login, city=values.city, club=values.club, personal_records=values.personal_records,
+            donation_url=values.donation_url,
         )
     except Exception:
         if new_key:

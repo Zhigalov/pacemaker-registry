@@ -84,6 +84,13 @@
       <button type="button" class="button profile-remove-contact" data-remove-contact aria-label="Удалить этот контакт">×</button>
     </div></template>
   </section>
+  <section class="profile-form-section" aria-labelledby="support-heading">
+    <h2 id="support-heading">Поддержка</h2>
+    <label>Ссылка для донатов
+      <input type="url" name="donation_url" maxlength="500" value="{{ values.donation_url }}" placeholder="https://pay.cloudtips.ru/p/…" aria-describedby="donation-hint" autocapitalize="none" spellcheck="false">
+      <small id="donation-hint" class="contact-field-hint"><a href="https://cloudtips.ru/faq" target="_blank" rel="noopener noreferrer">Как скопировать платёжную ссылку CloudTips</a>. Чтобы убрать кнопку «Поддержать», очистите поле.</small>
+    </label>
+  </section>
   {% if can_edit_achievements %}
   <section class="profile-form-section" aria-labelledby="achievements-heading">
     <h2 id="achievements-heading">Достижения</h2>

@@ -165,6 +165,7 @@ def profile_form_values(profile) -> dict:
     rows.extend(c for c in contacts if c['type'] == 'other')
     return {'about': profile.about or '', 'login': profile.login or '',
             'city': profile.city or '', 'club': profile.club or '',
+            'donation_url': profile.donation_url or '',
             'personal_records': profile.personal_records or {}, 'contacts': rows,
             'achievements': list(profile.achievements), 'profile_version': profile.version}
 
@@ -198,11 +199,29 @@ def normalize_profile_login(value: str) -> str | None:
     return login or None
 
 
+def normalize_donation_url(value: str) -> str | None:
+    value = value.strip()
+    if not value:
+        return None
+    error = 'Вставьте ссылку на страницу CloudTips вида https://pay.cloudtips.ru/p/…'
+    if len(value) > 500 or re.search(r'[\s\x00-\x1f\x7f\\]', value):
+        raise ValueError(error)
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        raise ValueError(error) from None
+    payment_page = re.fullmatch(r'/p/([A-Za-z0-9_-]{1,64})/?', parts.path)
+    if parts.scheme != 'https' or parts.netloc.lower() != 'pay.cloudtips.ru' or not payment_page:
+        raise ValueError(error)
+    return f'https://pay.cloudtips.ru/p/{payment_page[1]}'
+
+
 def normalize_profile_details(values: dict) -> dict:
     clean = dict(values)
     if len(clean['about']) > 5000:
         raise ValueError('Описание «О себе» — до 5000 символов.')
     clean['login'] = normalize_profile_login(clean['login'])
+    clean['donation_url'] = normalize_donation_url(clean.get('donation_url', ''))
     for field, title in (('city', 'Город'), ('club', 'Беговой клуб')):
         clean[field] = ' '.join(clean[field].split())
         if len(clean[field]) > 120:
@@ -255,6 +274,7 @@ class ProfileEdit:
     city: str = ''
     club: str = ''
     personal_records: dict | None = None
+    donation_url: str | None = None
 
     @classmethod
     def validate(cls, values, profile, *, is_admin):
@@ -272,7 +292,7 @@ def read_profile_form(form, profile, *, is_admin):
     """Keep original input for error responses, before normalization."""
     types, labels, contacts = (form.getlist(name) for name in ('contact_type', 'contact_label', 'contact_value'))
     values = {name: str(form.get(name, getattr(profile, name) or '')).strip()
-              for name in ('login', 'city', 'club')}
+              for name in ('login', 'city', 'club', 'donation_url')}
     values.update(
         about=str(form.get('about', form.get('motto', ''))).strip(),
         personal_records={d: {k: str(form.get(f'record_{d}_{k}', '')).strip()

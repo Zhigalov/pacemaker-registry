@@ -97,6 +97,7 @@ class PacemakerProfile:
     personal_records: dict | None = None
     rating: float | None = None
     rank: int | None = None
+    donation_url: str | None = None
 
     @property
     def public_path(self) -> str:

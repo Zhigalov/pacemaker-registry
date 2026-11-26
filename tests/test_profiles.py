@@ -206,7 +206,8 @@ async def test_edit_ignores_tampered_name_and_saves_only_profile(monkeypatch, co
         edit = await client.get('/pacemakers/7/edit')
     assert response.status_code == 303
     save.assert_called_once_with(7, 0, 'Ведём вместе',
-        [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}], ['pshp_graduate'], None, login=None, city='', club='', personal_records={})
+        [{'type': 'telegram', 'value': 'https://t.me/pacer_one'}], ['pshp_graduate'], None,
+        login=None, city='', club='', personal_records={}, donation_url=None)
     assert 'name="first_name"' not in edit.text and 'name="last_name"' not in edit.text
     assert 'Выбрать фото</label>' in edit.text
     assert 'Файл не выбран' in edit.text
@@ -346,11 +347,57 @@ async def test_public_login_and_details_edit_and_errors_preserve_fields(monkeypa
         saved = await client.post('/pacemakers/7/edit', data=data)
         assert saved.status_code == 303 and saved.headers['location'] == '/p/my_login?saved=true'
         assert save.call_args.kwargs == {'login': 'my_login', 'city': 'Новый город', 'club': 'Наш клуб',
+            'donation_url': None,
             'personal_records': {'5': {'time': '00:19:01', 'year': 2025, 'url': 'https://example.org/race'}}}
         invalid = await client.post('/pacemakers/7/edit', data=dict(data, login='no spaces allowed'))
         assert invalid.status_code == 422 and 'Наш клуб' in invalid.text and '19:01' in invalid.text
         assert 'Я' * 5000 in invalid.text
         assert save.call_count == 1
+
+
+@pytest.mark.parametrize('value', [
+    'http://pay.cloudtips.ru/p/1a2b3c4d',
+    'https://pay.cloudtips.ru.example.com/p/1a2b3c4d',
+    'https://pay.cloudtips.ru@other.example/p/1a2b3c4d',
+    'https://pay.cloudtips.ru:443/p/1a2b3c4d',
+    'https://pay.cloudtips.ru/faq',
+    'https://pay.cloudtips.ru/p/',
+    'https://pay.cloudtips.ru/p/a%2Fb',
+    'https://pay.cloudtips.ru/p/a\nb',
+    'javascript:alert(1)',
+])
+def test_invalid_cloudtips_links_are_rejected(value):
+    from pacemaker_registry.profiles import normalize_donation_url
+    with pytest.raises(ValueError, match='CloudTips'):
+        normalize_donation_url(value)
+
+
+@pytest.mark.anyio
+async def test_donation_link_profile_lifecycle(monkeypatch):
+    url = 'https://pay.cloudtips.ru/p/1a2b3c4d'
+    current = profile()
+    monkeypatch.setattr(db, 'get_pacemaker_profile', lambda *a, **k: current)
+
+    def save(*args, donation_url, **kwargs):
+        nonlocal current
+        current = profile(version=current.version + 1, donation_url=donation_url)
+        return True
+
+    monkeypatch.setattr(db, 'save_pacemaker_profile', save)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        edit = '/pacemakers/7/edit'
+        public = '/pacemakers/7'
+        assert 'profile-support' not in (await client.get(public)).text
+        invalid = await client.post(edit, data={'profile_version': '0', 'donation_url': 'https://example.org'})
+        assert invalid.status_code == 422 and 'value="https://example.org"' in invalid.text
+        saved = await client.post(edit, data={'profile_version': '0', 'donation_url': url + '/?amount=150'})
+        assert saved.status_code == 303
+        assert f'name="donation_url" maxlength="500" value="{url}"' in (await client.get(edit)).text
+        assert f'href="{url}" target="_blank" rel="noopener noreferrer"' in (await client.get(public)).text
+        assert (await client.post(edit, data={'profile_version': '1'})).status_code == 303
+        assert current.donation_url == url
+        assert (await client.post(edit, data={'profile_version': '2', 'donation_url': ''})).status_code == 303
+        assert 'profile-support' not in (await client.get(public)).text
 
 
 @pytest.mark.anyio
