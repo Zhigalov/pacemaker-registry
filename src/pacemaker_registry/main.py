@@ -160,9 +160,9 @@ def _require_event_editor(account, event):
 
 def _event_response(request, event, *, values=None, pace_values=None, splits_enabled=None,
                     error=None, saved=False, notice=None, status_code=200, result=None, result_url="",
-                    target_time_type=None, settings_error=False):
+                    target_time_type=None, draft_settings=False):
     try:
-        draft_results = get_draft_results(event) if event.is_draft else ()
+        draft_results = get_draft_results(event) if event.is_draft and not draft_settings else ()
     except (PsycopgError, RuntimeError) as error:
         raise HTTPException(503, "Не удалось загрузить результаты черновика.") from error
     return templates.TemplateResponse(
@@ -176,9 +176,9 @@ def _event_response(request, event, *, values=None, pace_values=None, splits_ena
             "splits_enabled": event.splits_enabled if splits_enabled is None else splits_enabled,
             "error": error, "saved": saved, "notice": notice, "result": result, "result_url": result_url,
             "target_time_type": target_time_type or event.target_time_type,
-            "settings_error": settings_error,
+            "draft_settings": draft_settings,
             "draft_defaults": {kind: asdict(default_event_rating(kind)) for kind in ("sub_minute", "round")}
-                              if event.is_draft else None,
+                              if draft_settings else None,
         },
         status_code=status_code,
     )
@@ -217,6 +217,14 @@ def event_page(request: Request, event_id: int, saved: bool = False,
     return _event_response(request, _load_event_or_404(request, event_id), saved=saved, notice=notice)
 
 
+@app.get("/events/{event_id}/draft", response_class=HTMLResponse)
+def draft_settings_page(request: Request, event_id: int, notice: Literal["draft"] | None = None):
+    event = _load_event_or_404(request, event_id)
+    if not event.is_draft:
+        return RedirectResponse(f"/events/{event_id}", status_code=303)
+    return _event_response(request, event, notice=notice, draft_settings=True)
+
+
 @app.post("/events/{event_id}/draft")
 async def update_draft(
     request: Request, event_id: int,
@@ -253,11 +261,11 @@ async def update_draft(
     if error:
         return await run_in_threadpool(_event_response, request, event, values=values, pace_values=pace_values,
                                        splits_enabled=enabled, target_time_type=target_time_type, error=error,
-                                       settings_error=True, status_code=status_code)
+                                       draft_settings=True, status_code=status_code)
     if not updated:
         raise HTTPException(409, "Черновик уже изменён. Обновите страницу.")
-    notice = "published" if publish else "draft"
-    return RedirectResponse(f"/events/{event_id}?notice={notice}", status_code=303)
+    location = f"/events/{event_id}?notice=published" if publish else f"/events/{event_id}/draft?notice=draft"
+    return RedirectResponse(location, status_code=303)
 
 
 @app.post("/events/{event_id}/rating", response_class=HTMLResponse)

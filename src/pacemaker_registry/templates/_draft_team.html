@@ -13,3 +13,9 @@
   {% with import_action='/events/' ~ event.id ~ '/preview-result', embedded=true %}{% include '_import_form.html' %}{% endwith %}
 </section>
 {% include '_import_result.html' %}
+{% if not result %}
+<div class="draft-next">
+  <p class="event-note">Когда вся команда добавлена, перейдите к настройкам оценки.</p>
+  <a class="button button--primary" href="/events/{{ event.id }}/draft">Перейти к настройкам <span aria-hidden="true">→</span></a>
+</div>
+{% endif %}

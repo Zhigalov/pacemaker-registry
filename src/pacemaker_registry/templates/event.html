@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ event.name }} — Реестр пейсмейкеров{% endblock %}
 {% block head %}
+{% if not event.is_draft or draft_settings %}
 <script src="{{ asset_url('rating-models.js') }}" defer></script>
 <script src="{{ asset_url('chart-utils.js') }}" defer></script>
 <script src="{{ asset_url('event-rating.js') }}" defer></script>
 <script src="{{ asset_url('pace-rating.js') }}" defer></script>
-{% if event.is_draft %}<script src="{{ asset_url('add.js') }}" defer></script>{% endif %}
+{% else %}<script src="{{ asset_url('add.js') }}" defer></script>{% endif %}
 {% endblock %}
 {% block before_main %}{% if notice == 'added' %}<span hidden data-analytics-goal="result_saved"></span>{% elif result %}<span hidden data-analytics-goal="result_preview"></span>{% endif %}{% endblock %}
 {% block shell_class %}app-shell event-shell{% endblock %}
@@ -25,7 +26,20 @@
 {% if saved %}<p class="event-success" role="status">Формула сохранена. Рейтинг результатов этого соревнования пересчитан при отображении.</p>{% endif %}
 {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
 {% if event.is_draft %}
+<ol class="draft-steps" aria-label="Шаги добавления соревнования">
+  {% if draft_settings %}
+  <li><a href="/events/{{ event.id }}">1. Участники</a></li>
+  <li aria-current="step">2. Настройки и публикация</li>
+  {% else %}
+  <li aria-current="step">1. Участники</li>
+  <li>2. Настройки и публикация</li>
+  {% endif %}
+</ol>
+{% endif %}
+{% if event.is_draft and not draft_settings %}
 {% include '_draft_team.html' %}
+{% else %}
+{% if draft_settings %}
 <form class="event-draft-settings" action="/events/{{ event.id }}/draft" method="post" data-draft-settings>
   <div class="event-editor draft-toolbar">
     <label for="event-target-type">Тип времени на флаге
@@ -35,13 +49,8 @@
         <option value="round"{% if target_time_type == 'round' %} selected{% endif %}>Ровное время</option>
       </select></span>
     </label>
-    <div class="draft-actions">
-      <button class="button draft-save" name="action" value="save">Сохранить черновик</button>
-      <button class="button button--primary" name="action" value="publish">Опубликовать</button>
-    </div>
   </div>
   <script type="application/json" data-draft-defaults>{{ draft_defaults | tojson }}</script>
-  <details class="draft-rating-settings"{% if settings_error %} open{% endif %}><summary>Настройки оценки финиша и темпа</summary>
 {% endif %}
 {% if can_edit_event %}
 {% set rating_tag = 'section' if event.is_draft else 'form' %}
@@ -77,7 +86,9 @@
   </div>
   <script type="application/json" data-rating-config>{{ defaults | tojson }}</script>
 </{{ rating_tag }}>
+{% if draft_settings %}<details class="draft-rating-settings"{% if error %} open{% endif %}><summary>Настройки оценки темпа на отрезках</summary>{% endif %}
 {% include '_pace_editor.html' %}
+{% if draft_settings %}</details>{% endif %}
 {% else %}
 <section class="event-editor" data-rating-widget>
   <h2>Оценка за финиш</h2>
@@ -92,7 +103,13 @@
   {% else %}<p class="event-note">Учёт отсечек отключён. Итог считается только по финишу.</p>{% endif %}
 </section>
 {% endif %}
-{% if event.is_draft %}</details></form>{% endif %}
+{% if draft_settings %}
+  <div class="draft-actions">
+    <button class="button draft-save" name="action" value="save">Сохранить черновик</button>
+    <button class="button button--primary" name="action" value="publish">Опубликовать</button>
+  </div>
+</form>
+{% else %}
 <details class="rating-methodology">
   <summary>Как получается итоговая оценка</summary>
   <div class="rating-methodology-content">
@@ -103,4 +120,6 @@
     <p>Оценки за темп взвешиваются по длине отрезков. Без достаточных отсечек или с выключенным учётом темпа итог равен оценке за финиш.</p>
   </div>
 </details>
+{% endif %}
+{% endif %}
 {% endblock %}

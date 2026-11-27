@@ -542,6 +542,12 @@ def test_competition_draft_lifecycle_and_visibility(database, monkeypatch, admin
     page = client.get(path)
     assert "Testov First" in page.text and "Черновик" in page.text
     assert "21,1 км" in page.text
+    assert f'href="{path}/draft"' in page.text
+    assert "Опубликовать" not in page.text and "Оценка за финиш" not in page.text
+    assert "Как получается итоговая оценка" not in page.text
+    settings = client.get(path + "/draft").text
+    assert "Опубликовать" in settings and "Оценка за финиш" in settings
+    assert "Добавить в черновик" not in settings and "Как получается итоговая оценка" not in settings
     opened, = db.get_draft_results(event)
     detail_path = f"/results/{opened.id}"
     assert client.get(detail_path).status_code == 200
@@ -557,10 +563,12 @@ def test_competition_draft_lifecycle_and_visibility(database, monkeypatch, admin
             **asdict(EventRatingConfig(left_good=-11))}
     actor = None
     assert client.get(path).status_code == client.get(detail_path).status_code == 404
+    assert client.get(path + "/draft").status_code == 404
     assert "Тайный старт" not in client.get("/events").text
     assert client.post(path + "/draft", data=data).status_code == 401
     actor = outsider
     assert client.get(path).status_code == client.get(detail_path).status_code == 404
+    assert client.get(path + "/draft").status_code == 404
     assert "Тайный старт" not in client.get("/events?status=all").text
     assert client.post(path + "/draft", data=data).status_code == 404
     assert client.post("/results", data={"result_url": first.source_url, "target_time": "00:50"}).status_code == 404
@@ -580,7 +588,9 @@ def test_competition_draft_lifecycle_and_visibility(database, monkeypatch, admin
     assert client.get(f"/pacemakers/{draft_only.pacemaker_id}").status_code == 404
     assert client.post(path + "/draft", data=dict(data, left_good=-200)).status_code == 422
     assert db.get_event(event.id).is_draft
-    assert client.post(path + "/draft", data=dict(data, action="save")).status_code == 303
+    saved_response = client.post(path + "/draft", data=dict(data, action="save"))
+    assert saved_response.status_code == 303
+    assert saved_response.headers["location"] == path + "/draft?notice=draft"
     saved = db.get_event(event.id)
     assert saved.is_draft and saved.target_time_type == "sub_minute" and saved.formula.left_good == -11
     assert client.post(path + "/draft", data=data).headers["location"].endswith("?notice=published")
@@ -588,6 +598,8 @@ def test_competition_draft_lifecycle_and_visibility(database, monkeypatch, admin
     assert client.post(path + "/draft", data=data).status_code == 409
     actor = outsider
     assert client.get(path).status_code == client.get(detail_path).status_code == 200
+    assert "Как получается итоговая оценка" in client.get(path).text
+    assert client.get(path + "/draft").headers["location"] == path
     assert "Тайный старт" in client.get("/events?status=available").text
     assert "Тайный старт" not in client.get("/events?status=draft").text
     assert db.load_registry(event_id=event.id).result_count == 2
