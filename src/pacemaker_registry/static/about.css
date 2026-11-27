@@ -7,7 +7,8 @@
 .about-page h2 { margin: 0; font-size: clamp(1.55rem, 4vw, 2rem); letter-spacing: -.025em; }
 .about-page a { color: #176f59; text-underline-offset: .18em; }
 .about-lead { font-size: clamp(1.05rem, 3vw, 1.2rem); font-weight: 570; }
-#rating-formulas { margin-top: 2.5rem; scroll-margin-top: 1rem; }
+.about-jump-links { display: flex; flex-wrap: wrap; gap: .25rem 1rem; }
+#rating-formulas, #faq { margin-top: 2.5rem; scroll-margin-top: 1rem; }
 .about-examples { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: .75rem; margin: 1.25rem 0; }
 .about-example, .about-formula { margin: 0; padding: clamp(.9rem, 3vw, 1.3rem); border: 1px solid #dce7e2; border-radius: .9rem; background: white; }
 .about-example figcaption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .2rem .5rem; }
@@ -31,6 +32,10 @@
 .about-tradeoffs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem 1rem; margin: .85rem 0; font-size: .9rem; }
 .about-tradeoffs dt { font-weight: 700; }
 .about-tradeoffs dd { margin: .15rem 0 0; color: #52665d; }
+.tips-steps { margin-block: .9rem; padding-inline-start: 1.4rem; }
+.tips-steps > li + li { margin-top: .9rem; }
+.tips-steps li::marker { color: #176f59; font-weight: 700; }
+.tips-steps img { display: block; width: 100%; height: auto; margin-top: .6rem; border: 1px solid #dce7e2; border-radius: .65rem; }
 @media (max-width: 34rem) {
   .about-tradeoffs { grid-template-columns: 1fr; }
 }
