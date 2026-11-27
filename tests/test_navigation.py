@@ -15,7 +15,7 @@ def test_shared_navigation_has_logo_and_one_active_section(path, active):
     html = templates.get_template('_navigation.html').render(request=request)
     assert html.count('aria-current="page"') == 1
     assert f'href="{active}" aria-current="page"' in html or (
-        active == '/add' and 'href="/add" aria-label="Добавить результат" aria-current="page"' in html)
+        active == '/add' and 'href="/add" aria-label="Добавить соревнование" aria-current="page"' in html)
     assert f'class="brand-mark" src="{asset_url("apple-touch-icon.png")}"' in html
     assert '>P</span>' not in html
     assert 'aria-label="Главное меню"' in html

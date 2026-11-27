@@ -25,7 +25,10 @@ from pacemaker_registry.db import (
     get_result_details,
     update_result_target_time,
     check_database,
-    get_event_target_time_type,
+    get_event_by_source,
+    get_draft_results,
+    save_event_draft,
+    EventAccessError,
     load_registry,
     save_race_result,
 )
@@ -33,7 +36,8 @@ from pacemaker_registry.rating import (
     default_event_rating, parse_event_rating, rating_color_style,
     PaceRatingConfig, parse_pace_rating, RANKING_FORMULAS,
 )
-from pacemaker_registry.imports import InvalidResultUrl, RaceResult, ResultImportError, guess_target_time
+from pacemaker_registry.imports import InvalidResultUrl, ResultImportError, guess_target_time
+from pacemaker_registry.models import EventStatus
 from pacemaker_registry.sources import load_race_result, result_source_links as _result_source_links
 from pacemaker_registry.times import format_target_time, normalize_target_time
 from pacemaker_registry.avatars import avatar_url
@@ -46,19 +50,6 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 def asset_url(name: str) -> str:
     version = sha256((PACKAGE_DIR / 'static' / name).read_bytes()).hexdigest()[:12]
     return f'/static/{name}?v={version}'
-
-
-def _apply_event_target_time_type(result: RaceResult) -> RaceResult:
-    try:
-        target_time_type = get_event_target_time_type(result.source_event_id)
-    except (PsycopgError, RuntimeError):
-        return result
-    if not target_time_type:
-        return result
-    return replace(
-        result,
-        target_time=guess_target_time(result.chip_time, target_time_type),
-    )
 
 
 app = FastAPI(
@@ -147,12 +138,12 @@ def home(
     )
 
 
-def _load_event_or_404(event_id: int):
+def _load_event_or_404(request: Request, event_id: int):
     try:
         event = get_event(event_id)
     except (PsycopgError, RuntimeError) as error:
         raise HTTPException(503, "Не удалось загрузить соревнование. Попробуйте позже.") from error
-    if event is None:
+    if event is None or (event.is_draft and not _can_edit_event(request, event)):
         raise HTTPException(404, "Соревнование не найдено.")
     return event
 
@@ -167,21 +158,30 @@ def _require_event_editor(account, event):
         raise HTTPException(403, "Настройки доступны капитану этого соревнования или администратору.")
 
 
-def _event_response(request, event, *, values=None, pace_values=None, splits_enabled=None, error=None, saved=False, status_code=200):
+def _event_response(request, event, *, values=None, pace_values=None, splits_enabled=None,
+                    error=None, saved=False, notice=None, status_code=200, result=None, result_url="",
+                    target_time_type=None, settings_error=False):
+    try:
+        draft_results = get_draft_results(event) if event.is_draft else ()
+    except (PsycopgError, RuntimeError) as error:
+        raise HTTPException(503, "Не удалось загрузить результаты черновика.") from error
     return templates.TemplateResponse(
         request=request, name="event.html",
         context={
-            "event": event, "can_edit_event": _can_edit_event(request, event),
+            "event": event, "can_edit_event": _can_edit_event(request, event), "draft_results": draft_results,
             "values": values if values is not None else asdict(event.formula),
             "defaults": asdict(default_event_rating(event.target_time_type)),
             "pace_values": pace_values if pace_values is not None else asdict(event.pace_formula),
             "pace_defaults": asdict(PaceRatingConfig()),
             "splits_enabled": event.splits_enabled if splits_enabled is None else splits_enabled,
-            "error": error, "saved": saved,
+            "error": error, "saved": saved, "notice": notice, "result": result, "result_url": result_url,
+            "target_time_type": target_time_type or event.target_time_type,
+            "settings_error": settings_error,
+            "draft_defaults": {kind: asdict(default_event_rating(kind)) for kind in ("sub_minute", "round")}
+                              if event.is_draft else None,
         },
         status_code=status_code,
     )
-
 
 @app.get("/about", response_class=HTMLResponse)
 def about_page(request: Request):
@@ -197,29 +197,76 @@ def about_page(request: Request):
 
 
 @app.get("/events", response_class=HTMLResponse)
-def events_page(request: Request):
+def events_page(request: Request, status: EventStatus | Literal["all"] = "all"):
+    account = auth.request_account(request)
     try:
-        events = list_events()
+        events = list_events(account, None if status == "all" else status)
     except (PsycopgError, RuntimeError) as error:
         raise HTTPException(503, "Не удалось загрузить соревнования. Попробуйте позже.") from error
     events = sorted(events, key=lambda event: round(event.team_rating, 1) if event.team_rating is not None else -1,
                     reverse=True)
     return templates.TemplateResponse(
         request=request, name="events.html",
-        context={"events": events},
+        context={"events": events, "status": status, "show_status_filter": account is not None},
     )
 
 
 @app.get("/events/{event_id}", response_class=HTMLResponse)
-def event_page(request: Request, event_id: int, saved: bool = False):
-    return _event_response(request, _load_event_or_404(event_id), saved=saved)
+def event_page(request: Request, event_id: int, saved: bool = False,
+               notice: Literal["added", "duplicate", "draft", "published"] | None = None):
+    return _event_response(request, _load_event_or_404(request, event_id), saved=saved, notice=notice)
+
+
+@app.post("/events/{event_id}/draft")
+async def update_draft(
+    request: Request, event_id: int,
+    action: Annotated[Literal["save", "publish"], Form()],
+    target_time_type: Annotated[Literal["sub_minute", "round"] | None, Form()] = None,
+):
+    account = auth.require_write(request)
+    event = await run_in_threadpool(_load_event_or_404, request, event_id)
+    _require_event_editor(account, event)
+    if not event.is_draft:
+        raise HTTPException(409, "Соревнование уже опубликовано.")
+    fields = await request.form()
+    values = {key: fields.get(key, "") for key in asdict(event.formula)}
+    enabled = fields.get("splits_enabled") == "true"
+    pace_values = {key: fields.get(key, "") for key in asdict(event.pace_formula)} if enabled else None
+    error = None
+    publish = action == "publish"
+    try:
+        if publish and target_time_type is None:
+            raise ValueError("Выберите тип времени на флаге перед публикацией.")
+        config = parse_event_rating(values)
+        # Keep a default formula dynamic when only the flag type changed.
+        if config == default_event_rating(target_time_type) or (event.rating_config is None and config == event.formula):
+            config = None
+        pace_config = parse_pace_rating(pace_values) if enabled else None
+        updated = await run_in_threadpool(
+            save_event_draft, event.id, account, target_time_type,
+            publish=publish, config=config, pace_config=pace_config, splits_enabled=enabled,
+        )
+    except ValueError as exception:
+        error, status_code = str(exception), 422
+    except (PsycopgError, RuntimeError):
+        error, status_code = "Не удалось сохранить соревнование.", 503
+    if error:
+        return await run_in_threadpool(_event_response, request, event, values=values, pace_values=pace_values,
+                                       splits_enabled=enabled, target_time_type=target_time_type, error=error,
+                                       settings_error=True, status_code=status_code)
+    if not updated:
+        raise HTTPException(409, "Черновик уже изменён. Обновите страницу.")
+    notice = "published" if publish else "draft"
+    return RedirectResponse(f"/events/{event_id}?notice={notice}", status_code=303)
 
 
 @app.post("/events/{event_id}/rating", response_class=HTMLResponse)
 async def update_event_rating(request: Request, event_id: int):
     account = auth.require_write(request)
-    event = await run_in_threadpool(_load_event_or_404, event_id)
+    event = await run_in_threadpool(_load_event_or_404, request, event_id)
     _require_event_editor(account, event)
+    if event.is_draft:
+        raise HTTPException(409, "Сохраните формулу на странице черновика.")
     form = await request.form()
     values = dict(form)
     try:
@@ -242,8 +289,10 @@ async def update_event_rating(request: Request, event_id: int):
 @app.post("/events/{event_id}/pace-rating", response_class=HTMLResponse)
 async def update_event_pace_rating(request: Request, event_id: int):
     account = auth.require_write(request)
-    event = await run_in_threadpool(_load_event_or_404, event_id)
+    event = await run_in_threadpool(_load_event_or_404, request, event_id)
     _require_event_editor(account, event)
+    if event.is_draft:
+        raise HTTPException(409, "Сохраните настройки на странице черновика.")
     values = dict(await request.form())
     submitted = values.pop("splits_enabled", None)
     if submitted not in (None, "true", "false"):
@@ -266,12 +315,12 @@ async def update_event_pace_rating(request: Request, event_id: int):
     return RedirectResponse(f"/events/{event_id}?saved=true#pace-rating", status_code=303)
 
 
-def _load_result_or_404(result_id: int):
+def _load_result_or_404(request: Request, result_id: int):
     try:
         details = get_result_details(result_id)
     except (PsycopgError, RuntimeError) as error:
         raise HTTPException(503, "Не удалось загрузить результат. Попробуйте позже.") from error
-    if details is None:
+    if details is None or (details.event.is_draft and not _can_edit_event(request, details.event)):
         raise HTTPException(404, "Результат не найден.")
     return details
 
@@ -287,7 +336,7 @@ def _result_response(request, details, filters, *,
             "source_url": source_url, "source_event_url": source_event_url,
             "finish_config": asdict(details.event.formula),
             "pace_config": asdict(details.event.pace_formula),
-            "back_url": filters.url(), "filters": filters,
+            "back_url": f"/events/{details.event.id}#team" if details.event.is_draft else filters.url(), "filters": filters,
             "edit_url": filters.url(f"/results/{details.result.id}/target-time"),
             "target_time_value": details.result.target_time_display if target_time is None else target_time,
             "error": error, "saved": saved,
@@ -302,7 +351,7 @@ def result_page(
     filters: Filters,
     saved: bool = False,
 ):
-    return _result_response(request, _load_result_or_404(result_id),
+    return _result_response(request, _load_result_or_404(request, result_id),
                             filters, saved=saved)
 
 
@@ -315,7 +364,7 @@ def edit_result_target_time(
     target_time_format: Annotated[Literal["duration"] | None, Form()] = None,
 ):
     account = auth.require_write(request)
-    details = _load_result_or_404(result_id)
+    details = _load_result_or_404(request, result_id)
     _require_event_editor(account, details.event)
     target_time = target_time.strip()
     try:
@@ -333,7 +382,7 @@ def edit_result_target_time(
             error="Не удалось сохранить время. Проверьте текущее значение и попробуйте ещё раз.", status_code=503,
         )
     if not updated:
-        details = _load_result_or_404(result_id)
+        details = _load_result_or_404(request, result_id)
         return _result_response(
             request, details, filters, target_time=format_target_time(target_time),
             error="Время уже изменено в другой вкладке. Сравните с текущей целью и подтвердите сохранение ещё раз.",
@@ -350,34 +399,41 @@ async def add_form(
     return await _preview_result(request, result_url or "")
 
 
-async def _preview_result(request: Request, result_url: str) -> HTMLResponse:
-    result = None
-    error = None
-    status_code = 200
-    submitted_url = result_url or ""
+def _add_response(request, *, result_url="", result=None, event=None, error=None, status_code=200):
+    return templates.TemplateResponse(
+        request=request, name="add.html", status_code=status_code,
+        context={"result": result, "error": error, "result_url": result_url, "event": event},
+    )
 
+
+async def _preview_result(request: Request, result_url: str, *, draft=None) -> HTMLResponse:
+    result = event = error = None
+    status_code = 200
     if result_url:
         try:
             result = await load_race_result(result_url)
-            result = await run_in_threadpool(_apply_event_target_time_type, result)
-        except InvalidResultUrl as exception:
-            error = str(exception)
-            status_code = 422
+            if draft is not None and result.source_event_id != draft.source_event_id:
+                raise ValueError("Результат относится к другому соревнованию.")
+            event = draft or await run_in_threadpool(get_event_by_source, result.source_event_id)
+            if event and not _can_edit_event(request, event):
+                message = "Соревнование недоступно для добавления." if event.is_draft else "Добавить результат может капитан или администратор."
+                return _add_response(request, result_url=result_url, error=message,
+                                     event=None if event.is_draft else event, status_code=403)
+            if event and event.target_time_type:
+                result = replace(result, target_time=guess_target_time(result.chip_time, event.target_time_type))
+        except (InvalidResultUrl, ValueError) as exception:
+            error, status_code = str(exception), 422
         except ResultImportError as exception:
-            error = str(exception)
-            status_code = 502
-
-    return templates.TemplateResponse(
-        request=request,
-        name="add.html",
-        context={
-            "result": result,
-            "error": error,
-            "result_url": submitted_url,
-            "saved_message": None,
-        },
-        status_code=status_code,
-    )
+            error, status_code = str(exception), 502
+        except (PsycopgError, RuntimeError):
+            error, status_code = "Не удалось загрузить соревнование. Попробуйте ещё раз.", 503
+    if error:
+        result = None
+    if draft is not None:
+        return await run_in_threadpool(_event_response, request, draft, result=result,
+                                       result_url=result_url, error=error, status_code=status_code)
+    return _add_response(request, result_url=result_url, result=result, event=event,
+                         error=error, status_code=status_code)
 
 
 @app.post("/add", response_class=HTMLResponse)
@@ -388,60 +444,55 @@ async def add_result(
     return await _preview_result(request, result_url)
 
 
+@app.post("/events/{event_id}/preview-result", response_class=HTMLResponse)
+async def preview_draft_result(
+    request: Request, event_id: int,
+    result_url: Annotated[str, Form(min_length=1, max_length=500)],
+):
+    account = auth.require_write(request)
+    event = await run_in_threadpool(_load_event_or_404, request, event_id)
+    _require_event_editor(account, event)
+    if not event.is_draft:
+        raise HTTPException(409, "Соревнование уже опубликовано. Добавьте результат через форму импорта.")
+    return await _preview_result(request, result_url, draft=event)
+
+
 @app.post("/results", response_class=HTMLResponse)
 async def save_result(
     request: Request,
     result_url: Annotated[str, Form(min_length=1, max_length=500)],
     target_time: Annotated[str, Form(max_length=20)],
     target_time_format: Annotated[Literal["duration"] | None, Form()] = None,
+    event_id: Annotated[int | None, Form(gt=0)] = None,
 ) -> HTMLResponse:
     account = auth.require_write(request)
-    result = None
-    error = None
-    saved_message = None
-    result_created = False
-    status_code = 200
-
+    event = None
+    if event_id is not None:
+        event = await run_in_threadpool(_load_event_or_404, request, event_id)
+        _require_event_editor(account, event)
     try:
         target_time = normalize_target_time(target_time, minutes_seconds=target_time_format == "duration")
-    except ValueError as exception:
-        error = str(exception)
-        status_code = 422
+        result = await load_race_result(result_url)
+        saved = await run_in_threadpool(save_race_result, result, target_time, account, event_id=event_id)
+    except EventAccessError as exception:
+        if exception.event.is_draft:
+            raise HTTPException(404, "Соревнование не найдено.") from None
+        event = exception.event
+        error, status_code = "Добавить результат может капитан или администратор.", 403
+    except (InvalidResultUrl, ValueError) as exception:
+        error, status_code = str(exception), 422
+    except ResultImportError as exception:
+        error, status_code = str(exception), 502
+    except (PsycopgError, RuntimeError):
+        error, status_code = "Не удалось сохранить результат. Попробуйте ещё раз.", 503
     else:
-        try:
-            result = await load_race_result(result_url)
-            result = replace(result, target_time=target_time)
-            created = await run_in_threadpool(save_race_result, result, target_time, account.id)
-            result_created = created
-            saved_message = (
-                "Результат сохранён в реестр."
-                if created
-                else "Этот результат уже был сохранён — дубликат не добавлен."
-            )
-            result = None
-            result_url = ""
-        except InvalidResultUrl as exception:
-            error = str(exception)
-            status_code = 422
-        except ResultImportError as exception:
-            error = str(exception)
-            status_code = 502
-        except (PsycopgError, RuntimeError):
-            error = "Не удалось сохранить результат. Попробуйте ещё раз."
-            status_code = 503
-
-    return templates.TemplateResponse(
-        request=request,
-        name="add.html",
-        context={
-            "result": result,
-            "error": error,
-            "result_url": result_url,
-            "saved_message": saved_message,
-            "result_created": result_created,
-        },
-        status_code=status_code,
-    )
+        notice = "added" if saved.created else "duplicate"
+        anchor = "#team" if saved.event.is_draft and event_id is not None else ""
+        return RedirectResponse(f"/events/{saved.event.id}?notice={notice}{anchor}", status_code=303)
+    if event and event.is_draft:
+        return await run_in_threadpool(_event_response, request, event, error=error,
+                                       result_url=result_url, status_code=status_code)
+    return _add_response(request, result_url=result_url, event=event, error=error, status_code=status_code)
 
 
 @app.get("/health")

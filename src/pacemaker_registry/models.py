@@ -1,5 +1,6 @@
 """Immutable view models, independent of SQL and HTTP."""
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, TYPE_CHECKING
 from pacemaker_registry.rating import EventRatingConfig, PaceRatingConfig, default_event_rating
 from pacemaker_registry.times import elapsed_seconds, format_duration, format_target_time
@@ -112,6 +113,11 @@ class PacemakerProfile:
         return self.last_name[0] + self.first_name[0]
 
 
+class EventStatus(StrEnum):
+    AVAILABLE = 'available'
+    DRAFT = 'draft'
+
+
 @dataclass(frozen=True, slots=True)
 class RegistryEvent:
     id: int
@@ -124,6 +130,12 @@ class RegistryEvent:
     result_count: int = 0
     team_rating: float | None = None
     participant_count: int = 0
+    status: EventStatus = EventStatus.AVAILABLE
+    source_event_id: str = ''
+
+    @property
+    def is_draft(self) -> bool:
+        return self.status == EventStatus.DRAFT
 
     @property
     def formula(self) -> EventRatingConfig:

@@ -48,16 +48,24 @@ def sample(**changes):
     return replace(result, **changes)
 
 
+def save_published_result(result, target_time):
+    return db.save_race_result(result, target_time).created
+
+
 def test_schema_can_adopt_existing_installation_without_data_loss(database):
     with database() as connection:
         connection.execute((migrate.MIGRATIONS_DIR / '0001_baseline.sql').read_text())
-    first = sample()
-    assert db.save_race_result(first, '00:50')
+        pacer = connection.execute("INSERT INTO pacemakers (last_name, first_name) VALUES ('Testov', 'First') RETURNING id").fetchone()[0]
+        event = connection.execute("INSERT INTO events (source_event_id, name) VALUES ('legacy', 'Legacy event') RETURNING id").fetchone()[0]
+        connection.execute('''INSERT INTO race_results
+            (pacemaker_id,event_id,source_participant_id,source_url,distance_km,chip_time,pace,target_time,checkpoints)
+            VALUES (%s,%s,%s,'https://example.org',10,'00:49:55','05:00','00:50','[]')''',
+            (pacer,event,uuid4()))
     assert migrate.migrate() == [
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
         '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql', '0008_roles.sql',
         '0009_flag_time_seconds.sql', '0010_event_splits_enabled.sql', '0011_pacemaker_reviews.sql',
-        '0012_reviews_without_event.sql', '0013_profile_donation_url.sql',
+        '0012_reviews_without_event.sql', '0013_profile_donation_url.sql', '0014_event_status.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -75,14 +83,14 @@ def test_readiness_rejects_unmigrated_database_without_changing_it(database):
 def test_duplicates_names_event_type_and_json_round_trip(database):
     migrate.migrate()
     first = sample()
-    assert db.save_race_result(first, '00:49')
-    assert not db.save_race_result(first, '00:49')
+    assert save_published_result(first, '00:49')
+    assert not save_published_result(first, '00:49')
     assert db.list_events()[0].result_count == 1
-    assert db.save_race_result(sample(athlete_name=' testov first '), '00:50')
+    assert save_published_result(sample(athlete_name=' testov first '), '00:50')
     registry = db.load_registry()
     assert len(registry.pacemakers) == registry.event_count == 1
     assert registry.result_count == 2
-    assert db.get_event_target_time_type('test-event') == 'sub_minute'
+    assert db.get_event_by_source('test-event').target_time_type == 'sub_minute'
     event = registry.events[0]
     assert db.save_event_rating(event.id, EventRatingConfig(left_score=6))
     assert db.save_event_pace_rating(event.id, PaceRatingConfig(tolerance=2))
@@ -91,19 +99,19 @@ def test_duplicates_names_event_type_and_json_round_trip(database):
     detail = db.get_result_details(registry.pacemakers[0].results[0].id)
     assert detail.result.checkpoints == tuple(map(asdict, first.checkpoints))
     assert detail.result.pace_markers
-    assert db.save_race_result(sample(source_event_id='other-event'), '00:50')
+    assert save_published_result(sample(source_event_id='other-event'), '00:50')
     assert sorted(e.result_count for e in db.list_events()) == [1, 2]
 
 
 def test_event_team_rating_uses_each_result_and_current_event_settings(database):
     migrate.migrate()
-    assert db.save_race_result(sample(chip_time='00:50:00'), '00:50')
-    assert db.save_race_result(sample(
+    assert save_published_result(sample(chip_time='00:50:00'), '00:50')
+    assert save_published_result(sample(
         athlete_name='Second Runner', chip_time='00:50:00',
         checkpoints=(Checkpoint('10', '10', '50:00', '06:00'),),
     ), '00:50')
-    assert db.save_race_result(sample(distance_km='5', chip_time='00:25:00', checkpoints=()), '00:25')
-    assert db.save_race_result(sample(source_event_id='other-event', chip_time='00:50:00'), '00:50')
+    assert save_published_result(sample(distance_km='5', chip_time='00:25:00', checkpoints=()), '00:25')
+    assert save_published_result(sample(source_event_id='other-event', chip_time='00:50:00'), '00:50')
 
     events = {event.id: event for event in db.list_events()}
     team = next(event for event in events.values() if event.result_count == 3)
@@ -124,8 +132,8 @@ def test_event_team_rating_uses_each_result_and_current_event_settings(database)
 
 def test_edit_conflict_and_filter_history(database):
     migrate.migrate()
-    assert db.save_race_result(sample(), '00:50')
-    assert db.save_race_result(sample(source_event_id='second-event'), '00:50')
+    assert save_published_result(sample(), '00:50')
+    assert save_published_result(sample(source_event_id='second-event'), '00:50')
     registry = db.load_registry()
     result = registry.pacemakers[0].results[0]
     assert db.update_result_target_time(result.id, '0:49', '00:50')
@@ -139,8 +147,8 @@ def test_edit_conflict_and_filter_history(database):
 
 def test_flag_seconds_survive_database_save_and_edit(database):
     migrate.migrate()
-    assert db.save_race_result(sample(distance_km='5', chip_time='22:27.4', checkpoints=()), '00:22:30')
-    assert db.get_event_target_time_type('test-event') is None
+    assert save_published_result(sample(distance_km='5', chip_time='22:27.4', checkpoints=()), '00:22:30')
+    assert db.get_event_by_source('test-event').target_time_type is None
     card = db.load_registry().pacemakers[0].results[0]
     result = db.get_result_details(card.id).result
     assert card.target_time_display == result.target_time_display == '00:22:30'
@@ -154,8 +162,8 @@ def test_flag_seconds_survive_database_save_and_edit(database):
 @pytest.mark.parametrize('splits_enabled', [True, False])
 def test_compact_cards_preserve_detail_scores_and_full_checkpoints(database, splits_enabled):
     migrate.migrate()
-    assert db.save_race_result(sample(), '00:50')
-    assert db.save_race_result(sample(source_event_id='other', checkpoints=()), '00:50')
+    assert save_published_result(sample(), '00:50')
+    assert save_published_result(sample(source_event_id='other', checkpoints=()), '00:50')
     registry = db.load_registry()
     event = registry.events[0]
     assert db.save_event_rating(event.id, EventRatingConfig(left_score=6, right_good=10, right_bad=45))
@@ -179,7 +187,7 @@ def test_concurrent_duplicate_is_inserted_once(database):
     migrate.migrate()
     result = sample()
     with ThreadPoolExecutor(max_workers=4) as pool:
-        created = list(pool.map(lambda _: db.save_race_result(result, '00:50'), range(4)))
+        created = list(pool.map(lambda _: save_published_result(result, '00:50'), range(4)))
     assert sum(created) == 1
     assert db.load_registry().result_count == 1
 
@@ -187,7 +195,7 @@ def test_concurrent_duplicate_is_inserted_once(database):
 def test_failed_insert_rolls_back_athlete_and_event(database):
     migrate.migrate()
     with pytest.raises(psycopg.errors.InvalidTextRepresentation):
-        db.save_race_result(sample(source_participant_id='not-a-uuid'), '00:50')
+        save_published_result(sample(source_participant_id='not-a-uuid'), '00:50')
     with database() as connection:
         for table in ['pacemakers', 'events', 'race_results']:
             assert connection.execute(sql.SQL('SELECT count(*) FROM {}').format(sql.Identifier(table))).fetchone() == (0,)
@@ -214,7 +222,7 @@ def test_applied_migrations_are_immutable(database, tmp_path, monkeypatch):
 
 def test_profile_save_conflict_and_reimport_preserve_fields(database):
     migrate.migrate()
-    assert db.save_race_result(sample(), '00:50')
+    assert save_published_result(sample(), '00:50')
     pacemaker_id = db.load_registry().pacemakers[0].id
     profile = db.get_pacemaker_profile(pacemaker_id)
     assert profile.version == 0 and profile.contacts == profile.achievements == ()
@@ -226,7 +234,7 @@ def test_profile_save_conflict_and_reimport_preserve_fields(database):
     assert db.save_pacemaker_profile(pacemaker_id, 0, 'Ведём вместе', contacts, ['pshp_graduate'], avatar,
                                      donation_url=donation_url)
     assert not db.save_pacemaker_profile(pacemaker_id, 0, 'Overwrite', [], [], None)
-    assert db.save_race_result(sample(), '00:50')
+    assert save_published_result(sample(), '00:50')
     changed = db.get_pacemaker_profile(pacemaker_id)
     assert changed.about == 'Ведём вместе' and changed.contacts == tuple(contacts)
     assert changed.achievements == ('pshp_graduate',)
@@ -243,8 +251,8 @@ def test_profile_save_conflict_and_reimport_preserve_fields(database):
 
 def test_profile_details_lookup_reuse_unique_login_and_atomic_conflict(database):
     migrate.migrate()
-    assert db.save_race_result(sample(), '00:50')
-    assert db.save_race_result(sample(athlete_name='Other Runner'), '00:50')
+    assert save_published_result(sample(), '00:50')
+    assert save_published_result(sample(athlete_name='Other Runner'), '00:50')
     ids = [p.id for p in db.load_registry().pacemakers]
     first, second = ids
     records = {'21.1': {'time': '01:20:00', 'year': 2025, 'url': 'https://example.org/race'}}
@@ -287,7 +295,7 @@ def test_previous_mottos_survive_profile_extension(database, tmp_path, monkeypat
 def test_concurrent_login_claim_only_one_profile_and_one_city(database):
     migrate.migrate()
     for name in ('Runner One', 'Runner Two'):
-        assert db.save_race_result(sample(athlete_name=name), '00:50')
+        assert save_published_result(sample(athlete_name=name), '00:50')
     ids = [p.id for p in db.load_registry().pacemakers]
     def save(pacer):
         try:
@@ -305,10 +313,10 @@ def test_concurrent_login_claim_only_one_profile_and_one_city(database):
 def test_distance_filter_combines_with_event_history_and_recalculates_rating(database):
     from decimal import Decimal
     migrate.migrate()
-    assert db.save_race_result(sample(athlete_name='First Pacer', distance_km='10', chip_time='00:50:00'), '00:50')
-    assert db.save_race_result(sample(athlete_name='First Pacer', source_event_id='half', distance_km='21.100', chip_time='01:45:00'), '01:40')
-    assert db.save_race_result(sample(athlete_name='Other Pacer', distance_km='10.000', chip_time='00:49:50'), '00:50')
-    assert db.save_race_result(sample(athlete_name='Third Pacer', source_event_id='marathon', distance_km='42.2', chip_time='03:59:00'), '04:00')
+    assert save_published_result(sample(athlete_name='First Pacer', distance_km='10', chip_time='00:50:00'), '00:50')
+    assert save_published_result(sample(athlete_name='First Pacer', source_event_id='half', distance_km='21.100', chip_time='01:45:00'), '01:40')
+    assert save_published_result(sample(athlete_name='Other Pacer', distance_km='10.000', chip_time='00:49:50'), '00:50')
+    assert save_published_result(sample(athlete_name='Third Pacer', source_event_id='marathon', distance_km='42.2', chip_time='03:59:00'), '04:00')
     all_results = db.load_registry()
     first = next(p for p in all_results.pacemakers if p.full_name == 'First Pacer')
     assert first.rating < 10
@@ -339,7 +347,7 @@ def test_name_search_all_words_order_case_yo_and_other_filters(database):
         ('Петров Пётр', 'one', '10'), ('Иванов Сергей', 'one', '10'),
         ('Сидоров Иван', 'one', '10'), ('Елкин Артём', 'one', '10'),
     ):
-        assert db.save_race_result(sample(athlete_name=name, source_event_id=event, distance_km=distance), '00:50')
+        assert save_published_result(sample(athlete_name=name, source_event_id=event, distance_km=distance), '00:50')
     def names(query, **filters):
         return {p.full_name for p in db.load_registry(search=query, **filters).pacemakers}
     assert names('иван') == {'Петров Иван', 'Иванов Сергей', 'Сидоров Иван'}
@@ -399,7 +407,7 @@ def test_profile_onboarding_finds_and_claims_only_unlinked_exact_names(database,
     from pacemaker_registry.main import app
 
     migrate.migrate()
-    assert db.save_race_result(sample(athlete_name='Семёнов Артём'), '00:50')
+    assert save_published_result(sample(athlete_name='Семёнов Артём'), '00:50')
     pacemaker_id = db.load_registry().pacemakers[0].id
     with database() as connection:
         another = connection.execute(
@@ -475,34 +483,118 @@ def test_profile_onboarding_creates_with_optional_identity_details(database, mon
         assert ('test@example.com' in page.text) is publish_email
 
 
-def test_first_successful_import_assigns_only_one_captain(database):
+def test_concurrent_draft_imports_allow_only_one_captain(database):
     migrate.migrate()
     with database() as connection:
-        account_ids = [row[0] for row in connection.execute(
+        ids = [row[0] for row in connection.execute(
             "INSERT INTO accounts (yandex_user_id) VALUES ('111'), ('222') RETURNING id"
         )]
-    assert db.save_race_result(sample(source_event_id='existing'), '00:50')
-    assert db.save_race_result(sample(source_event_id='existing'), '00:50', account_ids[0])
-    existing = next(e for e in db.list_events() if e.id == 1)
-    assert db.get_event(existing.id).captain_account_id is None
+    accounts = [auth.SignedInAccount(account_id, None, None) for account_id in ids]
 
-    first_result, second_result = (sample(athlete_name=name) for name in ('First Runner', 'Second Runner'))
+    def attempt(account, name):
+        try:
+            return db.save_race_result(sample(athlete_name=name), '00:50', account)
+        except db.EventAccessError:
+            return None
+
     with ThreadPoolExecutor(max_workers=2) as pool:
-        first = pool.submit(db.save_race_result, first_result, '00:50', account_ids[0])
-        second = pool.submit(db.save_race_result, second_result, '00:50', account_ids[1])
-        assert first.result() and second.result()
+        first = pool.submit(attempt, accounts[0], 'First Runner')
+        second = pool.submit(attempt, accounts[1], 'Second Runner')
+        imported, = (result for result in (first.result(), second.result()) if result)
+    assert imported.created and imported.event.is_draft
+    assert imported.event.captain_account_id in ids
+    assert len(db.get_draft_results(imported.event)) == 1
+    assert db.list_events() == ()
+
+
+def test_competition_draft_lifecycle_and_visibility(database, monkeypatch, admin_session):
+    from fastapi.testclient import TestClient
+    from pacemaker_registry import main
+    from pacemaker_registry.models import EventStatus
+
+    migrate.migrate()
     with database() as connection:
-        first_insert = connection.execute("""
-            SELECT e.captain_account_id, rr.source_participant_id::text
-            FROM race_results rr JOIN events e ON e.id = rr.event_id
-            WHERE e.source_event_id = %s ORDER BY rr.id LIMIT 1
-        """, (first_result.source_event_id,)).fetchone()
-    expected = {first_result.source_participant_id: account_ids[0], second_result.source_participant_id: account_ids[1]}
-    assert first_insert[0] == expected[first_insert[1]]
-    assert not db.save_race_result(first_result, '00:50', account_ids[1])
-    listed = next(e for e in db.list_events() if e.id != existing.id)
-    assert listed.result_count == 2
-    assert db.get_event(listed.id).captain_account_id == first_insert[0]
+        ids = [row[0] for row in connection.execute(
+            "INSERT INTO accounts (yandex_user_id) VALUES ('1'), ('2'), ('3') RETURNING id"
+        )]
+    captain, outsider = (auth.SignedInAccount(pid, None, None) for pid in ids[:2])
+    admin = auth.SignedInAccount(ids[2], None, None, is_admin=True)
+    actor = captain
+    monkeypatch.setattr(auth, "request_account", lambda _: actor)
+    assert save_published_result(sample(source_event_id="other-event", event_name="Открытый старт"), "00:50")
+    source = "https://results.runc.run/event/test/result/"
+    first = sample(event_name="Тайный старт", distance_km="21.1", source_url=source + "1/")
+    second = sample(athlete_name="Пейсмейкер Второй", source_url=source + "2/")
+    wrong = sample(source_event_id="other-event", source_url=source + "3/")
+    results = {entry.source_url: entry for entry in (first, second, wrong)}
+
+    async def fetch(url):
+        return results[url]
+
+    monkeypatch.setattr(main, "load_race_result", fetch)
+    client = TestClient(main.app, follow_redirects=False)
+    response = client.post("/results", data={"result_url": first.source_url, "target_time": "00:50"})
+    assert response.status_code == 303, response.text
+    event = db.get_event_by_source(first.source_event_id)
+    path = f"/events/{event.id}"
+    assert response.headers["location"] == path + "?notice=added"
+    assert event.is_draft and event.captain_account_id == captain.id
+    page = client.get(path)
+    assert "Testov First" in page.text and "Черновик" in page.text
+    assert "21,1 км" in page.text
+    opened, = db.get_draft_results(event)
+    detail_path = f"/results/{opened.id}"
+    assert client.get(detail_path).status_code == 200
+    assert "Тайный старт" in client.get("/events?status=draft").text
+    assert "Тайный старт" not in client.get("/events?status=available").text
+    assert "Открытый старт" not in client.get("/events?status=draft").text
+    assert db.load_registry().distances == ("10",)
+    profile = db.get_pacemaker_profile(opened.pacemaker_id, include_rank=True)
+    assert len(profile.results) == 1 and profile.rank == 1
+    assert db.load_registry(min_events=2).result_count == 0
+
+    data = {"target_time_type": "sub_minute", "action": "publish", "splits_enabled": "false",
+            **asdict(EventRatingConfig(left_good=-11))}
+    actor = None
+    assert client.get(path).status_code == client.get(detail_path).status_code == 404
+    assert "Тайный старт" not in client.get("/events").text
+    assert client.post(path + "/draft", data=data).status_code == 401
+    actor = outsider
+    assert client.get(path).status_code == client.get(detail_path).status_code == 404
+    assert "Тайный старт" not in client.get("/events?status=all").text
+    assert client.post(path + "/draft", data=data).status_code == 404
+    assert client.post("/results", data={"result_url": first.source_url, "target_time": "00:50"}).status_code == 404
+    assert client.post("/results", data={"result_url": wrong.source_url, "target_time": "00:50"}).status_code == 403
+    actor = admin
+    assert client.get(path).status_code == 200
+    assert "Тайный старт" in client.get("/events?status=draft").text
+
+    actor = captain
+    assert client.post(path + "/preview-result", data={"result_url": wrong.source_url}).status_code == 422
+    assert client.post(path + "/preview-result", data={"result_url": second.source_url}).status_code == 200
+    result_form = {"result_url": second.source_url, "target_time": "00:49", "event_id": event.id}
+    assert client.post("/results", data=result_form).headers["location"].endswith("?notice=added#team")
+    assert client.post("/results", data=result_form).headers["location"].endswith("?notice=duplicate#team")
+    draft_only, = [r for r in db.get_draft_results(event) if r.id != opened.id]
+    assert db.get_pacemaker_profile(draft_only.pacemaker_id) is None
+    assert client.get(f"/pacemakers/{draft_only.pacemaker_id}").status_code == 404
+    assert client.post(path + "/draft", data=dict(data, left_good=-200)).status_code == 422
+    assert db.get_event(event.id).is_draft
+    assert client.post(path + "/draft", data=dict(data, action="save")).status_code == 303
+    saved = db.get_event(event.id)
+    assert saved.is_draft and saved.target_time_type == "sub_minute" and saved.formula.left_good == -11
+    assert client.post(path + "/draft", data=data).headers["location"].endswith("?notice=published")
+    assert db.get_event(event.id).status == EventStatus.AVAILABLE
+    assert client.post(path + "/draft", data=data).status_code == 409
+    actor = outsider
+    assert client.get(path).status_code == client.get(detail_path).status_code == 200
+    assert "Тайный старт" in client.get("/events?status=available").text
+    assert "Тайный старт" not in client.get("/events?status=draft").text
+    assert db.load_registry(event_id=event.id).result_count == 2
+    assert db.get_pacemaker_profile(draft_only.pacemaker_id, include_rank=True).rank is not None
+    assert client.post("/results", data=result_form).status_code == 403
+    actor = captain
+    assert client.post("/results", data=result_form).headers["location"].endswith("?notice=duplicate")
 
 
 def test_admin_role_management_and_protected_achievement(database, monkeypatch):
@@ -515,7 +607,7 @@ def test_admin_role_management_and_protected_achievement(database, monkeypatch):
     headers = {'Origin': origin}
     admin_token = auth.create_session(auth.YandexIdentity('101', 'admin'), None)
     owner_token = auth.create_session(auth.YandexIdentity('102', 'owner'), None)
-    assert db.save_race_result(sample(), '00:50')
+    assert save_published_result(sample(), '00:50')
     with database() as connection:
         admin_id = connection.execute(
             "UPDATE accounts SET is_admin = true WHERE yandex_user_id = '101' RETURNING id"
@@ -552,9 +644,9 @@ def test_shared_scores_pagination_and_alternative_aggregate(database, monkeypatc
 
     migrate.migrate()
     for index in range(31):
-        assert db.save_race_result(sample(athlete_name=f'Runner{index:02} Test',
+        assert save_published_result(sample(athlete_name=f'Runner{index:02} Test',
                                          chip_time=f'00:50:{index:02}'), '00:50')
-    assert db.save_race_result(sample(athlete_name='Runner00 Test', source_event_id='other-event',
+    assert save_published_result(sample(athlete_name='Runner00 Test', source_event_id='other-event',
                                      chip_time='00:52:00', checkpoints=()), '00:50')
     whole = db.load_registry()
     calls = []
@@ -595,8 +687,8 @@ def test_shared_scores_pagination_and_alternative_aggregate(database, monkeypatc
 
 def test_formula_edits_are_scoped_and_preserve_other_settings(database):
     migrate.migrate()
-    assert db.save_race_result(sample(source_event_id='first'), '00:49')
-    assert db.save_race_result(sample(source_event_id='second'), '00:50')
+    assert save_published_result(sample(source_event_id='first'), '00:49')
+    assert save_published_result(sample(source_event_id='second'), '00:50')
     first, second = db.list_events()
     untouched = db.get_event(second.id)
     finish = EventRatingConfig(left_bad=-90, right_score=6)
@@ -618,13 +710,13 @@ def test_registry_formula_switch_reorders_results_and_keeps_pagination(database)
 
     migrate.migrate()
     for index in range(11):
-        assert db.save_race_result(sample(athlete_name='First Runner',
+        assert save_published_result(sample(athlete_name='First Runner',
             chip_time='50:03' if index == 10 else '50:00', checkpoints=()), '00:50')
     for _ in range(5):
-        assert db.save_race_result(sample(athlete_name='Second Runner',
+        assert save_published_result(sample(athlete_name='Second Runner',
             chip_time='50:00', checkpoints=()), '00:50')
     for index in range(24):
-        assert db.save_race_result(sample(athlete_name=f'Other Runner{index}',
+        assert save_published_result(sample(athlete_name=f'Other Runner{index}',
             chip_time='52:00', checkpoints=()), '00:50')
 
     client = TestClient(app)
@@ -656,9 +748,9 @@ def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(datab
     from pacemaker_registry.main import app
 
     migrate.migrate()
-    assert db.save_race_result(sample(), '00:50')
-    assert db.save_race_result(sample(source_event_id='second', event_name='Другой забег'), '00:50')
-    assert db.save_race_result(sample(athlete_name='Other Runner', source_event_id='other'), '00:50')
+    assert save_published_result(sample(), '00:50')
+    assert save_published_result(sample(source_event_id='second', event_name='Другой забег'), '00:50')
+    assert save_published_result(sample(athlete_name='Other Runner', source_event_id='other'), '00:50')
     registry = db.load_registry()
     pacer = next(p for p in registry.pacemakers if p.full_name == 'Testov First')
     event_ids = {result.event_name: result.event_id for result in pacer.results}

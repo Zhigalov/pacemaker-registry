@@ -1,7 +1,7 @@
 document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form => {
   const editable = form.matches('[data-pace-rating]');
   const defaults = JSON.parse(form.querySelector('[data-pace-defaults]').textContent);
-  const fields = editable ? Object.fromEntries(Object.keys(defaults).map(key => [key, form.elements.namedItem(key)])) : {};
+  const fields = editable ? Object.fromEntries(Object.keys(defaults).map(key => [key, form.querySelector(`[name="${key}"]`)])) : {};
   const chart = form.querySelector('[data-pace-chart]');
   const readout = form.querySelector('[data-readout]');
   const observations = window.resultChartMarkers?.read(form) || [];
@@ -141,9 +141,14 @@ document.querySelectorAll('[data-pace-rating], [data-pace-widget]').forEach(form
   }));
   slider.addEventListener('input', () => { fields.curve.value = slider.value; fields.curve.dispatchEvent(new Event('input')); });
   form.querySelector('[data-reset-pace]').addEventListener('click', () => { config = {...defaults}; syncFields(); render(); });
-  form.addEventListener('submit', event => {
-    if (toggle.checked && (!readFields() || !form.reportValidity())) { event.preventDefault(); return; }
-    submit.disabled = true; submit.textContent = 'Сохраняем…';
+  if (submit) {
+    form.addEventListener('submit', event => {
+      if (toggle.checked && (!readFields() || !form.reportValidity())) { event.preventDefault(); return; }
+      submit.disabled = true; submit.textContent = 'Сохраняем…';
+    });
+  }
+  window.addEventListener('pageshow', () => {
+    syncToggle();
+    if (submit) { submit.disabled = false; submit.textContent = 'Сохранить темп'; }
   });
-  window.addEventListener('pageshow', () => { syncToggle(); submit.disabled = false; submit.textContent = 'Сохранить темп'; });
 });

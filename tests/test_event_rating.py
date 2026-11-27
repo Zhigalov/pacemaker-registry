@@ -153,7 +153,7 @@ async def test_events_list_links_to_settings_and_participants(monkeypatch):
         RegistryEvent(2, "Второе", "sub_minute", result_count=3, team_rating=0.0, participant_count=3),
         RegistryEvent(3, "Третье", splits_enabled=False),
     )
-    monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: events[::-1])
+    monkeypatch.setattr("pacemaker_registry.main.list_events", lambda *_: events[::-1])
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/events")
         assert response.status_code == 200
@@ -176,6 +176,6 @@ async def test_events_list_links_to_settings_and_participants(monkeypatch):
         assert 'Балл команды' not in response.text
         assert 'Отсечки отключены' in response.text
         assert 'placeholder="Поиск"' in response.text
-        monkeypatch.setattr("pacemaker_registry.main.list_events", lambda: ())
+        monkeypatch.setattr("pacemaker_registry.main.list_events", lambda *_: ())
         response = await client.get("/events")
         assert "Пока нет соревнований" in response.text

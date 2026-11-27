@@ -6,6 +6,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from pacemaker_registry import main
+from pacemaker_registry.db import ResultImport
+from pacemaker_registry.models import RegistryEvent
 from pacemaker_registry.imports import RaceResult, InvalidResultUrl
 from pacemaker_registry.sources import load_race_result
 from pacemaker_registry.times import normalize_target_time, elapsed_seconds
@@ -54,14 +56,14 @@ async def test_zero_flag_never_fetches_or_saves(monkeypatch):
 async def test_database_does_not_block_event_loop(monkeypatch, sample_result, path, method):
     started, release = threading.Event(), threading.Event()
 
-    def blocking(*args):
+    def blocking(*args, **kwargs):
         started.set()
         if not release.wait(3):
             raise RuntimeError('Test worker was not released')
-        return True if path == '/results' else None
+        return ResultImport(RegistryEvent(5, 'Забег'), True) if path == '/results' else None
 
     monkeypatch.setattr(main, 'load_race_result', AsyncMock(return_value=sample_result))
-    monkeypatch.setattr(main, 'get_event_target_time_type', blocking)
+    monkeypatch.setattr(main, 'get_event_by_source', blocking)
     monkeypatch.setattr(main, 'save_race_result', blocking)
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url='http://test') as client:
         options = {} if method == 'get' else {'data': {'result_url': 'https://example.com', 'target_time': '00:50'}}
@@ -73,7 +75,7 @@ async def test_database_does_not_block_event_loop(monkeypatch, sample_result, pa
         finally:
             release.set()
             response = await pending
-    assert response.status_code == 200
+    assert response.status_code == (303 if path == "/results" else 200)
 
 
 @pytest.mark.anyio

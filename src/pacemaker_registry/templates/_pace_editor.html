@@ -1,4 +1,5 @@
-<form class="event-editor pace-editor" id="pace-rating" action="/events/{{ event.id }}/pace-rating" method="post" data-pace-rating>
+{% set pace_tag = 'section' if event.is_draft else 'form' %}
+<{{ pace_tag }} class="event-editor pace-editor" id="pace-rating"{% if not event.is_draft %} action="/events/{{ event.id }}/pace-rating" method="post"{% endif %} data-pace-rating>
   <div class="pace-editor-heading">
     <div>
       <h2>Оценка за темп на отрезках</h2>
@@ -10,7 +11,7 @@
         <input type="checkbox" name="splits_enabled" value="true" data-splits-toggle aria-controls="pace-settings" aria-describedby="splits-status"{% if splits_enabled %} checked{% endif %}>
         Учитывать отсечки
       </label>
-      <button class="button button--primary" type="submit">Сохранить темп</button>
+      {% if not event.is_draft %}<button class="button button--primary" type="submit">Сохранить темп</button>{% endif %}
     </div>
   </div>
   <fieldset id="pace-settings" class="pace-settings" aria-label="Шкала оценки темпа"{% if not splits_enabled %} disabled inert{% endif %}>
@@ -48,4 +49,4 @@
   </fieldset>
   <p class="event-note" data-save-state role="status">Изменения применятся после сохранения.</p>
   <script type="application/json" data-pace-defaults>{{ pace_defaults | tojson }}</script>
-</form>
+</{{ pace_tag }}>

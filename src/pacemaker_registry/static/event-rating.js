@@ -1,8 +1,9 @@
 document.querySelectorAll("[data-rating-widget]").forEach(form => {
   const editable = form.matches("[data-event-rating]");
-  const defaults = JSON.parse(form.querySelector("[data-rating-config]").textContent);
+  let defaults = JSON.parse(form.querySelector("[data-rating-config]").textContent);
+  const draft = form.closest("[data-draft-settings]");
   const keys = Object.keys(defaults);
-  const fields = editable ? Object.fromEntries(keys.map(key => [key, form.elements.namedItem(key)])) : {};
+  const fields = editable ? Object.fromEntries(keys.map(key => [key, form.querySelector(`[name="${key}"]`)])) : {};
   const svg = form.querySelector("[data-event-chart]");
   const readout = form.querySelector("[data-readout]");
   const observations = window.resultChartMarkers?.read(form) || [];
@@ -101,7 +102,7 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
   }
   function changed(rescale = true) {
     render(rescale);
-    if (valid()) state.textContent = "Есть несохранённые изменения. Нажмите «Сохранить формулу».";
+    if (valid()) state.textContent = draft ? "Есть несохранённые изменения." : "Есть несохранённые изменения. Нажмите «Сохранить формулу».";
   }
   if (editable) {
   keys.forEach(key => fields[key].addEventListener("input", () => changed()));
@@ -113,6 +114,24 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
     keys.forEach(key => { fields[key].value = defaults[key]; });
     changed();
   });
+  if (draft) {
+    const targetType = draft.elements.namedItem("target_time_type");
+    const presets = JSON.parse(draft.querySelector("[data-draft-defaults]").textContent);
+    if (targetType.value) defaults = presets[targetType.value];
+    targetType.addEventListener("change", () => {
+      if (!targetType.value) return;
+      const usingDefaults = keys.every(key => Number(fields[key].value) === defaults[key]);
+      defaults = presets[targetType.value];
+      if (usingDefaults) {
+        keys.forEach(key => { fields[key].value = defaults[key]; });
+        changed();
+      }
+    });
+    draft.addEventListener("invalid", event => {
+      const settings = event.target.closest(".draft-rating-settings");
+      if (settings) settings.open = true;
+    }, true);
+  }
   }
   function show(t) {
     if (!valid()) return;
@@ -152,7 +171,7 @@ document.querySelectorAll("[data-rating-widget]").forEach(form => {
     keys: ['ArrowLeft', 'ArrowRight'],
     step: key => show(selectedSecond + (key === 'ArrowRight' ? 1 : -1)),
   });
-  if (editable) {
+  if (editable && !draft) {
   form.addEventListener("submit", event => {
     if (!readConfig()) { event.preventDefault(); return; }
     form.querySelector('[type="submit"]').disabled = true;

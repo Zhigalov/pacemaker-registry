@@ -2,7 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from pacemaker_registry.db import (
-    Registry,
+    Registry, ResultImport,
     RegistryEvent,
     RegistryPacemaker,
 )
@@ -11,6 +11,11 @@ from pacemaker_registry.main import app, asset_url
 from pacemaker_registry.imports import Checkpoint, RaceResult
 
 pytestmark = pytest.mark.usefixtures("admin_session")
+
+
+@pytest.fixture(autouse=True)
+def event_lookup(monkeypatch):
+    monkeypatch.setattr("pacemaker_registry.main.get_event_by_source", lambda _: None)
 
 
 @pytest.fixture
@@ -222,12 +227,12 @@ async def test_add_form_renders_parsed_result(monkeypatch) -> None:
     assert "При необходимости скорректируйте время на флаге." in response.text
     assert "Убедитесь, что имя, время" not in response.text
     assert "Контрольные точки" in response.text
-    assert "Сохранить в реестр" in response.text
+    assert "Добавить в черновик" in response.text
     assert "Ожидаемый темп" in response.text
     assert 'data-distance="21,1"' in response.text
     assert f'src="{asset_url("add.js")}"' in response.text
     assert "пока ничего не сохраняется" not in response.text
-    assert response.text.index("Сохранить в реестр") < response.text.index(
+    assert response.text.index("Добавить в черновик") < response.text.index(
         "Контрольные точки"
     )
 
@@ -265,7 +270,7 @@ async def test_add_form_parses_result_url_from_query_without_saving(monkeypatch)
         "pacemaker_registry.main.save_race_result", fail_if_saved
     )
     monkeypatch.setattr(
-        "pacemaker_registry.main.get_event_target_time_type", lambda _: None
+        "pacemaker_registry.main.get_event_by_source", lambda _: None
     )
 
     async with AsyncClient(
@@ -279,7 +284,7 @@ async def test_add_form_parses_result_url_from_query_without_saving(monkeypatch)
     assert "01:19:53" in response.text
     assert 'value="01:20:00"' in response.text
     assert "Проверьте полученные данные" in response.text
-    assert "Сохранить в реестр" in response.text
+    assert "Добавить в черновик" in response.text
 
 
 @pytest.mark.anyio
@@ -302,7 +307,7 @@ async def test_add_form_uses_saved_event_target_time_type(monkeypatch) -> None:
         "pacemaker_registry.main.load_race_result", fake_load_race_result
     )
     monkeypatch.setattr(
-        "pacemaker_registry.main.get_event_target_time_type", lambda _: "round"
+        "pacemaker_registry.main.get_event_by_source", lambda _: RegistryEvent(3, "Забег", target_time_type="round", captain_account_id=1)
     )
 
     async with AsyncClient(
@@ -360,9 +365,9 @@ async def test_result_can_be_saved_after_review(monkeypatch, submitted, format_f
 
     saved: list[str] = []
 
-    def fake_save_race_result(_: RaceResult, target_time: str, account_id: int) -> bool:
+    def fake_save_race_result(_: RaceResult, target_time: str, account, *, event_id):
         saved.append(target_time)
-        return True
+        return ResultImport(RegistryEvent(5, "Забег"), True)
 
     monkeypatch.setattr(
         "pacemaker_registry.main.load_race_result", fake_load_race_result
@@ -379,12 +384,9 @@ async def test_result_can_be_saved_after_review(monkeypatch, submitted, format_f
             data={"result_url": result.source_url, "target_time": submitted, **format_fields},
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 303
     assert saved == [expected]
-    assert "Результат сохранён в реестр" in response.text
-    assert "Жигалов Сергей" not in response.text
-    assert 'value="01:55"' not in response.text
-    assert 'value=""' in response.text
+    assert response.headers["location"] == "/events/5?notice=added"
 
 
 @pytest.mark.anyio
@@ -412,7 +414,7 @@ async def test_duplicate_result_is_not_added(monkeypatch) -> None:
         "pacemaker_registry.main.load_race_result", fake_load_race_result
     )
     monkeypatch.setattr(
-        "pacemaker_registry.main.save_race_result", lambda *_: False
+        "pacemaker_registry.main.save_race_result", lambda *_, **__: ResultImport(RegistryEvent(5, "Забег"), False)
     )
 
     async with AsyncClient(
@@ -423,8 +425,8 @@ async def test_duplicate_result_is_not_added(monkeypatch) -> None:
             data={"result_url": result.source_url, "target_time": "00:30"},
         )
 
-    assert response.status_code == 200
-    assert "дубликат не добавлен" in response.text
+    assert response.status_code == 303
+    assert response.headers["location"] == "/events/5?notice=duplicate"
 
 
 @pytest.mark.anyio

@@ -46,12 +46,13 @@ def _save_review(pacemaker_id, event_id, token, account_id, score, comment):
     guest = 'guest:' + sha256(token.encode('ascii')).hexdigest()
     author_key = f'account:{account_id}' if account_id is not None else guest
     with db.connect_database() as connection:
-        row = connection.execute("""
+        row = connection.execute(f"""
             INSERT INTO pacemaker_reviews (pacemaker_id, event_id, author_key, account_id, score, comment)
             SELECT %s, %s, %s, %s, %s, %s
             FROM pacemakers p
-            WHERE p.id = %s AND (%s::bigint IS NULL OR EXISTS (
-                SELECT 1 FROM race_results WHERE pacemaker_id = p.id AND event_id = %s
+            WHERE p.id = %s AND {db.PUBLIC_PACEMAKER} AND (%s::bigint IS NULL OR EXISTS (
+                SELECT 1 FROM race_results rr JOIN events e ON e.id = rr.event_id
+                WHERE rr.pacemaker_id = p.id AND rr.event_id = %s AND e.status = 'available'
             ))
             ON CONFLICT (pacemaker_id, event_id, author_key) DO UPDATE
             SET score = EXCLUDED.score,

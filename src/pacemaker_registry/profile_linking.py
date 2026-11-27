@@ -20,7 +20,7 @@ def _matching_profiles(connection, last_name, first_name):
     return [
         (pid, f'{last} {first}', account_id)
         for pid, last, first, account_id in connection.execute(
-            'SELECT id, last_name, first_name, account_id FROM pacemakers ORDER BY id'
+            f'SELECT id, last_name, first_name, account_id FROM pacemakers p WHERE {db.PUBLIC_PACEMAKER} ORDER BY id'
         )
         if _name_key(last) == last_key and _name_key(first) == first_key
     ]
@@ -50,7 +50,11 @@ def _bind_profile(account, last_name, first_name, candidate_id, login, publish_e
         avatar_key = f'yandex/{account.avatar_id}' if use_photo and account.avatar_url else None
         return connection.execute(
             '''INSERT INTO pacemakers (last_name, first_name, account_id, login, contacts, avatar_key)
-               VALUES (%s, %s, %s, %s, %s, %s) RETURNING id''',
+               VALUES (%s, %s, %s, %s, %s, %s)
+               ON CONFLICT ((lower(btrim(last_name))), (lower(btrim(first_name))))
+               DO UPDATE SET account_id = EXCLUDED.account_id, login = EXCLUDED.login,
+                             contacts = EXCLUDED.contacts, avatar_key = EXCLUDED.avatar_key
+               RETURNING id''',
             (last_name, first_name, account.id, login, Jsonb(contacts), avatar_key),
         ).fetchone()[0]
 

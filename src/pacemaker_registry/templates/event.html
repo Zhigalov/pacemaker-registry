@@ -5,22 +5,50 @@
 <script src="{{ asset_url('chart-utils.js') }}" defer></script>
 <script src="{{ asset_url('event-rating.js') }}" defer></script>
 <script src="{{ asset_url('pace-rating.js') }}" defer></script>
+{% if event.is_draft %}<script src="{{ asset_url('add.js') }}" defer></script>{% endif %}
 {% endblock %}
+{% block before_main %}{% if notice == 'added' %}<span hidden data-analytics-goal="result_saved"></span>{% elif result %}<span hidden data-analytics-goal="result_preview"></span>{% endif %}{% endblock %}
 {% block shell_class %}app-shell event-shell{% endblock %}
 {% block content %}
 <section class="event-heading">
-  <p class="eyebrow"><a href="/events">Соревнования</a>{% if can_edit_event %} / Настройки{% endif %}</p>
-  <h1>{{ event.name }}</h1>
+  <p class="eyebrow"><a href="{{ '/events?status=draft' if event.is_draft else '/events' }}">Соревнования</a>{% if can_edit_event and not event.is_draft %} / Настройки{% endif %}</p>
+  <div class="event-title-row"><h1>{{ event.name }}</h1><span class="event-status{% if event.is_draft %} event-status--draft{% endif %}">{{ 'Черновик' if event.is_draft else 'Опубликовано' }}</span></div>
+  {% if event.is_draft %}
+  <p>Черновик виден капитану и администраторам.</p>
+  {% else %}
   <p>Время на флаге: <strong>{% if event.target_time_type == 'sub_minute' %}саб-минута · 1:29, 1:34, 1:39{% elif event.target_time_type == 'round' %}ровное · 1:30, 1:35, 1:40{% else %}ещё не определено{% endif %}</strong></p>
   <a class="quiet-link" href="/?event_id={{ event.id }}">Результаты соревнования →</a>
+  {% endif %}
 </section>
+{% set notices = {'added': 'Результат добавлен в черновик.' if event.is_draft else 'Результат сохранён в реестр.', 'duplicate': 'Этот результат уже добавлен.', 'draft': 'Черновик сохранён.', 'published': 'Соревнование опубликовано и появилось в рейтинге.'} %}
+{% if notice %}<p class="event-success" role="status">{{ notices[notice] }}</p>{% endif %}
 {% if saved %}<p class="event-success" role="status">Формула сохранена. Рейтинг результатов этого соревнования пересчитан при отображении.</p>{% endif %}
 {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
+{% if event.is_draft %}
+{% include '_draft_team.html' %}
+<form class="event-draft-settings" action="/events/{{ event.id }}/draft" method="post" data-draft-settings>
+  <div class="event-editor draft-toolbar">
+    <label for="event-target-type">Тип времени на флаге
+      <span class="registry-filter-select"><select id="event-target-type" name="target_time_type">
+        {% if not target_time_type %}<option value="">Выберите тип</option>{% endif %}
+        <option value="sub_minute"{% if target_time_type == 'sub_minute' %} selected{% endif %}>Саб-минута</option>
+        <option value="round"{% if target_time_type == 'round' %} selected{% endif %}>Ровное время</option>
+      </select></span>
+    </label>
+    <div class="draft-actions">
+      <button class="button draft-save" name="action" value="save">Сохранить черновик</button>
+      <button class="button button--primary" name="action" value="publish">Опубликовать</button>
+    </div>
+  </div>
+  <script type="application/json" data-draft-defaults>{{ draft_defaults | tojson }}</script>
+  <details class="draft-rating-settings"{% if settings_error %} open{% endif %}><summary>Настройки оценки финиша и темпа</summary>
+{% endif %}
 {% if can_edit_event %}
-<form class="event-editor" action="/events/{{ event.id }}/rating" method="post" data-event-rating data-rating-widget>
+{% set rating_tag = 'section' if event.is_draft else 'form' %}
+<{{ rating_tag }} class="event-editor"{% if not event.is_draft %} action="/events/{{ event.id }}/rating" method="post"{% endif %} data-event-rating data-rating-widget>
   <div class="event-editor-heading">
     <div><h2>Оценка за финиш</h2><p>Сдвигайте границы на графике или вводите секунды. Минус — раньше времени на флаге, плюс — позже.</p></div>
-    <button class="button button--primary" type="submit">Сохранить формулу</button>
+    {% if not event.is_draft %}<button class="button button--primary" type="submit">Сохранить формулу</button>{% endif %}
   </div>
   {% include '_rating_chart.html' %}
   <div class="event-zones">
@@ -48,7 +76,7 @@
     <span data-save-state role="status">Настройки применяются ко всем результатам этого соревнования после сохранения.</span>
   </div>
   <script type="application/json" data-rating-config>{{ defaults | tojson }}</script>
-</form>
+</{{ rating_tag }}>
 {% include '_pace_editor.html' %}
 {% else %}
 <section class="event-editor" data-rating-widget>
@@ -64,10 +92,11 @@
   {% else %}<p class="event-note">Учёт отсечек отключён. Итог считается только по финишу.</p>{% endif %}
 </section>
 {% endif %}
+{% if event.is_draft %}</details></form>{% endif %}
 <details class="rating-methodology">
   <summary>Как получается итоговая оценка</summary>
   <div class="rating-methodology-content">
-    <p>{% if can_edit_event %}На этой странице можно настроить оценки за финиш и темп. Сохраняйте каждый блок отдельно. {% endif %}Когда включён учёт темпа, итог состоит из 60% оценки за финиш и 40% оценки за темп на отрезках.</p>
+    <p>Когда включён учёт темпа, итог состоит из 60% оценки за финиш и 40% оценки за темп на отрезках.</p>
     {% if event.splits_enabled %}
     <div class="rating-composition-bar"><span class="rating-composition-finish"><strong>60%</strong> финиш</span><span class="rating-composition-splits"><strong>40%</strong> темп</span></div>
     {% else %}<p><strong>Сейчас 100% оценки составляет финиш. Учёт отсечек выключен.</strong></p>{% endif %}

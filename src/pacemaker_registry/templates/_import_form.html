@@ -1,0 +1,27 @@
+  <form class="result-form js-fetch-result" method="post" action="{{ import_action }}">
+    <label for="result-url">Ссылка на страницу участника</label>
+    <div class="form-row">
+      <input
+        id="result-url"
+        name="result_url"
+        type="url"
+        required
+        maxlength="500"
+        autocomplete="off"
+        inputmode="url"
+        {% if not embedded %}aria-describedby="url-example"{% endif %}
+        placeholder="Ссылка на результат RussiaRunning или RUNC"
+        value="{{ result_url }}"
+      >
+      <button class="button button--primary loading-button" type="submit">
+        <span class="loading-button__label">Получить данные</span>
+        <span class="loading-button__busy">
+          <span class="spinner" aria-hidden="true"></span>
+          Получаем данные…
+        </span>
+      </button>
+    </div>
+    {% if not embedded %}<p class="field-hint" id="url-example">
+      Например: <span>https://results.runc.run/event/moscow_marathon_10_km2026/result/27050/</span>
+    </p>{% endif %}
+  </form>

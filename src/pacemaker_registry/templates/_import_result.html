@@ -1,0 +1,98 @@
+{% if result %}
+  <section class="result-card" aria-labelledby="result-title">
+    <div class="review-notice" role="status">
+      <span class="review-icon" aria-hidden="true">✓</span>
+      <div>
+        <strong>Проверьте полученные данные</strong>
+        <p>При необходимости скорректируйте время на флаге.</p>
+      </div>
+    </div>
+
+    <form class="save-result-form" method="post" action="/results">
+      {% if event %}<input type="hidden" name="event_id" value="{{ event.id }}">{% endif %}
+      <input type="hidden" name="result_url" value="{{ result.source_url }}">
+      <input type="hidden" name="target_time_format" value="duration">
+
+      <div class="result-heading">
+        <div>
+          <p class="eyebrow">Участник</p>
+          <h2 id="result-title">{{ result.athlete_name }}</h2>
+          <p class="event-name">{{ result.event_name }}</p>
+        </div>
+        <div class="result-heading-actions">
+          <a class="source-link" href="{{ result.source_url }}" target="_blank" rel="noreferrer">Открыть источник ↗</a>
+          {% if signed_in_account %}
+          <button class="button button--primary" type="submit">{% if event and not event.is_draft %}Добавить результат{% else %}Добавить в черновик{% endif %}</button>
+          {% else %}
+          <a class="button button--primary" href="/auth/yandex">Войти, чтобы сохранить</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <dl class="result-facts">
+        <div>
+          <dt>Дистанция</dt>
+          <dd>{{ result.distance_km }} <span>км</span></dd>
+        </div>
+        <div>
+          <dt>Чип-тайм</dt>
+          <dd>{{ result.chip_time }}</dd>
+        </div>
+        <div class="target-time-fact">
+          <dt><label for="target-time">Время на флаге</label></dt>
+          <dd>
+            <input
+              class="target-time-input"
+              id="target-time"
+              name="target_time"
+              type="text"
+              pattern="[0-5]?[0-9]:[0-5][0-9]|[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]"
+              maxlength="8"
+              value="{{ result.target_time | flag_time }}"
+              placeholder="27:30"
+              required
+              aria-describedby="target-time-hint"
+            >
+          </dd>
+          <p id="target-time-hint">Можно исправить: ММ:СС (27:30) или ЧЧ:ММ:СС (1:12:30).</p>
+        </div>
+        <div>
+          <dt>Фактический темп</dt>
+          <dd>{{ result.pace }}</dd>
+        </div>
+        <div class="expected-pace-fact">
+          <dt>Ожидаемый темп</dt>
+          <dd>
+            <output id="target-pace" for="target-time" data-distance="{{ result.distance_km }}">—</output>
+          </dd>
+          <p>Рассчитан по времени на флаге.</p>
+        </div>
+      </dl>
+
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Сплиты</p>
+          <h3>Контрольные точки</h3>
+        </div>
+        <span>{{ result.checkpoints | length }}</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Точка</th><th>Отрезок</th><th>Время</th><th>Темп</th></tr>
+          </thead>
+          <tbody>
+            {% for checkpoint in result.checkpoints %}
+              <tr>
+                <td data-label="Точка"><strong>{{ checkpoint.distance_km }}</strong> км</td>
+                <td data-label="Отрезок"><strong>{{ checkpoint.segment_distance_km }}</strong> км</td>
+                <td data-label="Время">{{ checkpoint.time }}</td>
+                <td data-label="Темп">{{ checkpoint.pace_per_km }} <span class="unit">/км</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </section>
+{% endif %}

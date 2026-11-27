@@ -1,0 +1,15 @@
+<section class="event-editor draft-team" id="team" aria-labelledby="draft-team-title">
+  <h2 id="draft-team-title">Команда <span>{{ draft_results | length }}</span></h2>
+  <ul class="draft-results">
+    {% for entry in draft_results %}
+    <li>
+      <a href="/results/{{ entry.id }}">{{ entry.last_name }} {{ entry.first_name }}</a>
+      <span>{{ entry.card().distance_km }} км</span>
+      <span>Флаг <strong>{{ entry.target_time | flag_time }}</strong></span>
+      <span>Финиш <strong>{{ entry.chip_time }}</strong></span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% with import_action='/events/' ~ event.id ~ '/preview-result', embedded=true %}{% include '_import_form.html' %}{% endwith %}
+</section>
+{% include '_import_result.html' %}

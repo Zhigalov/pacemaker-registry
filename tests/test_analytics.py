@@ -2,6 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from pacemaker_registry import main
+from pacemaker_registry.db import ResultImport
+from pacemaker_registry.models import RegistryEvent
 from pacemaker_registry.imports import RaceResult, ResultImportError
 
 pytestmark = pytest.mark.usefixtures("admin_session")
@@ -37,7 +39,9 @@ def test_save_goal_only_for_new_successful_result(monkeypatch, created):
     )
     async def load(_): return sample
     monkeypatch.setattr(main, "load_race_result", load)
-    monkeypatch.setattr(main, "save_race_result", lambda *_: created)
+    event = RegistryEvent(5, "Тест")
+    monkeypatch.setattr(main, "save_race_result", lambda *_, **__: ResultImport(event, created))
+    monkeypatch.setattr(main, "get_event", lambda _: event)
     client = TestClient(main.app)
     response = client.post("/results", data={"result_url": sample.source_url, "target_time": "00:49"})
     assert response.status_code == 200
