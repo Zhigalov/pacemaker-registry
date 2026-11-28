@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block analytics %}{% endblock %}
+{% block title %}Обращение №{{ entry.id }} — Реестр пейсмейкеров{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ asset_url('support.css') }}">{% endblock %}
+{% block content %}
+<section class="support-shell" aria-labelledby="request-title">
+  <header class="event-heading">
+    <a class="quiet-link" href="/admin/support">← Все обращения</a>
+    <div class="event-title-row">
+      <h1 id="request-title">Обращение №{{ entry.id }}</h1>
+      <span class="event-status{% if not entry.closed_at %} event-status--draft{% endif %}">{{ 'Закрыто' if entry.closed_at else 'Открыто' }}</span>
+    </div>
+  </header>
+  <section class="event-editor support-message" aria-label="Сообщение посетителя">
+    <p class="support-date">{{ entry.created_at.strftime('%d.%m.%Y') }}</p>
+    <p class="support-text">{{ entry.body }}</p>
+    {% if entry.images %}
+    <ul class="support-attachments" aria-label="Вложения">
+      {% for position in entry.images %}
+      {% set url = '/admin/support/' ~ entry.id ~ '/images/' ~ position %}
+      <li><a href="{{ url }}" target="_blank" rel="noopener noreferrer"><img src="{{ url }}" alt="Открыть изображение {{ position }}" loading="lazy"></a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <p class="support-reply">
+      <strong>Контакт для ответа</strong>
+      {% if entry.contact_kind == 'telegram' %}
+      <a href="{{ entry.contact }}" target="_blank" rel="noopener noreferrer">@{{ entry.contact.rsplit('/', 1)[1] }}</a>
+      {% else %}<span>{{ entry.contact }}</span>{% endif %}
+    </p>
+  </section>
+  {% if entry.closed_at %}
+  <section class="event-editor support-resolution" aria-labelledby="resolution-title">
+    <h2 id="resolution-title">Резолюция</h2>
+    <p class="support-date">Закрыл: <strong>{{ entry.closed_by_login }}</strong> · {{ entry.closed_at.strftime('%d.%m.%Y') }}</p>
+    <p class="support-text">{{ entry.resolution }}</p>
+  </section>
+  {% else %}
+  <form class="event-editor support-form" action="/admin/support/{{ entry.id }}/close" method="post">
+    <label for="resolution">Резолюция</label>
+    <textarea id="resolution" name="resolution" rows="4" maxlength="2000" placeholder="Что решили по обращению" required></textarea>
+    <button class="button button--primary" type="submit">Закрыть обращение</button>
+  </form>
+  {% endif %}
+  {% if not entry.telegram_sent_at %}
+  <div class="support-delivery">
+    {% if delivery == 'failed' %}<p class="event-note" role="status">Уведомление не доставлено.</p>{% endif %}
+    {% if notifications_enabled %}
+    <form method="post" action="/admin/support/{{ entry.id }}/notify">
+      <button class="button draft-save" type="submit">Повторить уведомление в Telegram</button>
+    </form>
+    {% else %}<p class="event-note">Уведомления Telegram пока не настроены.</p>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

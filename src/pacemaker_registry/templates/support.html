@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block analytics %}{% endblock %}
+{% block title %}Поддержка — Реестр пейсмейкеров{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ asset_url('support.css') }}">
+<script src="{{ asset_url('support.js') }}" defer></script>
+{% endblock %}
+{% block content %}
+<section class="support-shell" aria-labelledby="support-title">
+  <header class="event-heading"><h1 id="support-title">Поддержка</h1></header>
+  {% if receipt %}
+  <div class="event-editor support-receipt">
+    <h2>Обращение №{{ receipt }} принято</h2>
+    <p>Ответим по контакту, который вы указали.</p>
+    <a class="button draft-save" href="/">Вернуться к реестру</a>
+  </div>
+  {% else %}
+  {% if error %}<p class="error-message" role="alert">{{ error }}</p>{% endif %}
+  <form class="event-editor support-form" method="post" action="/support" enctype="multipart/form-data" data-support-form data-max-files="{{ max_files }}" data-max-upload="{{ max_upload }}">
+    <label for="support-body">Текст обращения</label>
+    <textarea id="support-body" name="body" rows="6" maxlength="{{ max_text }}" required>{{ body }}</textarea>
+    <div class="support-contact">
+      <label for="support-channel">Куда ответить
+        <span class="registry-filter-select"><select id="support-channel" name="contact_kind">
+          <option value="telegram"{% if contact_kind == 'telegram' %} selected{% endif %}>Telegram</option>
+          <option value="email"{% if contact_kind == 'email' %} selected{% endif %}>Почта</option>
+        </select></span>
+      </label>
+      <label for="support-contact-value"><span data-contact-label>Контакт для ответа</span>
+        <input id="support-contact-value" name="contact" type="text" value="{{ contact }}" maxlength="254" required autocapitalize="none" spellcheck="false" placeholder="@username или name@example.com">
+      </label>
+    </div>
+    <div>
+      <label class="button draft-save support-file-picker">
+        <input type="file" name="images" accept="image/jpeg,image/png,image/webp" aria-describedby="support-file-hint" multiple>
+        <span>Прикрепить картинки</span>
+      </label>
+      <p class="event-note support-file-hint" id="support-file-hint">До {{ max_files }} файлов JPEG, PNG или WebP.</p>
+      <ul class="support-file-list" data-file-list aria-live="polite" hidden></ul>
+      <noscript><p class="event-note">Без JavaScript размер одного файла ограничен {{ max_upload // 1024 }} КБ.</p></noscript>
+    </div>
+    <p class="error-message" data-support-error role="alert" hidden></p>
+    <button class="button button--primary" type="submit">Отправить обращение</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

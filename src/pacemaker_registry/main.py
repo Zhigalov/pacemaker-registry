@@ -93,6 +93,7 @@ templates.env.filters["avatar_url"] = avatar_url
 templates.env.filters["flag_time"] = format_target_time
 
 from pacemaker_registry.admin import create_admin_router
+from pacemaker_registry.support import create_support_router
 from pacemaker_registry.profile_routes import create_profile_router
 from pacemaker_registry.profile_linking import create_profile_link_router
 app.include_router(create_profile_router(templates))
@@ -101,6 +102,7 @@ from pacemaker_registry.reviews import router as reviews_router
 app.include_router(reviews_router)
 app.include_router(auth.router)
 app.include_router(create_admin_router(templates))
+app.include_router(create_support_router(templates))
 
 
 @app.get("/", response_class=HTMLResponse)

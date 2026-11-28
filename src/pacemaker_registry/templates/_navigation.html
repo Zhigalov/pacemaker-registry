@@ -9,6 +9,7 @@
     <a class="site-menu-link" href="/about"{% if request.url.path == '/about' %} aria-current="page"{% endif %}>О проекте</a>
   </nav>
   <div class="site-actions">
+    <a class="site-support-link" href="/support" aria-label="Поддержка" title="Поддержка"{% if request.url.path == '/support' %} aria-current="page"{% endif %}><span aria-hidden="true">?</span></a>
     <a class="button button--primary site-add" href="/add" aria-label="Добавить соревнование"{% if request.url.path in ['/add', '/results'] %} aria-current="page"{% endif %}><span aria-hidden="true">＋</span> Добавить<span class="site-add-long"> соревнование</span></a>
     {% if yandex_login_enabled %}
       {% if signed_in_account %}
@@ -36,7 +37,10 @@
             </div>
           </div>
           <a class="button site-account" href="/account/profile">Мой профиль</a>
-          {% if signed_in_account.is_admin %}<a class="button site-account" href="/admin/roles">Управление ролями</a>{% endif %}
+          {% if signed_in_account.is_admin %}
+          <a class="button site-account" href="/admin/support">Обращения</a>
+          <a class="button site-account" href="/admin/roles">Управление ролями</a>
+          {% endif %}
           <form method="post" action="/auth/logout">
             <button type="submit" class="button site-account">Выйти</button>
           </form>

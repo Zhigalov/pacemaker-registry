@@ -61,6 +61,9 @@ a, button, input { -webkit-tap-highlight-color: transparent; }
 .site-menu-link:hover { background: #edf3f0; color: #176f59; }
 .site-menu-link[aria-current="page"] { background: #e5f1ec; color: #176f59; }
 .site-actions { display: flex; align-items: center; gap: .5rem; }
+.site-support-link { display: grid; place-items: center; flex: none; width: 2.65rem; height: 2.65rem; border-radius: .65rem; color: #52635c; text-decoration: none; }
+.site-support-link span { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 1px solid currentColor; border-radius: 50%; font-size: .82rem; font-weight: 700; }
+.site-support-link:hover, .site-support-link[aria-current] { background: #e5f1ec; color: #176f59; }
 .site-header .site-add, .site-header .site-account { white-space: nowrap; box-shadow: none; }
 .site-header .site-account { gap: 0; background: #e5f1ec; color: #176f59; }
 .site-header .site-account:hover { background: #d7ebe2; }

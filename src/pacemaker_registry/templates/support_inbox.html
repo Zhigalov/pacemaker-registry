@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block analytics %}{% endblock %}
+{% block title %}Обращения — Реестр пейсмейкеров{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ asset_url('support.css') }}">{% endblock %}
+{% block content %}
+<section class="support-shell" aria-labelledby="support-inbox-title">
+  <header class="event-heading"><h1 id="support-inbox-title">Обращения</h1></header>
+  <ul class="support-entries">
+    {% for entry in entries %}
+    <li>
+      <a href="/admin/support/{{ entry.id }}">
+        <span><strong>№{{ entry.id }}</strong> <span class="support-date">{{ entry.created_at.strftime('%d.%m.%Y') }}</span></span>
+        <span class="support-excerpt">{{ entry.excerpt }}</span>
+        <span class="event-status{% if not entry.closed_at %} event-status--draft{% endif %}">{{ 'Закрыто' if entry.closed_at else 'Открыто' }}</span>
+        {% if entry.closed_at %}<span class="support-date">{{ entry.closed_by_login }}</span>{% endif %}
+      </a>
+    </li>
+    {% else %}<li class="event-note">На этой странице нет обращений.</li>{% endfor %}
+  </ul>
+  {% if page > 1 or has_next %}
+  <nav class="support-pagination" aria-label="Страницы обращений">
+    {% if page > 1 %}<a href="/admin/support?page={{ page - 1 }}">← Назад</a>{% endif %}
+    {% if has_next %}<a href="/admin/support?page={{ page + 1 }}">Дальше →</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

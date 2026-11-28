@@ -132,6 +132,7 @@ def check_database() -> None:
             FROM account_sessions AS s JOIN accounts AS a ON a.id = s.account_id
             LIMIT 0""")
         connection.execute("SELECT score, comment FROM pacemaker_reviews LIMIT 0")
+        connection.execute("SELECT r.resolution, i.position FROM support_requests r JOIN support_images i ON i.request_id = r.id LIMIT 0")
 
 
 def get_pacemaker_profile(pacemaker_id: int, *,

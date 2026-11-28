@@ -65,7 +65,7 @@ def test_schema_can_adopt_existing_installation_without_data_loss(database):
         '0001_baseline.sql', '0002_pacemaker_profiles.sql', '0003_profile_details.sql',
         '0004_accounts.sql', '0005_account_identity.sql', '0006_profile_link.sql', '0007_account_names.sql', '0008_roles.sql',
         '0009_flag_time_seconds.sql', '0010_event_splits_enabled.sql', '0011_pacemaker_reviews.sql',
-        '0012_reviews_without_event.sql', '0013_profile_donation_url.sql', '0014_event_status.sql',
+        '0012_reviews_without_event.sql', '0013_profile_donation_url.sql', '0014_event_status.sql', '0015_support_requests.sql',
     ]
     assert migrate.migrate() == []
     assert db.load_registry().result_count == 1
@@ -869,3 +869,82 @@ def test_runner_reviews_have_one_vote_per_event_and_require_login_for_text(datab
     response = client.post(f'/pacemakers/{new_pacer_id}/reviews', headers=origin, data={'score': 5})
     assert response.status_code == 303
     assert 'Оценок: 1' in client.get(f'/pacemakers/{new_pacer_id}').text
+
+
+def test_support_submission_notification_and_admin_resolution(database, admin_session, monkeypatch):
+    from io import BytesIO
+    from unittest.mock import Mock
+
+    from fastapi.testclient import TestClient
+    from PIL import Image
+    import httpx
+
+    from pacemaker_registry import main, support
+
+    migrate.migrate()
+    with database() as connection:
+        admin_id, = connection.execute(
+            """INSERT INTO accounts (yandex_user_id, yandex_login, is_admin)
+               VALUES ('411', 'registry-admin', true) RETURNING id"""
+        ).fetchone()
+
+    account = None
+    monkeypatch.setattr(auth, 'request_account', lambda request: account)
+    monkeypatch.setenv('SUPPORT_TELEGRAM_BOT_TOKEN', '123:fake-test-token')
+    monkeypatch.setenv('SUPPORT_TELEGRAM_CHAT_ID', '-100123456')
+    telegram = Mock(side_effect=[httpx.ConnectTimeout('offline'), httpx.Response(200, json={'ok': True})])
+    monkeypatch.setattr(support.httpx, 'post', telegram)
+
+    source = BytesIO()
+    Image.new('RGB', (800, 500), '#176f59').save(source, format='PNG')
+    files = [('images', (f'example-{i}.png', source.getvalue(), 'image/png')) for i in range(5)]
+    origin = {'Origin': 'http://test'}
+    data = {'body': 'Пример <script> с новой строкой\nПродолжение', 'contact_kind': 'telegram', 'contact': '@pacer_one'}
+    client = TestClient(main.app, base_url='http://test', follow_redirects=False)
+    assert 'Поддержка' in client.get('/support').text
+    assert client.post('/support', data=data, files=files).status_code == 403
+    assert client.post('/support', data=data, files=files + files[:1], headers=origin).status_code == 422
+    assert client.post('/support', data=data, files={'images': ('bad.png', b'<svg/>', 'image/png')},
+                       headers=origin).status_code == 422
+    assert client.post('/support', data=dict(data, contact_kind='email', contact='invalid'), headers=origin).status_code == 422
+    created = client.post('/support', data=data, files=files, headers=origin)
+    assert created.status_code == 303
+    request_id = int(created.headers['location'].split('=')[1])
+    assert f'Обращение №{request_id} принято' in client.get(created.headers['location']).text
+    with database() as connection:
+        assert connection.execute('SELECT telegram_sent_at FROM support_requests').fetchall() == [(None,)]
+        assert connection.execute('SELECT count(*) FROM support_images').fetchone() == (5,)
+    path = f'/admin/support/{request_id}'
+    image_path = path + '/images/5'
+    assert client.get(path).status_code == client.get(image_path).status_code == 401
+    account = auth.SignedInAccount(999, 'non-admin', None)
+    assert client.get('/admin/support').status_code == client.get(path).status_code == client.get(image_path).status_code == 403
+    assert client.post(path + '/close', data={'resolution': 'Готово'}, headers=origin).status_code == 403
+    account = auth.SignedInAccount(admin_id, 'registry-admin', None, is_admin=True)
+
+    detail = client.get(path)
+    assert '@pacer_one' in detail.text and 'Пример &lt;script&gt;' in detail.text
+    assert detail.headers['cache-control'] == 'private, no-store'
+    attachment = client.get(image_path)
+    with Image.open(BytesIO(attachment.content)) as image:
+        assert image.format == 'WEBP' and image.size == (800, 500)
+    assert attachment.headers['cache-control'] == 'private, no-store'
+    assert client.post(path + '/notify', headers=origin).status_code == 303
+    assert client.post(path + '/notify', headers=origin).status_code == 303
+    assert telegram.call_count == 2
+    payload = telegram.call_args.kwargs['json']
+    assert payload == {'chat_id': '-100123456', 'text': f'Новое обращение №{request_id}',
+        'reply_markup': {'inline_keyboard': [[{'text': 'Открыть в реестре', 'url': 'https://pacersreg.ru' + path}]]}}
+    assert client.post(path + '/close', data={'resolution': '   '}, headers=origin).status_code == 422
+    resolution = 'Исправили отображение.'
+    assert client.post(path + '/close', data={'resolution': resolution}, headers=origin).status_code == 303
+    assert client.post(path + '/close', data={'resolution': 'Повторное закрытие'}, headers=origin).status_code == 409
+    assert resolution in client.get(path).text
+    assert 'registry-admin' in client.get(path).text and 'registry-admin' in client.get('/admin/support').text
+    with database() as connection:
+        assert connection.execute('SELECT closed_by, resolution FROM support_requests').fetchone() == (admin_id, resolution)
+    monkeypatch.delenv('SUPPORT_TELEGRAM_BOT_TOKEN')
+    no_attachments = client.post('/support', data={
+        'body': 'Сообщение без вложений', 'contact_kind': 'email', 'contact': 'runner@example.org',
+    }, headers=origin)
+    assert no_attachments.status_code == 303
